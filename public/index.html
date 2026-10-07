@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Snake Arena v10</title>
+<title>Snake Arena</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -51,7 +51,18 @@ table{width:100%;border-collapse:collapse}td{padding:12px 4px;border-bottom:1px 
 .gamewrap{width:min(560px,100%);height:100%;margin:auto;display:flex;flex-direction:column;min-height:0}
 .gtop{display:flex;align-items:center;justify-content:space-between;padding:5px 2px 10px;font-weight:900}
 .scorepill{padding:8px 11px;border-radius:999px;background:rgba(5,18,11,.88);border:1px solid var(--line)}
-.board-shell{position:relative;width:100%;aspect-ratio:1/1;margin:auto;max-height:calc(100vh - 120px);display:grid;place-items:center}
+.board-shell{position:relative;width:min(100%,calc(100vh - 130px),calc(100dvh - 130px));aspect-ratio:1/1;margin:auto;display:grid;place-items:center}
+#game.dpad-on .board-shell{width:min(100%,calc(100vh - 290px),calc(100dvh - 290px))}
+.dpad{display:none;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,58px);gap:8px;justify-content:center;margin:6px auto 0;touch-action:none}
+#game.dpad-on .dpad{display:grid}
+.dpad button{border-radius:18px;background:#10271b;border:1px solid var(--line);font-size:24px;color:var(--accent);touch-action:none;user-select:none;-webkit-user-select:none}
+.dpad button:active{background:#1c4a31}
+.dpad .u{grid-column:2;grid-row:1}.dpad .l{grid-column:1;grid-row:2}.dpad .d{grid-column:2;grid-row:2}.dpad .r{grid-column:3;grid-row:2}
+.pad-toggle{height:48px;padding:0 14px;border-radius:16px;background:#10241a;border:1px solid var(--line);font-size:13px}
+.gbot .btns{display:flex;gap:8px}
+.refbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.refbtns .primary{margin:0}
+.refbtns .alt{background:#13281d;border:1px solid var(--line);border-radius:16px;padding:14px 16px;font-weight:800}
 canvas{
   display:block;width:100%;height:100%;aspect-ratio:1;
   border-radius:26px;border:1px solid rgba(91,255,170,.3);
@@ -111,8 +122,10 @@ canvas{
     <button id="bonusBtn" class="primary" style="width:100%;margin-top:14px">🎁 Ежедневный бонус</button>
   </div></section>
   <section id="profile" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>👤 Профиль</h2>
-    <p>Рекорд: <b id="pbest">0</b></p><p>Монеты: <b id="pcoins">0</b> 🪙</p><h3>👥 Пригласи друга</h3><p class="muted">Поделись ссылкой и приглашай друзей.</p>
-    <div class="ref" id="ref"></div><button id="shareBtn" class="primary" style="width:100%;margin-top:10px">📤 Пригласить друга</button>
+    <p>Рекорд: <b id="pbest">0</b></p><p>Монеты: <b id="pcoins">0</b> 🪙</p><h3>👥 Пригласи друга</h3><p class="muted" id="refInfo">Поделись ссылкой — когда друг зайдёт, вы оба получите монеты.</p>
+    <p>Приглашено друзей: <b id="pref">0</b></p>
+    <div class="ref" id="ref"></div>
+    <div class="refbtns"><button id="shareBtn" class="primary">📤 Пригласить</button><button id="copyBtn" class="alt">📋 Копировать</button></div>
   </div></section>
 </div>
 
@@ -127,7 +140,8 @@ canvas{
     </div>
     <div class="gtop"><span>🐍 Snake Arena</span><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span></div>
     <div class="board-shell"><canvas id="cv" width="720" height="720" aria-label="Игровое поле Snake"></canvas><div class="board-vignette"></div><div id="combo" class="combo">COMBO ×2</div></div>
-    <div class="gbot"><span>⌨️ Стрелки / WASD · Space: пауза/заново · 📱 свайп</span><button id="pauseBtn" class="pause">Ⅱ</button></div>
+    <div class="dpad" id="dpad"><button class="u" data-d="0,-1" aria-label="Вверх">▲</button><button class="l" data-d="-1,0" aria-label="Влево">◀</button><button class="d" data-d="0,1" aria-label="Вниз">▼</button><button class="r" data-d="1,0" aria-label="Вправо">▶</button></div>
+    <div class="gbot"><span>📱 Свайп по экрану · ⌨️ Стрелки/WASD</span><div class="btns"><button id="padBtn" class="pad-toggle">🎮 Кнопки</button><button id="pauseBtn" class="pause">Ⅱ</button></div></div>
   </div>
 </section>
 
@@ -153,7 +167,7 @@ canvas{
     coins:$("coins"), name:$("name"), best:$("best"), refs:$("refs"),
     pbest:$("pbest"), pcoins:$("pcoins"), score:$("score"), gc:$("gc"),
     final:$("final"), reward:$("reward"), table:$("table"), shopGrid:$("shopGrid"),
-    ref:$("ref"), toast:$("toast")
+    ref:$("ref"), toast:$("toast"), pauseBtn:$("pauseBtn")
   };
 
   let p = {first_name:"Игрок",coins:0,best_score:0,referrals:0,skin:"classic",owned_skins:["classic"]};
@@ -180,7 +194,7 @@ canvas{
 
   function ui(){
     el.coins.textContent=p.coins||0; el.best.textContent=p.best_score||0; el.pbest.textContent=p.best_score||0;
-    el.pcoins.textContent=p.coins||0; el.refs.textContent=p.referrals||0; el.name.textContent=p.first_name||"Игрок";
+    el.pcoins.textContent=p.coins||0; el.refs.textContent=p.referrals||0; $("pref").textContent=p.referrals||0; el.name.textContent=p.first_name||"Игрок";
     el.gc.textContent=p.coins||0;
   }
 
@@ -189,7 +203,14 @@ canvas{
     if(d?.player) p={...p,...d.player,bot_username:d.bot_username||p.bot_username};
     else if(tg?.initDataUnsafe?.user) p.first_name=tg.initDataUnsafe.user.first_name||"Игрок";
     ui(); renderShop(); renderRating();
-    el.ref.textContent=location.href.split("?")[0]+"?startapp=ref_"+(p.telegram_id||"friend");
+    el.ref.textContent=refLink();
+    if(p.ref_reward) $("refInfo").textContent=`За каждого друга: +${p.ref_reward} 🪙 вам и +${p.ref_bonus} 🪙 другу.`;
+  }
+
+  function refLink(){
+    if(p.ref_link) return p.ref_link; // ссылка вида t.me/бот?startapp=ref_ID от сервера
+    const id=p.telegram_id||tg?.initDataUnsafe?.user?.id;
+    return id ? location.origin+location.pathname+"?startapp=ref_"+id : location.origin+location.pathname;
   }
 
   function show(id){
@@ -218,16 +239,31 @@ canvas{
   }
 
   async function share(){
-    const u=el.ref.textContent;
-    if(navigator.share){try{await navigator.share({title:"Snake Arena",text:"Играй со мной!",url:u});return}catch(e){}}
-    try{await navigator.clipboard.writeText(u);toast("Ссылка скопирована")}catch(e){toast("Скопируй ссылку из профиля")}
+    const u=refLink();
+    const text="🐍 Играй со мной в Snake Arena! Заходи по ссылке — получишь бонусные монеты 🪙";
+    const tgShare="https://t.me/share/url?url="+encodeURIComponent(u)+"&text="+encodeURIComponent(text);
+    try{
+      if(tg?.openTelegramLink){ tg.openTelegramLink(tgShare); return; }
+    }catch(e){}
+    if(navigator.share){try{await navigator.share({title:"Snake Arena",text,url:u});return}catch(e){}}
+    copyRef();
+  }
+
+  async function copyRef(){
+    const u=refLink();
+    try{await navigator.clipboard.writeText(u);toast("Ссылка скопирована 📋")}
+    catch(e){
+      try{const t=document.createElement("textarea");t.value=u;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();toast("Ссылка скопирована 📋")}
+      catch(_){toast("Скопируй ссылку из профиля")}
+    }
   }
 
   // ---------- V5 GAME ----------
   const ctx=el.cv.getContext("2d",{alpha:false});
   const N=24;
-  const MAX_SNAKE_LENGTH=14;
-  let cell=30, snake=[], food={x:0,y:0,type:"apple"}, dir={x:1,y:0}, next={x:1,y:0};
+  const START_LEN=4;
+  const GROWTH={apple:1,coin:1,gold:3}; // сегментов за еду; растут по одному за ход
+  let cell=30, snake=[], food={x:0,y:0,type:"apple"}, dir={x:1,y:0}, queue=[], pendingGrowth=0, runCoins=0;
   let score=0, timer=null, running=false, paused=false, tx=0, ty=0;
   let particles=[], combo=0, comboTimer=0, bestRun=0, raf=0, speedMs=120, growthFlash=0;
 
@@ -245,25 +281,30 @@ canvas{
     const splash=$("startSplash");
     splash.style.display="none";
     snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12},{x:9,y:12}];
-    dir={x:1,y:0}; next={x:1,y:0}; score=0; combo=0; bestRun=0; growthFlash=0; running=true; paused=false;
+    dir={x:1,y:0}; queue=[]; pendingGrowth=0; runCoins=0; score=0; combo=0; bestRun=0; growthFlash=0; running=true; paused=false;
     el.score.textContent="0"; el.gc.textContent=p.coins||0; placeFood();
     speedMs=120;
+    el.pauseBtn.textContent="Ⅱ";
     clearInterval(timer); timer=setInterval(tick,speedMs);
     requestAnimationFrame(()=>{resizeCanvas(); draw();});
     cancelAnimationFrame(raf); raf=requestAnimationFrame(renderLoop);
   }
 
   function placeFood(){
-    do {
-      food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N),
-        type:Math.random()<.82?"apple":(Math.random()<.5?"coin":"gold")};
-    } while(snake.some(s=>s.x===food.x&&s.y===food.y));
+    const free=[];
+    for(let x=0;x<N;x++)for(let y=0;y<N;y++) if(!snake.some(s=>s.x===x&&s.y===y)) free.push({x,y});
+    if(!free.length) return false; // поле заполнено
+    const c=free[Math.floor(Math.random()*free.length)];
+    food={x:c.x,y:c.y,type:Math.random()<.82?"apple":(Math.random()<.5?"coin":"gold")};
+    return true;
   }
 
   function setdir(x,y){
     if(!running || paused) return;
-    if(x===-dir.x && y===-dir.y) return;
-    next={x,y};
+    // сравниваем с последним направлением в очереди, чтобы быстрые свайпы/нажатия не терялись
+    const base=queue.length?queue[queue.length-1]:dir;
+    if((x===-base.x && y===-base.y) || (x===base.x && y===base.y)) return;
+    if(queue.length<2) queue.push({x,y});
     try{tg?.HapticFeedback?.impactOccurred("light")}catch(e){}
   }
 
@@ -277,22 +318,22 @@ canvas{
 
   function tick(){
     if(!running || paused) return;
-    dir=next;
+    if(queue.length) dir=queue.shift();
     const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
-    if(h.x<0||h.x>=N||h.y<0||h.y>=N||snake.some(s=>s.x===h.x&&s.y===h.y)){end();return}
+    // если хвост на этом ходу уйдёт (роста нет) — в его клетку можно зайти
+    const body = pendingGrowth>0 ? snake : snake.slice(0,-1);
+    if(h.x<0||h.x>=N||h.y<0||h.y>=N||body.some(s=>s.x===h.x&&s.y===h.y)){end();return}
     snake.unshift(h);
+
     const ateFood = h.x===food.x && h.y===food.y;
     if(ateFood){
       score += food.type==="gold"?5:1;
-      if(food.type==="coin") p.coins=(p.coins||0)+10;
-      if(food.type==="gold") p.coins=(p.coins||0)+50;
+      if(food.type==="coin"){ p.coins=(p.coins||0)+10; runCoins+=10; }
+      if(food.type==="gold"){ p.coins=(p.coins||0)+50; runCoins+=50; }
+      pendingGrowth += GROWTH[food.type]||1;
       combo++; comboTimer=30; bestRun=Math.max(bestRun,combo);
       growthFlash=1;
-      // Combo never changes the snake length. Each food adds at most one segment,
-      // and the total length is capped so the snake cannot suddenly become huge.
-      if(snake.length > MAX_SNAKE_LENGTH) snake.length=MAX_SNAKE_LENGTH;
-      // Gradual acceleration: never becomes impossibly fast.
-      speedMs=Math.max(62,120-score*2);
+      speedMs=Math.max(70,Math.round(120-score*1.5));
       clearInterval(timer); timer=setInterval(tick,speedMs);
       addParticles(food.x,food.y,food.type);
       el.score.textContent=score; el.gc.textContent=p.coins||0;
@@ -300,11 +341,15 @@ canvas{
         $("combo").textContent=`COMBO ×${Math.floor(combo)}`;
         $("combo").classList.add("show");
       }
-      placeFood();
       try{tg?.HapticFeedback?.notificationOccurred(food.type==="gold"?"success":"light")}catch(e){}
+      if(!placeFood()){ // победа: змейка заняла всё поле
+        draw(); end(); return;
+      }
     }
-    if(!ateFood && snake.length > MAX_SNAKE_LENGTH) snake.pop();
-    if(ateFood && snake.length > MAX_SNAKE_LENGTH) snake.length=MAX_SNAKE_LENGTH;
+
+    // Рост: хвост не убираем только пока есть "накопленный" рост — по одному сегменту за ход.
+    if(pendingGrowth>0) pendingGrowth--; else snake.pop();
+
     if(growthFlash>0) growthFlash=Math.max(0,growthFlash-.18);
     if(comboTimer>0) {
       comboTimer--;
@@ -351,6 +396,7 @@ canvas{
   }
 
   function drawSnake(){
+    if(!snake.length) return;
     const skin=p.skin||"classic";
     const colors={
       classic:["#75ffc0","#18d978"],fire:["#ffe083","#ff4f32"],ice:["#d2fbff","#35bfff"],
@@ -403,7 +449,7 @@ canvas{
 
   function end(){
     running=false;clearInterval(timer);cancelAnimationFrame(raf);$("combo").classList.remove("show");
-    const reward=Math.max(5,score*5)+(bestRun>=5?100:0);
+    const reward=Math.max(5,score*5)+(bestRun>=5?100:0)+runCoins;
     el.final.textContent=score;el.reward.textContent=reward;el.over.classList.add("show");
     api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward})}).then(d=>{if(d?.player){p={...p,...(d.player||{}),...(d.bot_username?{bot_username:d.bot_username}:{})};ui();renderRating()}});
   }
@@ -414,36 +460,6 @@ canvas{
 
   function pause(){if(!running)return;paused=!paused;el.pauseBtn.textContent=paused?"▶":"Ⅱ";draw();}
 
-  // ---------- INVITE ----------
-  $("inviteBtn")?.addEventListener("click", async ()=>{
-    const id = p.telegram_id || tg?.initDataUnsafe?.user?.id;
-    if(!id) return;
-    // Clean Telegram deep link. Set BOT_USERNAME in Render environment variables.
-    const botUsername = p.bot_username || window.BOT_USERNAME || "";
-    const cleanRef = `ref_${id}`;
-    const link = botUsername
-      ? `https://t.me/${botUsername}?startapp=${encodeURIComponent(cleanRef)}`
-      : `${location.origin}${location.pathname}?startapp=${encodeURIComponent(cleanRef)}`;
-
-    const text = `🐍 Присоединяйся ко мне в Snake Arena!\n🎮 Играй, набирай очки и попади в топ!`;
-    const share = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
-
-    try{
-      if(tg?.openTelegramLink){
-        tg.openTelegramLink(share);
-      } else {
-        window.open(share,"_blank");
-      }
-    }catch(e){
-      try{
-        await navigator.clipboard.writeText(link);
-        $("refStatus").textContent="Ссылка скопирована 📋";
-      }catch(_){
-        $("refStatus").textContent=link;
-      }
-    }
-  });
-
   document.querySelectorAll("[data-screen]").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.screen!=="game") show(b.dataset.screen); }));
 
   $("playBtn").addEventListener("click",()=>{el.game.classList.add("active");$("startSplash").style.display="block";requestAnimationFrame(()=>resizeCanvas())});
@@ -452,7 +468,9 @@ canvas{
   $("menuBtn").addEventListener("click",closeGame);
   $("pauseBtn").addEventListener("click",pause);
   $("shareBtn").addEventListener("click",share);
+  $("copyBtn").addEventListener("click",copyRef);
   $("bonusBtn").addEventListener("click",()=>toast("Ежедневный бонус скоро будет доступен"));
+  document.addEventListener("visibilitychange",()=>{if(document.hidden&&running&&!paused)pause()});
   window.addEventListener("resize",()=>{if(running)resizeCanvas()});
 
   window.addEventListener("keydown",e=>{
@@ -470,12 +488,45 @@ canvas{
     }
   },{passive:false});
 
-  el.cv.addEventListener("touchstart",e=>{const t=e.changedTouches[0];tx=t.clientX;ty=t.clientY},{passive:true});
-  el.cv.addEventListener("touchend",e=>{
-    const t=e.changedTouches[0],dx=t.clientX-tx,dy=t.clientY-ty;
-    if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;
-    if(Math.abs(dx)>Math.abs(dy))setdir(dx>0?1:-1,0);else setdir(0,dy>0?1:-1);
+  // ---------- МОБИЛЬНОЕ УПРАВЛЕНИЕ ----------
+  // Свайп в любом месте экрана игры: поворот срабатывает сразу во время движения пальца,
+  // а не после отпускания. После поворота точка отсчёта сдвигается — можно делать
+  // серию поворотов, не отрывая палец.
+  const SWIPE_MIN=16;
+  let tracking=false;
+  el.game.addEventListener("touchstart",e=>{
+    if(e.target.closest("button")) return;
+    const t=e.changedTouches[0]; tx=t.clientX; ty=t.clientY; tracking=true;
+    // тап по полю во время паузы снимает паузу
+    if(paused&&running&&e.target===el.cv) pause();
   },{passive:true});
+  el.game.addEventListener("touchmove",e=>{
+    if(!tracking) return;
+    e.preventDefault();
+    const t=e.changedTouches[0], dx=t.clientX-tx, dy=t.clientY-ty;
+    if(Math.max(Math.abs(dx),Math.abs(dy))<SWIPE_MIN) return;
+    if(Math.abs(dx)>Math.abs(dy)) setdir(dx>0?1:-1,0); else setdir(0,dy>0?1:-1);
+    tx=t.clientX; ty=t.clientY;
+  },{passive:false});
+  el.game.addEventListener("touchend",()=>{tracking=false},{passive:true});
+  el.game.addEventListener("touchcancel",()=>{tracking=false},{passive:true});
+
+  // Экранные кнопки (по желанию), реагируют сразу на касание
+  document.querySelectorAll("#dpad button").forEach(b=>{
+    b.addEventListener("pointerdown",e=>{
+      e.preventDefault();
+      const [x,y]=b.dataset.d.split(",").map(Number); setdir(x,y);
+    });
+  });
+  function setPad(on){
+    el.game.classList.toggle("dpad-on",on);
+    $("padBtn").textContent=on?"🎮 Скрыть":"🎮 Кнопки";
+    try{localStorage.setItem("snakePad",on?"1":"0")}catch(e){}
+    requestAnimationFrame(()=>resizeCanvas());
+  }
+  $("padBtn").addEventListener("click",()=>setPad(!el.game.classList.contains("dpad-on")));
+  try{ if(localStorage.getItem("snakePad")==="1") el.game.classList.add("dpad-on"), $("padBtn").textContent="🎮 Скрыть"; }catch(e){}
+  try{ tg?.disableVerticalSwipes?.(); }catch(e){} // чтобы свайп вниз не сворачивал Mini App
 
   load();
 })();
