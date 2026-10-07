@@ -1,15 +1,221 @@
 require("dotenv").config();
-const express=require("express"),crypto=require("crypto"),Database=require("better-sqlite3"),path=require("path");
-const app=express(),PORT=process.env.PORT||3000,BOT_TOKEN=process.env.BOT_TOKEN||"";
-const db=new Database("data.db"); db.pragma("journal_mode = WAL");
-db.exec(`CREATE TABLE IF NOT EXISTS players(
-telegram_id TEXT PRIMARY KEY,username TEXT,first_name TEXT,coins INTEGER DEFAULT 0,
-best_score INTEGER DEFAULT 0,referrals INTEGER DEFAULT 0,skin TEXT DEFAULT 'classic',updated_at TEXT NOT NULL)`);
-app.use(express.json({limit:"100kb"})); app.use(express.static(path.join(__dirname,"public")));
-function user(req){try{let s=req.get("X-Telegram-Init-Data")||"",p=new URLSearchParams(s),h=p.get("hash");if(!BOT_TOKEN||!h)return null;p.delete("hash");let d=[...p].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k}=${v}`).join("\n"),key=crypto.createHmac("sha256","WebAppData").update(BOT_TOKEN).digest(),calc=crypto.createHmac("sha256",key).update(d).digest("hex");if(!crypto.timingSafeEqual(Buffer.from(calc),Buffer.from(h)))return null;return JSON.parse(p.get("user")||"{}")}catch{return null}}
-function player(u){let id=String(u.id),p=db.prepare("SELECT * FROM players WHERE telegram_id=?").get(id);if(!p)db.prepare("INSERT INTO players(telegram_id,username,first_name,updated_at) VALUES(?,?,?,datetime('now'))").run(id,u.username||"",u.first_name||"");else db.prepare("UPDATE players SET username=?,first_name=?,updated_at=datetime('now') WHERE telegram_id=?").run(u.username||"",u.first_name||"",id);return db.prepare("SELECT * FROM players WHERE telegram_id=?").get(id)}
-app.get("/api/me",(q,r)=>{let u=user(q);if(!u?.id)return r.status(401).json({error:"Telegram authorization required"});r.json({player:player(u)})});
-app.get("/api/leaderboard",(q,r)=>r.json({leaderboard:db.prepare("SELECT username,first_name,best_score,coins FROM players ORDER BY best_score DESC,coins DESC LIMIT 20").all()}));
-app.post("/api/score",(q,r)=>{let u=user(q);if(!u?.id)return r.status(401).json({error:"Telegram authorization required"});let p=player(u),score=Math.max(0,Math.min(100000,Number(q.body.score)||0)),coins=Math.max(0,Math.min(10000,Number(q.body.coins)||0));db.prepare("UPDATE players SET best_score=?,coins=coins+?,updated_at=datetime('now') WHERE telegram_id=?").run(Math.max(p.best_score,score),coins,String(u.id));r.json({player:player(u)})});
-app.post("/api/profile",(q,r)=>{let u=user(q);if(!u?.id)return r.status(401).json({error:"Telegram authorization required"});let p=player(u),allowed={classic:0,fire:2000,ice:5000,gold:10000,cyber:20000},s=q.body.skin;if(!(s in allowed))return r.status(400).json({error:"Bad skin"});if(p.skin!==s){if(p.coins<allowed[s])return r.status(400).json({error:"Not enough coins"});db.prepare("UPDATE players SET coins=coins-?,skin=? WHERE telegram_id=?").run(allowed[s],s,String(u.id))}r.json({player:player(u)})});
-app.listen(PORT,"0.0.0.0",()=>console.log("Snake Arena running on "+PORT));
+const express = require("express");
+const crypto = require("crypto");
+const { Pool } = require("pg");
+const path = require("path");
+
+const app = express();
+const PORT = Number(process.env.PORT || 3000);
+const BOT_TOKEN = process.env.BOT_TOKEN || "";
+const BOT_USERNAME = (process.env.BOT_USERNAME || "").replace(/^@/, "");
+const DATABASE_URL = process.env.DATABASE_URL || "";
+
+if (!DATABASE_URL) {
+  console.error("DATABASE_URL is required. Create a Render Postgres database and add its Internal Database URL to the web service environment.");
+  process.exit(1);
+}
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: process.env.DB_SSL === "false" ? false : { rejectUnauthorized: false },
+  max: Number(process.env.PG_POOL_MAX || 10),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
+});
+
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS players (
+      telegram_id TEXT PRIMARY KEY,
+      username TEXT NOT NULL DEFAULT '',
+      first_name TEXT NOT NULL DEFAULT '',
+      coins INTEGER NOT NULL DEFAULT 0,
+      best_score INTEGER NOT NULL DEFAULT 0,
+      referrals INTEGER NOT NULL DEFAULT 0,
+      skin TEXT NOT NULL DEFAULT 'classic',
+      owned_skins TEXT[] NOT NULL DEFAULT ARRAY['classic']::TEXT[],
+      missions JSONB NOT NULL DEFAULT '{}'::jsonb,
+      daily_bonus_claimed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  // Safe schema upgrades for a database created by an earlier Snake Arena v11 build.
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS owned_skins TEXT[] NOT NULL DEFAULT ARRAY['classic']::TEXT[]`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS missions JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS daily_bonus_claimed_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`UPDATE players SET owned_skins=ARRAY['classic']::TEXT[] WHERE owned_skins IS NULL OR cardinality(owned_skins)=0`);
+  await pool.query(`UPDATE players SET owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY['classic']::TEXT[])) WHERE NOT ('classic' = ANY(owned_skins))`);
+}
+
+app.use(express.json({ limit: "100kb" }));
+app.use(express.static(path.join(__dirname, "public")));
+
+function telegramUser(req) {
+  try {
+    const raw = req.get("X-Telegram-Init-Data") || "";
+    const params = new URLSearchParams(raw);
+    const hash = params.get("hash");
+    if (!BOT_TOKEN || !hash) return null;
+
+    params.delete("hash");
+    const dataCheckString = [...params]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join("\n");
+
+    const secretKey = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+    const calculatedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+    const a = Buffer.from(calculatedHash, "utf8");
+    const b = Buffer.from(hash, "utf8");
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+    const u = JSON.parse(params.get("user") || "{}");
+    return u?.id ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getPlayer(u) {
+  const id = String(u.id);
+  await pool.query(
+    `INSERT INTO players (telegram_id, username, first_name)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (telegram_id) DO UPDATE SET
+       username=EXCLUDED.username,
+       first_name=EXCLUDED.first_name,
+       updated_at=NOW()`,
+    [id, u.username || "", u.first_name || ""]
+  );
+  const { rows } = await pool.query(`SELECT * FROM players WHERE telegram_id=$1`, [id]);
+  return rows[0];
+}
+
+function responsePlayer(p) {
+  if (!p) return p;
+  return {
+    ...p,
+    owned_skins: Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"]
+  };
+}
+
+app.get("/health", async (_req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ ok: true, database: "postgres" });
+  } catch {
+    res.status(503).json({ ok: false, database: "unavailable" });
+  }
+});
+
+app.get("/api/me", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+  try {
+    const p = await getPlayer(u);
+    res.json({ player: responsePlayer(p), bot_username: BOT_USERNAME });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+app.get("/api/leaderboard", async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT username,first_name,best_score,coins
+       FROM players
+       ORDER BY best_score DESC, coins DESC
+       LIMIT 20`
+    );
+    res.json({ leaderboard: rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ leaderboard: [] });
+  }
+});
+
+app.post("/api/score", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+
+  try {
+    const p = await getPlayer(u);
+    const score = Math.max(0, Math.min(100000, Number(req.body?.score) || 0));
+    const coins = Math.max(0, Math.min(10000, Number(req.body?.coins) || 0));
+
+    await pool.query(
+      `UPDATE players
+       SET best_score=GREATEST(best_score,$1),
+           coins=coins+$2,
+           updated_at=NOW()
+       WHERE telegram_id=$3`,
+      [score, coins, String(u.id)]
+    );
+
+    const updated = await getPlayer(u);
+    res.json({ player: responsePlayer(updated), bot_username: BOT_USERNAME });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+app.post("/api/profile", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+
+  const allowed = { classic: 0, fire: 2000, ice: 5000, gold: 10000, cyber: 20000 };
+  const skin = String(req.body?.skin || "");
+  if (!(skin in allowed)) return res.status(400).json({ error: "Bad skin" });
+
+  try {
+    const p = await getPlayer(u);
+    const owned = Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"];
+
+    if (!owned.includes(skin)) {
+      const price = allowed[skin];
+      if (Number(p.coins) < price) return res.status(400).json({ error: "Not enough coins" });
+      await pool.query(
+        `UPDATE players
+         SET coins=coins-$1,
+             skin=$2,
+             owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$2]::TEXT[])),
+             updated_at=NOW()
+         WHERE telegram_id=$3`,
+        [price, skin, String(u.id)]
+      );
+    } else {
+      await pool.query(
+        `UPDATE players SET skin=$1, updated_at=NOW() WHERE telegram_id=$2`,
+        [skin, String(u.id)]
+      );
+    }
+
+    const updated = await getPlayer(u);
+    res.json({ player: responsePlayer(updated), bot_username: BOT_USERNAME });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+async function start() {
+  try {
+    await initDb();
+    await pool.query("SELECT 1");
+    app.listen(PORT, "0.0.0.0", () => console.log(`Snake Arena v11 running on ${PORT} with PostgreSQL`));
+  } catch (e) {
+    console.error("Database initialization failed:", e);
+    process.exit(1);
+  }
+}
+
+process.on("SIGTERM", async () => { await pool.end(); process.exit(0); });
+process.on("SIGINT", async () => { await pool.end(); process.exit(0); });
+
+start();

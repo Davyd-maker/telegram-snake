@@ -1,8 +1,16 @@
-# Snake Arena v2
-Telegram Mini App Snake with keyboard/WASD, swipe controls, coins, leaderboard, skins, missions UI and referral UI.
-Render: `npm install` / `npm start`. Set `BOT_TOKEN` in Environment.
+# Snake Arena v12
 
+v12 keeps the PostgreSQL backend from v11 and fixes snake growth behavior.
 
-## Node.js / Render
+## Growth changes
+- COMBO does not increase snake length.
+- Each food can add at most one segment.
+- Snake length is capped at 14 segments to prevent sudden oversized snakes.
+- New growth gets a tiny visual pulse.
+- Speed progression remains gradual.
 
-This version pins Node.js to 24.21.0 and uses better-sqlite3 13.0.3. If Render has a `NODE_VERSION` environment variable set to 26.x, change it to `24.21.0` (or remove it so `.node-version` is used).
+## Run
+npm install
+npm start
+
+Set `DATABASE_URL`, `BOT_TOKEN`, and `BOT_USERNAME` in production.
