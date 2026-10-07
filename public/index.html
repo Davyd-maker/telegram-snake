@@ -1,288 +1,50 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>Snake</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    :root {
-      --bg: var(--tg-theme-bg-color, #0f1115);
-      --card: var(--tg-theme-secondary-bg-color, #181b22);
-      --text: var(--tg-theme-text-color, #fff);
-      --muted: var(--tg-theme-hint-color, #8d95a5);
-      --button: var(--tg-theme-button-color, #2aabee);
-      --button-text: var(--tg-theme-button-text-color, #fff);
-      --green: #35d07f;
-      --red: #ff5364;
-    }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body {
-      margin: 0; padding: 16px;
-      background: var(--bg); color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
-      overscroll-behavior: none;
-    }
-    .app { width: min(100%, 460px); margin: auto; }
-    header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
-    h1 { margin:0; font-size:24px; }
-    .stats { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-    .pill { background:var(--card); padding:7px 10px; border-radius:999px; font-size:13px; }
-    canvas {
-      display:block; width:100%; aspect-ratio:1; background:#101318;
-      border:1px solid rgba(255,255,255,.08); border-radius:16px;
-      touch-action:none;
-    }
-    .actions { display:flex; gap:8px; margin:12px 0; }
-    button {
-      border:0; border-radius:12px; min-height:46px; padding:0 16px;
-      font-size:16px; font-weight:700; background:var(--button); color:var(--button-text);
-    }
-    button.secondary { background:var(--card); color:var(--text); }
-    button:disabled { opacity:.5; }
-    .controls { display:grid; grid-template-columns:repeat(3,60px); gap:7px; justify-content:center; margin:12px 0 18px; }
-    .controls button { padding:0; font-size:22px; }
-    .empty { visibility:hidden; }
-    section { background:var(--card); border-radius:16px; padding:14px; margin-top:12px; }
-    section h2 { font-size:17px; margin:0 0 10px; }
-    #message { min-height:20px; text-align:center; color:var(--muted); font-size:14px; margin:7px 0; }
-    ol { margin:0; padding-left:25px; }
-    li { padding:6px 0; display:flex; justify-content:space-between; gap:10px; }
-    .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .score { font-weight:700; }
-  </style>
-</head>
-<body>
-<main class="app">
-  <header>
-    <h1>🐍 Snake</h1>
-    <div class="stats">
-      <div class="pill">⭐ <span id="score">0</span></div>
-      <div class="pill">🪙 <span id="coins">0</span></div>
-      <div class="pill">🏆 <span id="best">0</span></div>
-    </div>
-  </header>
-
-  <canvas id="game" width="400" height="400" aria-label="Игровое поле"></canvas>
-  <div id="message">Нажми «Играть»</div>
-
-  <div class="actions">
-    <button id="start">▶ Играть</button>
-    <button id="leaders" class="secondary">🏆 Лидеры</button>
-  </div>
-
-  <div class="controls">
-    <span class="empty"></span>
-    <button data-dir="up">⬆️</button>
-    <span class="empty"></span>
-    <button data-dir="left">⬅️</button>
-    <button data-dir="down">⬇️</button>
-    <button data-dir="right">➡️</button>
-  </div>
-
-  <section id="leaderboard" hidden>
-    <h2>🏆 Топ 20</h2>
-    <ol id="leaderList"></ol>
-  </section>
-</main>
-
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snake Arena</title><script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#050b09;--panel:rgba(14,27,21,.82);--panel2:rgba(8,18,13,.9);--line:rgba(111,255,182,.16);--text:#f4fff9;--muted:#87a69a;--accent:#4cff9b;--accent2:#21d77b;--shadow:0 18px 55px rgba(0,0,0,.35)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{min-height:100%;margin:0}body{background:radial-gradient(circle at 20% 0%,#123424 0,#07110c 34%,#040806 100%);color:var(--text);font:15px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 20%,rgba(76,255,155,.035) 50%,transparent 80%);animation:sweep 8s linear infinite}@keyframes sweep{0%{transform:translateX(-40%)}100%{transform:translateX(40%)}}
+button{border:0;border-radius:16px;padding:13px 15px;font-weight:850;color:#f6fffa;background:rgba(23,40,32,.92);border:1px solid rgba(125,255,190,.08);box-shadow:inset 0 1px rgba(255,255,255,.04);cursor:pointer;transition:.18s transform,.18s filter,.18s background}button:active{transform:scale(.97)}button:hover{filter:brightness(1.12)}button.primary{background:linear-gradient(135deg,#59ffab,#24d77b);color:#03170e;box-shadow:0 10px 30px rgba(48,239,139,.18)}
+.app{position:relative;z-index:1;max-width:560px;margin:auto;padding:14px 14px 30px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.logo{font-size:23px;font-weight:950;letter-spacing:-.5px;text-shadow:0 0 22px rgba(76,255,155,.16)}.logo span{color:var(--accent)}.coins{background:rgba(18,36,27,.8);border:1px solid var(--line);padding:8px 12px;border-radius:99px;box-shadow:0 8px 25px rgba(0,0,0,.18)}
+.screen{display:none}.screen.active{display:block;animation:appear .22s ease}@keyframes appear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.hero,.card{background:linear-gradient(145deg,rgba(16,31,24,.9),rgba(9,20,15,.9));border:1px solid var(--line);border-radius:25px;padding:18px;margin-bottom:11px;box-shadow:var(--shadow);backdrop-filter:blur(14px)}.hero{position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:180px;height:180px;border-radius:50%;right:-80px;top:-90px;background:rgba(76,255,155,.08);filter:blur(5px)}.profile{display:flex;gap:12px;align-items:center}.avatar{width:50px;height:50px;border-radius:16px;background:linear-gradient(135deg,#173e2b,#0c1e16);border:1px solid rgba(106,255,181,.18);display:grid;place-items:center;font-size:23px;box-shadow:0 0 30px rgba(76,255,155,.08)}.name{font-size:19px;font-weight:950}.muted,small{color:var(--muted)}.big{width:100%;font-size:18px;margin-top:18px;padding:17px;position:relative;z-index:1}.big:before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 0 rgba(76,255,155,.28);animation:pulse 2.2s infinite}@keyframes pulse{70%{box-shadow:0 0 0 12px rgba(76,255,155,0)}100%{box-shadow:0 0 0 0 rgba(76,255,155,0)}}
+.stats,.nav,.shop{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.stat{background:rgba(5,14,10,.65);border:1px solid rgba(120,255,190,.08);border-radius:17px;padding:13px}.stat b{display:block;font-size:21px}.nav button{padding:16px;text-align:left;background:rgba(13,27,21,.86)}.back{margin-bottom:10px;background:transparent;border:1px solid var(--line)}
+.skin{background:rgba(5,14,10,.66);border:1px solid rgba(120,255,190,.1);border-radius:18px;padding:13px;position:relative;overflow:hidden}.skin .emoji{font-size:35px;filter:drop-shadow(0 0 10px rgba(76,255,155,.14))}.skin b,.skin small{display:block;margin-top:3px}.skin button{width:100%;margin-top:9px}table{width:100%;border-collapse:collapse}td{padding:12px 4px;border-bottom:1px solid rgba(120,255,190,.09)}td:last-child{text-align:right;font-weight:900}.mission{display:flex;justify-content:space-between;gap:10px;padding:14px 0;border-bottom:1px solid rgba(120,255,190,.09)}
+#game{position:fixed;inset:0;background:radial-gradient(circle at 50% 15%,#123a28,#06100b 48%,#020504 100%);z-index:10;padding:env(safe-area-inset-top) 10px env(safe-area-inset-bottom);touch-action:none}.gamewrap{max-width:560px;height:100%;margin:auto;display:flex;flex-direction:column}.gtop,.gbot{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;font-weight:850}.gtop{font-size:15px}.scorepill{padding:7px 10px;border-radius:99px;background:rgba(10,25,17,.8);border:1px solid var(--line)}.hint{font-size:12px;color:var(--muted)}canvas{width:100%;aspect-ratio:1;background:linear-gradient(145deg,#08150f,#050b08);border:1px solid rgba(112,255,183,.22);border-radius:24px;touch-action:none;margin:auto;box-shadow:0 20px 70px rgba(0,0,0,.42),0 0 50px rgba(40,230,126,.06)}.overlay{position:fixed;inset:0;background:rgba(0,0,0,.68);backdrop-filter:blur(10px);z-index:20;display:none;align-items:center;justify-content:center;padding:20px}.overlay.show{display:flex}.modal{max-width:420px;width:100%;background:linear-gradient(145deg,#12261c,#09140f);border:1px solid rgba(116,255,187,.2);border-radius:27px;padding:24px;text-align:center;box-shadow:0 30px 100px rgba(0,0,0,.5);animation:pop .25s ease}@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}.modal h2{font-size:28px;margin:8px 0}.actions{display:grid;gap:9px}.ref{word-break:break-all;background:#07110c;padding:10px;border-radius:12px;font-size:12px;border:1px solid rgba(120,255,190,.08)}
+@media(max-width:380px){.app{padding-left:10px;padding-right:10px}.logo{font-size:21px}.nav button{font-size:13px}}
+</style></head><body><div class="app">
+<div class="top"><div class="logo">🐍 Snake <span>Arena</span></div><div class="coins">🪙 <b id="coins">0</b></div></div>
+<section id="home" class="screen active"><div class="hero"><div class="profile"><div class="avatar">🐍</div><div><div class="name" id="name">Игрок</div><small>Добро пожаловать</small></div></div><button class="primary big" onclick="start()">🎮 ИГРАТЬ</button><div class="stats"><div class="stat"><b id="best">0</b><small>🏆 Рекорд</small></div><div class="stat"><b id="refs">0</b><small>👥 Друзей</small></div></div></div>
+<div class="nav"><button onclick="show('rating')">🏆 Рейтинг</button><button onclick="show('shop')">🎨 Скины</button><button onclick="show('missions')">🎁 Задания</button><button onclick="show('profile')">👤 Профиль</button></div></section>
+<section id="rating" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>🏆 Рейтинг</h2><table id="table"></table></div></section>
+<section id="shop" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>🎨 Скины</h2><p class="muted">Покупай оформление змейки за монеты.</p><div class="shop" id="shopGrid"></div></div></section>
+<section id="missions" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>🎁 Задания</h2><div class="mission"><span>🎯 Набери 100 очков</span><b>+300 🪙</b></div><div class="mission"><span>🐍 Сыграй 3 раза</span><b>+500 🪙</b></div><div class="mission"><span>🍎 Съешь 30 яблок</span><b>+700 🪙</b></div><button class="primary" style="width:100%;margin-top:14px" onclick="alert('Ежедневный бонус будет добавлен в следующем обновлении')">🎁 Ежедневный бонус</button></div></section>
+<section id="profile" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>👤 Профиль</h2><p>Рекорд: <b id="pbest">0</b></p><p>Монеты: <b id="pcoins">0</b> 🪙</p><h3>👥 Пригласи друга</h3><p class="muted">Поделись ссылкой и приглашай друзей.</p><div class="ref" id="ref"></div><button class="primary" style="width:100%;margin-top:10px" onclick="share()">📤 Пригласить друга</button></div></section>
+</div>
+<section id="game" class="screen"><div class="gamewrap"><div class="gtop"><span>🐍 Snake Arena</span><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span></div><canvas id="cv" width="480" height="480"></canvas><div class="gbot"><span class="hint">⌨️ Стрелки / WASD · 📱 свайп</span><button onclick="pause()">⏸</button></div></div></section>
+<div id="over" class="overlay"><div class="modal"><div style="font-size:44px">💥</div><h2>Игра окончена</h2><p>Очки: <b id="final">0</b></p><p>Награда: <b id="reward">0</b> 🪙</p><div class="actions"><button class="primary" onclick="start()">🔄 Играть ещё</button><button onclick="closeGame()">🏠 В меню</button></div></div></div>
 <script>
-(() => {
-  const tg = window.Telegram?.WebApp;
-  tg?.ready();
-  tg?.expand();
-
-  const canvas = document.getElementById("game");
-  const ctx = canvas.getContext("2d");
-  const scoreEl = document.getElementById("score");
-  const coinsEl = document.getElementById("coins");
-  const bestEl = document.getElementById("best");
-  const startBtn = document.getElementById("start");
-  const message = document.getElementById("message");
-  const leaderboard = document.getElementById("leaderboard");
-  const leaderList = document.getElementById("leaderList");
-
-  const GRID = 20;
-  const TILE = canvas.width / GRID;
-  let snake = [];
-  let food = {x: 5, y: 5};
-  let dir = {x:1, y:0};
-  let nextDir = {x:1, y:0};
-  let score = 0;
-  let runCoins = 0;
-  let timer = null;
-  let running = false;
-
-  const headers = () => ({
-    "Content-Type": "application/json",
-    "X-Telegram-Init-Data": tg?.initData || ""
-  });
-
-  async function api(url, options = {}) {
-    const response = await fetch(url, {
-      ...options,
-      headers: {...headers(), ...(options.headers || {})}
-    });
-    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Ошибка сервера");
-    return response.json();
-  }
-
-  async function loadMe() {
-    try {
-      const data = await api("/api/me");
-      coinsEl.textContent = data.player.coins;
-      bestEl.textContent = data.player.bestScore;
-    } catch {
-      message.textContent = "Открой игру через Telegram";
-    }
-  }
-
-  async function loadLeaderboard() {
-    try {
-      const data = await fetch("/api/leaderboard").then(r => r.json());
-      leaderList.innerHTML = "";
-      data.leaderboard.forEach(p => {
-        const li = document.createElement("li");
-        li.innerHTML = `<span class="name">${p.place}. ${escapeHtml(p.name)}</span><span class="score">${p.score} ⭐</span>`;
-        leaderList.appendChild(li);
-      });
-      leaderboard.hidden = false;
-    } catch {
-      message.textContent = "Не удалось загрузить рейтинг";
-    }
-  }
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, c => ({
-      "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
-    }[c]));
-  }
-
-  function startGame() {
-    clearInterval(timer);
-    snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
-    dir = {x:1,y:0};
-    nextDir = {x:1,y:0};
-    score = 0;
-    runCoins = 0;
-    scoreEl.textContent = "0";
-    createFood();
-    running = true;
-    startBtn.textContent = "↻ Заново";
-    message.textContent = "Собирай еду!";
-    timer = setInterval(tick, 120);
-    draw();
-  }
-
-  function createFood() {
-    do {
-      food = {x:Math.floor(Math.random()*GRID), y:Math.floor(Math.random()*GRID)};
-    } while (snake.some(s => s.x === food.x && s.y === food.y));
-  }
-
-  function tick() {
-    dir = nextDir;
-    const head = {x:snake[0].x + dir.x, y:snake[0].y + dir.y};
-
-    if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID ||
-        snake.some(s => s.x === head.x && s.y === head.y)) {
-      return finish();
-    }
-
-    snake.unshift(head);
-
-    if (head.x === food.x && head.y === food.y) {
-      score++;
-      runCoins++;
-      scoreEl.textContent = score;
-      createFood();
-    } else {
-      snake.pop();
-    }
-
-    draw();
-  }
-
-  async function finish() {
-    clearInterval(timer);
-    running = false;
-    startBtn.textContent = "▶ Играть снова";
-    message.textContent = `Игра окончена. Счёт: ${score}. +${runCoins} 🪙`;
-
-    try {
-      const data = await api("/api/score", {
-        method:"POST",
-        body:JSON.stringify({score, coins:runCoins})
-      });
-      coinsEl.textContent = data.coins;
-      bestEl.textContent = data.bestScore;
-    } catch {
-      message.textContent += " (результат не сохранён)";
-    }
-  }
-
-  function setDirection(name) {
-    if (!running) return;
-    const map = {
-      up:{x:0,y:-1}, down:{x:0,y:1},
-      left:{x:-1,y:0}, right:{x:1,y:0}
-    };
-    const n = map[name];
-    if (n && !(n.x === -dir.x && n.y === -dir.y)) nextDir = n;
-  }
-
-  function draw() {
-    ctx.fillStyle = "#101318";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    ctx.strokeStyle = "rgba(255,255,255,.035)";
-    for (let i=0;i<=GRID;i++) {
-      ctx.beginPath(); ctx.moveTo(i*TILE,0); ctx.lineTo(i*TILE,canvas.height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,i*TILE); ctx.lineTo(canvas.width,i*TILE); ctx.stroke();
-    }
-
-    ctx.fillStyle = "#ff5364";
-    ctx.beginPath();
-    ctx.arc(food.x*TILE+TILE/2, food.y*TILE+TILE/2, TILE*.32, 0, Math.PI*2);
-    ctx.fill();
-
-    snake.forEach((p,i) => {
-      ctx.fillStyle = i === 0 ? "#2aabee" : "#35d07f";
-      ctx.fillRect(p.x*TILE+2,p.y*TILE+2,TILE-4,TILE-4);
-    });
-  }
-
-  document.addEventListener("keydown", e => {
-    const keys = {
-      ArrowUp:"up", ArrowDown:"down", ArrowLeft:"left", ArrowRight:"right"
-    };
-    if (keys[e.key]) { e.preventDefault(); setDirection(keys[e.key]); }
-  });
-
-  document.querySelectorAll("[data-dir]").forEach(b =>
-    b.addEventListener("click", () => setDirection(b.dataset.dir))
-  );
-
-  let sx=0, sy=0;
-  canvas.addEventListener("touchstart", e => {
-    sx=e.changedTouches[0].clientX;
-    sy=e.changedTouches[0].clientY;
-  }, {passive:true});
-
-  canvas.addEventListener("touchend", e => {
-    const dx=e.changedTouches[0].clientX-sx;
-    const dy=e.changedTouches[0].clientY-sy;
-    if (Math.max(Math.abs(dx),Math.abs(dy)) < 20) return;
-    setDirection(Math.abs(dx)>Math.abs(dy) ? (dx>0?"right":"left") : (dy>0?"down":"up"));
-  }, {passive:true});
-
-  startBtn.addEventListener("click", startGame);
-  document.getElementById("leaders").addEventListener("click", loadLeaderboard);
-
-  loadMe();
-  draw();
-})();
-</script>
-</body>
-</html>
-
+const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}let p={first_name:"Игрок",coins:0,best_score:0,referrals:0,skin:"classic"};
+const skins=[["classic","Классика",0,"🐍"],["fire","Огненная",2000,"🔥"],["ice","Ледяная",5000,"❄️"],["gold","Золотая",10000,"👑"],["cyber","Кибер",20000,"🤖"]];
+const H=()=>tg?.initData?{"Content-Type":"application/json","X-Telegram-Init-Data":tg.initData}:{"Content-Type":"application/json"};
+async function api(u,o={}){try{return await (await fetch(u,{...o,headers:{...H(),...(o.headers||{})}})).json()}catch{return null}}
+async function load(){let d=await api("/api/me");if(d?.player)p=d.player;else if(tg?.initDataUnsafe?.user)p.first_name=tg.initDataUnsafe.user.first_name||"Игрок";ui();shop();rating();document.getElementById("ref").textContent=location.href+"?startapp=ref_"+(p.telegram_id||"friend")}
+function ui(){coins.textContent=p.coins||0;best.textContent=p.best_score||0;pbest.textContent=p.best_score||0;pcoins.textContent=p.coins||0;refs.textContent=p.referrals||0;name.textContent=p.first_name||"Игрок"}
+function show(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");if(id==="rating")rating()}
+async function rating(){let d=await api("/api/leaderboard"),a=d?.leaderboard||[];table.innerHTML=a.map((x,i)=>`<tr><td>${i<3?["🥇","🥈","🥉"][i]:i+1+". "} ${x.first_name||x.username||"Игрок"}</td><td>${x.best_score} 🏆</td></tr>`).join("")||"<tr><td>Пока пусто</td></tr>"}
+function shop(){shopGrid.innerHTML=skins.map(s=>`<div class="skin"><div class="emoji">${s[3]}</div><b>${s[1]}</b><small>${s[2]?"🪙 "+s[2]:"Бесплатно"}</small><button onclick="buy('${s[0]}')">${p.skin===s[0]?"✅ Выбрано":s[2]?"Купить":"Выбрать"}</button></div>`).join("")}
+async function buy(id){let s=skins.find(x=>x[0]===id);if(p.skin===id)return;if(p.coins<s[2])return alert("Не хватает монет");let d=await api("/api/profile",{method:"POST",body:JSON.stringify({skin:id})});if(d?.player){p=d.player;ui();shop()}}
+function share(){let u=document.getElementById("ref").textContent;if(navigator.share)navigator.share({title:"Snake Arena",text:"Играй со мной!",url:u});else navigator.clipboard?.writeText(u)}
+let cv=document.getElementById("cv"),c=cv.getContext("2d"),N=24,sz=20,snake,food,dir,next,score,timer,running=false,paused=false,tx,ty;
+function start(){over.classList.remove("show");game.classList.add("active");snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12}];dir={x:1,y:0};next={...dir};score=0;scoreEl.textContent=0;gc.textContent=p.coins||0;running=true;paused=false;place();clearInterval(timer);timer=setInterval(tick,105);draw()}
+function place(){do food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};while(snake.some(x=>x.x===food.x&&x.y===food.y))}
+function setdir(x,y){if(x===-dir.x&&y===-dir.y)return;next={x,y};try{tg?.HapticFeedback?.impactOccurred("light")}catch(e){}}
+function tick(){if(!running||paused)return;dir=next;let h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(h.x<0||h.x>=N||h.y<0||h.y>=N||snake.some(x=>x.x===h.x&&x.y===h.y))return end();snake.unshift(h);if(h.x===food.x&&h.y===food.y){score++;scoreEl.textContent=score;place()}else snake.pop();draw()}
+function draw(){const g=c.createLinearGradient(0,0,480,480);g.addColorStop(0,"#0b1b13");g.addColorStop(1,"#040a07");c.fillStyle=g;c.fillRect(0,0,480,480);c.strokeStyle="rgba(76,255,155,.075)";c.lineWidth=1;for(let i=1;i<N;i++){c.beginPath();c.moveTo(i*sz,0);c.lineTo(i*sz,480);c.stroke();c.beginPath();c.moveTo(0,i*sz);c.lineTo(480,i*sz);c.stroke()}const fx=food.x*sz+10,fy=food.y*sz+10;c.shadowColor="#ff5b69";c.shadowBlur=18;c.font="18px serif";c.textAlign="center";c.textBaseline="middle";c.fillText("🍎",fx,fy);c.shadowBlur=0;let em=(skins.find(x=>x[0]===p.skin)||skins[0])[3];snake.forEach((x,i)=>{c.globalAlpha=i?Math.max(.3,1-i/snake.length):1;c.shadowColor=i?"rgba(76,255,155,.35)":"rgba(76,255,155,.75)";c.shadowBlur=i?6:14;c.font=i?"16px serif":"19px serif";c.fillText(em,x.x*sz+10,x.y*sz+10)});c.shadowBlur=0;c.globalAlpha=1}
+function end(){running=false;clearInterval(timer);let r=Math.max(5,score*5);final.textContent=score;reward.textContent=r;over.classList.add("show");api("/api/score",{method:"POST",body:JSON.stringify({score,coins:r})}).then(d=>{if(d?.player){p=d.player;ui()}})}
+function closeGame(){running=false;clearInterval(timer);over.classList.remove("show");game.classList.remove("active");show("home");load()}function pause(){paused=!paused}
+window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();if(k==="arrowup"||k==="w")setdir(0,-1);if(k==="arrowdown"||k==="s")setdir(0,1);if(k==="arrowleft"||k==="a")setdir(-1,0);if(k==="arrowright"||k==="d")setdir(1,0);if(k===" ")pause()});
+cv.addEventListener("touchstart",e=>{let t=e.changedTouches[0];tx=t.clientX;ty=t.clientY},{passive:true});
+cv.addEventListener("touchend",e=>{let t=e.changedTouches[0],dx=t.clientX-tx,dy=t.clientY-ty;if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;if(Math.abs(dx)>Math.abs(dy))setdir(dx>0?1:-1,0);else setdir(0,dy>0?1:-1)},{passive:true});
+load();
+</script></body></html>
