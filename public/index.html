@@ -1,50 +1,365 @@
-<!doctype html><html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Snake Arena</title><script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Snake Arena</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root{--bg:#050b09;--panel:rgba(14,27,21,.82);--panel2:rgba(8,18,13,.9);--line:rgba(111,255,182,.16);--text:#f4fff9;--muted:#87a69a;--accent:#4cff9b;--accent2:#21d77b;--shadow:0 18px 55px rgba(0,0,0,.35)}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{min-height:100%;margin:0}body{background:radial-gradient(circle at 20% 0%,#123424 0,#07110c 34%,#040806 100%);color:var(--text);font:15px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 20%,rgba(76,255,155,.035) 50%,transparent 80%);animation:sweep 8s linear infinite}@keyframes sweep{0%{transform:translateX(-40%)}100%{transform:translateX(40%)}}
-button{border:0;border-radius:16px;padding:13px 15px;font-weight:850;color:#f6fffa;background:rgba(23,40,32,.92);border:1px solid rgba(125,255,190,.08);box-shadow:inset 0 1px rgba(255,255,255,.04);cursor:pointer;transition:.18s transform,.18s filter,.18s background}button:active{transform:scale(.97)}button:hover{filter:brightness(1.12)}button.primary{background:linear-gradient(135deg,#59ffab,#24d77b);color:#03170e;box-shadow:0 10px 30px rgba(48,239,139,.18)}
-.app{position:relative;z-index:1;max-width:560px;margin:auto;padding:14px 14px 30px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.logo{font-size:23px;font-weight:950;letter-spacing:-.5px;text-shadow:0 0 22px rgba(76,255,155,.16)}.logo span{color:var(--accent)}.coins{background:rgba(18,36,27,.8);border:1px solid var(--line);padding:8px 12px;border-radius:99px;box-shadow:0 8px 25px rgba(0,0,0,.18)}
-.screen{display:none}.screen.active{display:block;animation:appear .22s ease}@keyframes appear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.hero,.card{background:linear-gradient(145deg,rgba(16,31,24,.9),rgba(9,20,15,.9));border:1px solid var(--line);border-radius:25px;padding:18px;margin-bottom:11px;box-shadow:var(--shadow);backdrop-filter:blur(14px)}.hero{position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:180px;height:180px;border-radius:50%;right:-80px;top:-90px;background:rgba(76,255,155,.08);filter:blur(5px)}.profile{display:flex;gap:12px;align-items:center}.avatar{width:50px;height:50px;border-radius:16px;background:linear-gradient(135deg,#173e2b,#0c1e16);border:1px solid rgba(106,255,181,.18);display:grid;place-items:center;font-size:23px;box-shadow:0 0 30px rgba(76,255,155,.08)}.name{font-size:19px;font-weight:950}.muted,small{color:var(--muted)}.big{width:100%;font-size:18px;margin-top:18px;padding:17px;position:relative;z-index:1}.big:before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 0 rgba(76,255,155,.28);animation:pulse 2.2s infinite}@keyframes pulse{70%{box-shadow:0 0 0 12px rgba(76,255,155,0)}100%{box-shadow:0 0 0 0 rgba(76,255,155,0)}}
-.stats,.nav,.shop{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.stat{background:rgba(5,14,10,.65);border:1px solid rgba(120,255,190,.08);border-radius:17px;padding:13px}.stat b{display:block;font-size:21px}.nav button{padding:16px;text-align:left;background:rgba(13,27,21,.86)}.back{margin-bottom:10px;background:transparent;border:1px solid var(--line)}
-.skin{background:rgba(5,14,10,.66);border:1px solid rgba(120,255,190,.1);border-radius:18px;padding:13px;position:relative;overflow:hidden}.skin .emoji{font-size:35px;filter:drop-shadow(0 0 10px rgba(76,255,155,.14))}.skin b,.skin small{display:block;margin-top:3px}.skin button{width:100%;margin-top:9px}table{width:100%;border-collapse:collapse}td{padding:12px 4px;border-bottom:1px solid rgba(120,255,190,.09)}td:last-child{text-align:right;font-weight:900}.mission{display:flex;justify-content:space-between;gap:10px;padding:14px 0;border-bottom:1px solid rgba(120,255,190,.09)}
-#game{position:fixed;inset:0;background:radial-gradient(circle at 50% 15%,#123a28,#06100b 48%,#020504 100%);z-index:10;padding:env(safe-area-inset-top) 10px env(safe-area-inset-bottom);touch-action:none}.gamewrap{max-width:560px;height:100%;margin:auto;display:flex;flex-direction:column}.gtop,.gbot{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;font-weight:850}.gtop{font-size:15px}.scorepill{padding:7px 10px;border-radius:99px;background:rgba(10,25,17,.8);border:1px solid var(--line)}.hint{font-size:12px;color:var(--muted)}canvas{width:100%;aspect-ratio:1;background:linear-gradient(145deg,#08150f,#050b08);border:1px solid rgba(112,255,183,.22);border-radius:24px;touch-action:none;margin:auto;box-shadow:0 20px 70px rgba(0,0,0,.42),0 0 50px rgba(40,230,126,.06)}.overlay{position:fixed;inset:0;background:rgba(0,0,0,.68);backdrop-filter:blur(10px);z-index:20;display:none;align-items:center;justify-content:center;padding:20px}.overlay.show{display:flex}.modal{max-width:420px;width:100%;background:linear-gradient(145deg,#12261c,#09140f);border:1px solid rgba(116,255,187,.2);border-radius:27px;padding:24px;text-align:center;box-shadow:0 30px 100px rgba(0,0,0,.5);animation:pop .25s ease}@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}.modal h2{font-size:28px;margin:8px 0}.actions{display:grid;gap:9px}.ref{word-break:break-all;background:#07110c;padding:10px;border-radius:12px;font-size:12px;border:1px solid rgba(120,255,190,.08)}
-@media(max-width:380px){.app{padding-left:10px;padding-right:10px}.logo{font-size:21px}.nav button{font-size:13px}}
-</style></head><body><div class="app">
-<div class="top"><div class="logo">🐍 Snake <span>Arena</span></div><div class="coins">🪙 <b id="coins">0</b></div></div>
-<section id="home" class="screen active"><div class="hero"><div class="profile"><div class="avatar">🐍</div><div><div class="name" id="name">Игрок</div><small>Добро пожаловать</small></div></div><button class="primary big" onclick="start()">🎮 ИГРАТЬ</button><div class="stats"><div class="stat"><b id="best">0</b><small>🏆 Рекорд</small></div><div class="stat"><b id="refs">0</b><small>👥 Друзей</small></div></div></div>
-<div class="nav"><button onclick="show('rating')">🏆 Рейтинг</button><button onclick="show('shop')">🎨 Скины</button><button onclick="show('missions')">🎁 Задания</button><button onclick="show('profile')">👤 Профиль</button></div></section>
-<section id="rating" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>🏆 Рейтинг</h2><table id="table"></table></div></section>
-<section id="shop" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>🎨 Скины</h2><p class="muted">Покупай оформление змейки за монеты.</p><div class="shop" id="shopGrid"></div></div></section>
-<section id="missions" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>🎁 Задания</h2><div class="mission"><span>🎯 Набери 100 очков</span><b>+300 🪙</b></div><div class="mission"><span>🐍 Сыграй 3 раза</span><b>+500 🪙</b></div><div class="mission"><span>🍎 Съешь 30 яблок</span><b>+700 🪙</b></div><button class="primary" style="width:100%;margin-top:14px" onclick="alert('Ежедневный бонус будет добавлен в следующем обновлении')">🎁 Ежедневный бонус</button></div></section>
-<section id="profile" class="screen"><button class="back" onclick="show('home')">← Назад</button><div class="card"><h2>👤 Профиль</h2><p>Рекорд: <b id="pbest">0</b></p><p>Монеты: <b id="pcoins">0</b> 🪙</p><h3>👥 Пригласи друга</h3><p class="muted">Поделись ссылкой и приглашай друзей.</p><div class="ref" id="ref"></div><button class="primary" style="width:100%;margin-top:10px" onclick="share()">📤 Пригласить друга</button></div></section>
+:root{
+  --bg:#030907;--panel:#0a1711;--panel2:#0d2017;--line:rgba(89,255,166,.18);
+  --text:#f3fff8;--muted:#83a296;--accent:#55ffad;--accent2:#20d97b;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:15px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{overflow-x:hidden}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.app{max-width:560px;margin:auto;padding:14px 14px 28px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.logo{font-size:22px;font-weight:950;letter-spacing:-.6px}.logo span{color:var(--accent)}
+.coins{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#0b1912}
+.screen{display:none}.screen.active{display:block}
+.card,.hero{background:linear-gradient(145deg,#0d2117,#07110c);border:1px solid var(--line);border-radius:24px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.3)}
+.hero{position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;width:220px;height:220px;right:-100px;top:-120px;border-radius:50%;background:rgba(85,255,173,.08);filter:blur(8px)}
+.profile{display:flex;gap:12px;align-items:center;position:relative;z-index:1}
+.avatar{width:52px;height:52px;border-radius:17px;display:grid;place-items:center;background:#102c1e;border:1px solid var(--line);font-size:25px}
+.name{font-size:19px;font-weight:900}.muted,small{color:var(--muted)}
+.primary{background:linear-gradient(135deg,#64ffb5,#1bd778);color:#03170d;font-weight:950;border-radius:16px;padding:14px 16px;box-shadow:0 12px 30px rgba(40,230,126,.16)}
+.big{width:100%;font-size:18px;margin-top:18px;padding:17px;position:relative;z-index:1}
+.big:after{content:"";position:absolute;inset:-3px;border-radius:18px;border:1px solid rgba(85,255,173,.18);animation:pulse 2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 10px rgba(85,255,173,0)}}
+.stats,.nav,.shop{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:11px}
+.stat,.nav button,.skin{background:rgba(4,14,9,.72);border:1px solid rgba(120,255,190,.1);border-radius:17px;padding:13px}
+.stat b{display:block;font-size:21px}
+.nav button{text-align:left;font-weight:800;min-height:58px}
+.back{background:transparent;border:1px solid var(--line);padding:10px 13px;border-radius:13px;margin-bottom:10px}
+.skin .emoji{font-size:34px}.skin b,.skin small{display:block;margin-top:4px}.skin button{width:100%;margin-top:9px;padding:10px;border-radius:12px;background:#12271c}
+table{width:100%;border-collapse:collapse}td{padding:12px 4px;border-bottom:1px solid rgba(120,255,190,.08)}td:last-child{text-align:right;font-weight:900}
+.mission{display:flex;justify-content:space-between;gap:10px;padding:14px 0;border-bottom:1px solid rgba(120,255,190,.08)}
+.ref{word-break:break-all;background:#06100b;padding:10px;border-radius:12px;font-size:12px;border:1px solid rgba(120,255,190,.08)}
+
+#game.screen.active{
+  position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;
+  background:
+    radial-gradient(circle at 50% 12%,rgba(37,150,91,.28),transparent 32%),
+    radial-gradient(circle at 10% 90%,rgba(0,130,70,.13),transparent 28%),
+    #020604;
+  padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));
+  touch-action:none;
+}
+.gamewrap{width:min(560px,100%);height:100%;margin:auto;display:flex;flex-direction:column;min-height:0}
+.gtop{display:flex;align-items:center;justify-content:space-between;padding:5px 2px 10px;font-weight:900}
+.scorepill{padding:8px 11px;border-radius:999px;background:rgba(5,18,11,.88);border:1px solid var(--line)}
+.board-shell{position:relative;width:100%;aspect-ratio:1/1;margin:auto;max-height:calc(100vh - 120px);display:grid;place-items:center}
+canvas{
+  display:block;width:100%;height:100%;aspect-ratio:1;
+  border-radius:26px;border:1px solid rgba(91,255,170,.3);
+  background:#06100b;touch-action:none;
+  box-shadow:0 0 0 1px rgba(255,255,255,.025),0 22px 80px rgba(0,0,0,.55),0 0 65px rgba(35,220,125,.1);
+}
+.board-vignette{pointer-events:none;position:absolute;inset:0;border-radius:26px;box-shadow:inset 0 0 60px rgba(0,0,0,.42)}
+.gbot{display:flex;align-items:center;justify-content:space-between;padding:10px 2px 3px;font-size:12px;color:var(--muted)}
+.pause{width:48px;height:48px;border-radius:16px;background:#10241a;border:1px solid var(--line);font-size:18px}
+.overlay{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
+.overlay.show{display:flex}
+.modal{width:min(420px,100%);background:linear-gradient(145deg,#10271b,#07120c);border:1px solid rgba(116,255,187,.22);border-radius:28px;padding:25px;text-align:center;box-shadow:0 30px 100px rgba(0,0,0,.55)}
+.modal h2{font-size:28px;margin:7px 0}.actions{display:grid;gap:9px;margin-top:16px}
+.actions button{padding:14px;border-radius:15px;background:#13281d}
+.actions .primary{background:linear-gradient(135deg,#64ffb5,#1bd778);color:#03170d}
+#toast{position:fixed;left:50%;bottom:25px;transform:translateX(-50%) translateY(15px);z-index:100;padding:10px 14px;border-radius:999px;background:#10261a;border:1px solid var(--line);opacity:0;pointer-events:none;transition:.2s}
+#toast.show{opacity:1;transform:translateX(-50%)}
+@media(max-width:380px){.app{padding-left:10px;padding-right:10px}.logo{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="logo">🐍 Snake <span>Arena</span></div>
+    <div class="coins">🪙 <b id="coins">0</b></div>
+  </div>
+
+  <section id="home" class="screen active">
+    <div class="hero">
+      <div class="profile">
+        <div class="avatar">🐍</div>
+        <div><div class="name" id="name">Игрок</div><small>Готов к новому рекорду?</small></div>
+      </div>
+      <button id="playBtn" class="primary big">🎮 ИГРАТЬ</button>
+      <div class="stats">
+        <div class="stat"><b id="best">0</b><small>🏆 Рекорд</small></div>
+        <div class="stat"><b id="refs">0</b><small>👥 Друзей</small></div>
+      </div>
+    </div>
+    <div class="nav">
+      <button data-screen="rating">🏆 Рейтинг</button>
+      <button data-screen="shop">🎨 Скины</button>
+      <button data-screen="missions">🎁 Задания</button>
+      <button data-screen="profile">👤 Профиль</button>
+    </div>
+  </section>
+
+  <section id="rating" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🏆 Рейтинг</h2><table id="table"></table></div></section>
+  <section id="shop" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🎨 Скины</h2><p class="muted">Покупай оформление змейки за монеты.</p><div class="shop" id="shopGrid"></div></div></section>
+  <section id="missions" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🎁 Задания</h2>
+    <div class="mission"><span>🎯 Набери 100 очков</span><b>+300 🪙</b></div>
+    <div class="mission"><span>🐍 Сыграй 3 раза</span><b>+500 🪙</b></div>
+    <div class="mission"><span>🍎 Съешь 30 яблок</span><b>+700 🪙</b></div>
+    <button id="bonusBtn" class="primary" style="width:100%;margin-top:14px">🎁 Ежедневный бонус</button>
+  </div></section>
+  <section id="profile" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>👤 Профиль</h2>
+    <p>Рекорд: <b id="pbest">0</b></p><p>Монеты: <b id="pcoins">0</b> 🪙</p><h3>👥 Пригласи друга</h3><p class="muted">Поделись ссылкой и приглашай друзей.</p>
+    <div class="ref" id="ref"></div><button id="shareBtn" class="primary" style="width:100%;margin-top:10px">📤 Пригласить друга</button>
+  </div></section>
 </div>
-<section id="game" class="screen"><div class="gamewrap"><div class="gtop"><span>🐍 Snake Arena</span><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span></div><canvas id="cv" width="480" height="480"></canvas><div class="gbot"><span class="hint">⌨️ Стрелки / WASD · 📱 свайп</span><button onclick="pause()">⏸</button></div></div></section>
-<div id="over" class="overlay"><div class="modal"><div style="font-size:44px">💥</div><h2>Игра окончена</h2><p>Очки: <b id="final">0</b></p><p>Награда: <b id="reward">0</b> 🪙</p><div class="actions"><button class="primary" onclick="start()">🔄 Играть ещё</button><button onclick="closeGame()">🏠 В меню</button></div></div></div>
+
+<section id="game" class="screen">
+  <div class="gamewrap">
+    <div class="gtop"><span>🐍 Snake Arena</span><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span></div>
+    <div class="board-shell"><canvas id="cv" width="720" height="720" aria-label="Игровое поле Snake"></canvas><div class="board-vignette"></div></div>
+    <div class="gbot"><span>⌨️ Стрелки / WASD · 📱 свайп</span><button id="pauseBtn" class="pause">Ⅱ</button></div>
+  </div>
+</section>
+
+<div id="over" class="overlay">
+  <div class="modal">
+    <div style="font-size:44px">💥</div><h2>Игра окончена</h2>
+    <p>Очки: <b id="final">0</b></p><p>Награда: <b id="reward">0</b> 🪙</p>
+    <div class="actions"><button id="againBtn" class="primary">🔄 Играть ещё</button><button id="menuBtn">🏠 В меню</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
 <script>
-const tg=window.Telegram?.WebApp;if(tg){tg.ready();tg.expand()}let p={first_name:"Игрок",coins:0,best_score:0,referrals:0,skin:"classic"};
-const skins=[["classic","Классика",0,"🐍"],["fire","Огненная",2000,"🔥"],["ice","Ледяная",5000,"❄️"],["gold","Золотая",10000,"👑"],["cyber","Кибер",20000,"🤖"]];
-const H=()=>tg?.initData?{"Content-Type":"application/json","X-Telegram-Init-Data":tg.initData}:{"Content-Type":"application/json"};
-async function api(u,o={}){try{return await (await fetch(u,{...o,headers:{...H(),...(o.headers||{})}})).json()}catch{return null}}
-async function load(){let d=await api("/api/me");if(d?.player)p=d.player;else if(tg?.initDataUnsafe?.user)p.first_name=tg.initDataUnsafe.user.first_name||"Игрок";ui();shop();rating();document.getElementById("ref").textContent=location.href+"?startapp=ref_"+(p.telegram_id||"friend")}
-function ui(){coins.textContent=p.coins||0;best.textContent=p.best_score||0;pbest.textContent=p.best_score||0;pcoins.textContent=p.coins||0;refs.textContent=p.referrals||0;name.textContent=p.first_name||"Игрок"}
-function show(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");if(id==="rating")rating()}
-async function rating(){let d=await api("/api/leaderboard"),a=d?.leaderboard||[];table.innerHTML=a.map((x,i)=>`<tr><td>${i<3?["🥇","🥈","🥉"][i]:i+1+". "} ${x.first_name||x.username||"Игрок"}</td><td>${x.best_score} 🏆</td></tr>`).join("")||"<tr><td>Пока пусто</td></tr>"}
-function shop(){shopGrid.innerHTML=skins.map(s=>`<div class="skin"><div class="emoji">${s[3]}</div><b>${s[1]}</b><small>${s[2]?"🪙 "+s[2]:"Бесплатно"}</small><button onclick="buy('${s[0]}')">${p.skin===s[0]?"✅ Выбрано":s[2]?"Купить":"Выбрать"}</button></div>`).join("")}
-async function buy(id){let s=skins.find(x=>x[0]===id);if(p.skin===id)return;if(p.coins<s[2])return alert("Не хватает монет");let d=await api("/api/profile",{method:"POST",body:JSON.stringify({skin:id})});if(d?.player){p=d.player;ui();shop()}}
-function share(){let u=document.getElementById("ref").textContent;if(navigator.share)navigator.share({title:"Snake Arena",text:"Играй со мной!",url:u});else navigator.clipboard?.writeText(u)}
-let cv=document.getElementById("cv"),c=cv.getContext("2d"),N=24,sz=20,snake,food,dir,next,score,timer,running=false,paused=false,tx,ty;
-function start(){over.classList.remove("show");game.classList.add("active");snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12}];dir={x:1,y:0};next={...dir};score=0;scoreEl.textContent=0;gc.textContent=p.coins||0;running=true;paused=false;place();clearInterval(timer);timer=setInterval(tick,105);draw()}
-function place(){do food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};while(snake.some(x=>x.x===food.x&&x.y===food.y))}
-function setdir(x,y){if(x===-dir.x&&y===-dir.y)return;next={x,y};try{tg?.HapticFeedback?.impactOccurred("light")}catch(e){}}
-function tick(){if(!running||paused)return;dir=next;let h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(h.x<0||h.x>=N||h.y<0||h.y>=N||snake.some(x=>x.x===h.x&&x.y===h.y))return end();snake.unshift(h);if(h.x===food.x&&h.y===food.y){score++;scoreEl.textContent=score;place()}else snake.pop();draw()}
-function draw(){const g=c.createLinearGradient(0,0,480,480);g.addColorStop(0,"#0b1b13");g.addColorStop(1,"#040a07");c.fillStyle=g;c.fillRect(0,0,480,480);c.strokeStyle="rgba(76,255,155,.075)";c.lineWidth=1;for(let i=1;i<N;i++){c.beginPath();c.moveTo(i*sz,0);c.lineTo(i*sz,480);c.stroke();c.beginPath();c.moveTo(0,i*sz);c.lineTo(480,i*sz);c.stroke()}const fx=food.x*sz+10,fy=food.y*sz+10;c.shadowColor="#ff5b69";c.shadowBlur=18;c.font="18px serif";c.textAlign="center";c.textBaseline="middle";c.fillText("🍎",fx,fy);c.shadowBlur=0;let em=(skins.find(x=>x[0]===p.skin)||skins[0])[3];snake.forEach((x,i)=>{c.globalAlpha=i?Math.max(.3,1-i/snake.length):1;c.shadowColor=i?"rgba(76,255,155,.35)":"rgba(76,255,155,.75)";c.shadowBlur=i?6:14;c.font=i?"16px serif":"19px serif";c.fillText(em,x.x*sz+10,x.y*sz+10)});c.shadowBlur=0;c.globalAlpha=1}
-function end(){running=false;clearInterval(timer);let r=Math.max(5,score*5);final.textContent=score;reward.textContent=r;over.classList.add("show");api("/api/score",{method:"POST",body:JSON.stringify({score,coins:r})}).then(d=>{if(d?.player){p=d.player;ui()}})}
-function closeGame(){running=false;clearInterval(timer);over.classList.remove("show");game.classList.remove("active");show("home");load()}function pause(){paused=!paused}
-window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();if(k==="arrowup"||k==="w")setdir(0,-1);if(k==="arrowdown"||k==="s")setdir(0,1);if(k==="arrowleft"||k==="a")setdir(-1,0);if(k==="arrowright"||k==="d")setdir(1,0);if(k===" ")pause()});
-cv.addEventListener("touchstart",e=>{let t=e.changedTouches[0];tx=t.clientX;ty=t.clientY},{passive:true});
-cv.addEventListener("touchend",e=>{let t=e.changedTouches[0],dx=t.clientX-tx,dy=t.clientY-ty;if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;if(Math.abs(dx)>Math.abs(dy))setdir(dx>0?1:-1,0);else setdir(0,dy>0?1:-1)},{passive:true});
-load();
-</script></body></html>
+(() => {
+  "use strict";
+
+  const tg = window.Telegram?.WebApp;
+  if (tg) { try { tg.ready(); tg.expand(); } catch(e) {} }
+
+  const $ = id => document.getElementById(id);
+  const el = {
+    home:$("home"), game:$("game"), over:$("over"), cv:$("cv"),
+    coins:$("coins"), name:$("name"), best:$("best"), refs:$("refs"),
+    pbest:$("pbest"), pcoins:$("pcoins"), score:$("score"), gc:$("gc"),
+    final:$("final"), reward:$("reward"), table:$("table"), shopGrid:$("shopGrid"),
+    ref:$("ref"), toast:$("toast")
+  };
+
+  let p = {first_name:"Игрок",coins:0,best_score:0,referrals:0,skin:"classic"};
+  const skins = [
+    ["classic","Классика",0,"🐍"],["fire","Огненная",2000,"🔥"],["ice","Ледяная",5000,"❄️"],
+    ["gold","Золотая",10000,"👑"],["cyber","Кибер",20000,"🤖"]
+  ];
+
+  const headers = () => tg?.initData
+    ? {"Content-Type":"application/json","X-Telegram-Init-Data":tg.initData}
+    : {"Content-Type":"application/json"};
+
+  async function api(url, options={}) {
+    try {
+      const r = await fetch(url, {...options, headers:{...headers(),...(options.headers||{})}});
+      return await r.json();
+    } catch(e) { return null; }
+  }
+
+  function toast(msg){
+    el.toast.textContent=msg; el.toast.classList.add("show");
+    clearTimeout(toast.t); toast.t=setTimeout(()=>el.toast.classList.remove("show"),1800);
+  }
+
+  function ui(){
+    el.coins.textContent=p.coins||0; el.best.textContent=p.best_score||0; el.pbest.textContent=p.best_score||0;
+    el.pcoins.textContent=p.coins||0; el.refs.textContent=p.referrals||0; el.name.textContent=p.first_name||"Игрок";
+    el.gc.textContent=p.coins||0;
+  }
+
+  async function load(){
+    const d=await api("/api/me");
+    if(d?.player) p=d.player;
+    else if(tg?.initDataUnsafe?.user) p.first_name=tg.initDataUnsafe.user.first_name||"Игрок";
+    ui(); renderShop(); renderRating();
+    el.ref.textContent=location.href.split("?")[0]+"?startapp=ref_"+(p.telegram_id||"friend");
+  }
+
+  function show(id){
+    document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+    $(id).classList.add("active");
+    if(id==="rating") renderRating();
+  }
+
+  async function renderRating(){
+    const d=await api("/api/leaderboard"), a=d?.leaderboard||[];
+    el.table.innerHTML=a.length ? a.map((x,i)=>`<tr><td>${i<3?["🥇","🥈","🥉"][i]:(i+1)+". "} ${x.first_name||x.username||"Игрок"}</td><td>${x.best_score||0} 🏆</td></tr>`).join("") : "<tr><td>Пока пусто</td></tr>";
+  }
+
+  function renderShop(){
+    el.shopGrid.innerHTML=skins.map(s=>`<div class="skin"><div class="emoji">${s[3]}</div><b>${s[1]}</b><small>${s[2]?"🪙 "+s[2]:"Бесплатно"}</small><button data-skin="${s[0]}">${p.skin===s[0]?"✅ Выбрано":s[2]?"Купить":"Выбрать"}</button></div>`).join("");
+    el.shopGrid.querySelectorAll("[data-skin]").forEach(b=>b.addEventListener("click",()=>buy(b.dataset.skin)));
+  }
+
+  async function buy(id){
+    const s=skins.find(x=>x[0]===id); if(!s || p.skin===id) return;
+    if((p.coins||0)<s[2]) return toast("Не хватает монет");
+    const d=await api("/api/profile",{method:"POST",body:JSON.stringify({skin:id})});
+    if(d?.player){p=d.player;ui();renderShop();toast("Скин выбран!");}
+  }
+
+  async function share(){
+    const u=el.ref.textContent;
+    if(navigator.share){try{await navigator.share({title:"Snake Arena",text:"Играй со мной!",url:u});return}catch(e){}}
+    try{await navigator.clipboard.writeText(u);toast("Ссылка скопирована")}catch(e){toast("Скопируй ссылку из профиля")}
+  }
+
+  // ---------- GAME ----------
+  const ctx=el.cv.getContext("2d",{alpha:false});
+  const N=24;
+  let cell=30, snake=[], food={x:0,y:0}, dir={x:1,y:0}, next={x:1,y:0};
+  let score=0, timer=null, running=false, paused=false, tx=0, ty=0, raf=0;
+
+  function resizeCanvas(){
+    const rect=el.cv.getBoundingClientRect();
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    const side=Math.max(240,Math.floor(Math.min(rect.width,rect.height)));
+    el.cv.width=Math.floor(side*dpr); el.cv.height=Math.floor(side*dpr);
+    cell=side/N;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+
+  function start(){
+    el.over.classList.remove("show"); el.game.classList.add("active");
+    snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12},{x:9,y:12}];
+    dir={x:1,y:0}; next={x:1,y:0}; score=0; running=true; paused=false;
+    el.score.textContent="0"; el.gc.textContent=p.coins||0; placeFood();
+    clearInterval(timer); timer=setInterval(tick,105);
+    requestAnimationFrame(()=>{resizeCanvas(); draw();});
+  }
+
+  function placeFood(){
+    do food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};
+    while(snake.some(s=>s.x===food.x&&s.y===food.y));
+  }
+
+  function setdir(x,y){
+    if(!running || paused) return;
+    if(x===-dir.x && y===-dir.y) return;
+    next={x,y};
+    try{tg?.HapticFeedback?.impactOccurred("light")}catch(e){}
+  }
+
+  function tick(){
+    if(!running || paused) return;
+    dir=next;
+    const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+    if(h.x<0||h.x>=N||h.y<0||h.y>=N||snake.some(s=>s.x===h.x&&s.y===h.y)){end();return}
+    snake.unshift(h);
+    if(h.x===food.x&&h.y===food.y){score++;el.score.textContent=score;placeFood();} else snake.pop();
+    draw();
+  }
+
+  function roundRect(x,y,w,h,r){
+    const rr=Math.min(r,w/2,h/2);ctx.beginPath();
+    ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);
+    ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+  }
+
+  function drawGrid(side){
+    ctx.fillStyle="#06110b";ctx.fillRect(0,0,side,side);
+    const bg=ctx.createRadialGradient(side*.5,side*.35,10,side*.5,side*.5,side*.75);
+    bg.addColorStop(0,"rgba(26,110,67,.20)");bg.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=bg;ctx.fillRect(0,0,side,side);
+    ctx.strokeStyle="rgba(110,255,180,.065)";ctx.lineWidth=1;
+    for(let i=1;i<N;i++){let p=i*cell;ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,side);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(side,p);ctx.stroke();}
+  }
+
+  function drawFood(){
+    const x=(food.x+.5)*cell,y=(food.y+.5)*cell,r=cell*.30;
+    ctx.save();ctx.shadowColor="rgba(255,77,103,.85)";ctx.shadowBlur=18;
+    const g=ctx.createRadialGradient(x-r*.35,y-r*.35,2,x,y,r);
+    g.addColorStop(0,"#ffb0b9");g.addColorStop(.35,"#ff5c6e");g.addColorStop(1,"#c91f43");
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;ctx.fillStyle="#5dff9d";ctx.beginPath();ctx.ellipse(x+r*.25,y-r*.9,r*.28,r*.13,-.5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSnake(){
+    const skin=p.skin||"classic";
+    const colors={
+      classic:["#70ffb9","#20d77b"],fire:["#ffd166","#ff5a36"],ice:["#b8f7ff","#39b9ff"],
+      gold:["#fff1a6","#e6a92b"],cyber:["#e9b7ff","#9b5cff"]
+    }[skin]||["#70ffb9","#20d77b"];
+
+    for(let i=snake.length-1;i>=0;i--){
+      const s=snake[i], pad=cell*.12, x=s.x*cell+pad,y=s.y*cell+pad,w=cell-pad*2;
+      const t=i/Math.max(1,snake.length-1), alpha=1-t*.55;
+      ctx.save();ctx.globalAlpha=alpha;
+      const g=ctx.createLinearGradient(x,y,x+w,y+w);g.addColorStop(0,colors[0]);g.addColorStop(1,colors[1]);
+      ctx.fillStyle=g;ctx.shadowColor=colors[1];ctx.shadowBlur=i===0?16:7;
+      roundRect(x,y,w,w,cell*.22);ctx.fill();ctx.restore();
+    }
+    const h=snake[0],x=h.x*cell,y=h.y*cell;
+    ctx.save();ctx.fillStyle="#fff";ctx.shadowColor="#fff";ctx.shadowBlur=4;
+    let eyes=[[.68,.28],[.68,.68]];
+    if(dir.x<0) eyes=[[.32,.28],[.32,.68]];
+    if(dir.y<0) eyes=[[.28,.32],[.72,.32]];
+    if(dir.y>0) eyes=[[.28,.68],[.72,.68]];
+    eyes.forEach(([ex,ey])=>{ctx.beginPath();ctx.arc(x+ex*cell,y+ey*cell,cell*.075,0,Math.PI*2);ctx.fill()});
+    ctx.fillStyle="#102016";ctx.shadowBlur=0;
+    eyes.forEach(([ex,ey])=>{ctx.beginPath();ctx.arc(x+ex*cell, y+ey*cell, cell*.035,0,Math.PI*2);ctx.fill()});
+    ctx.restore();
+  }
+
+  function draw(){
+    const rect=el.cv.getBoundingClientRect(), side=Math.min(rect.width,rect.height);
+    if(!side) return;
+    drawGrid(side);drawFood();drawSnake();
+    if(paused && running){
+      ctx.fillStyle="rgba(0,0,0,.42)";ctx.fillRect(0,0,side,side);
+      ctx.fillStyle="#f4fff9";ctx.font="900 28px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("ПАУЗА",side/2,side/2);
+    }
+  }
+
+  function end(){
+    running=false;clearInterval(timer);
+    const reward=Math.max(5,score*5);
+    el.final.textContent=score;el.reward.textContent=reward;el.over.classList.add("show");
+    api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward})}).then(d=>{if(d?.player){p=d.player;ui();renderRating()}});
+  }
+
+  function closeGame(){
+    running=false;clearInterval(timer);el.over.classList.remove("show");el.game.classList.remove("active");show("home");load();
+  }
+
+  function pause(){
+    if(!running)return;paused=!paused;el.pauseBtn.textContent=paused?"▶":"Ⅱ";draw();
+  }
+
+  document.querySelectorAll("[data-screen]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.screen)));
+  $("playBtn").addEventListener("click",start);
+  $("againBtn").addEventListener("click",start);
+  $("menuBtn").addEventListener("click",closeGame);
+  $("pauseBtn").addEventListener("click",pause);
+  $("shareBtn").addEventListener("click",share);
+  $("bonusBtn").addEventListener("click",()=>toast("Ежедневный бонус скоро будет доступен"));
+  window.addEventListener("resize",()=>{if(running)resizeCanvas()});
+
+  window.addEventListener("keydown",e=>{
+    const k=e.key.toLowerCase();
+    const map={arrowup:[0,-1],w:[0,-1],arrowdown:[0,1],s:[0,1],arrowleft:[-1,0],a:[-1,0],arrowright:[1,0],d:[1,0]};
+    if(map[k]){e.preventDefault();setdir(...map[k]);}
+    if(k===" "){e.preventDefault();pause();}
+  },{passive:false});
+
+  el.cv.addEventListener("touchstart",e=>{const t=e.changedTouches[0];tx=t.clientX;ty=t.clientY},{passive:true});
+  el.cv.addEventListener("touchend",e=>{
+    const t=e.changedTouches[0],dx=t.clientX-tx,dy=t.clientY-ty;
+    if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;
+    if(Math.abs(dx)>Math.abs(dy))setdir(dx>0?1:-1,0);else setdir(0,dy>0?1:-1);
+  },{passive:true});
+
+  load();
+})();
+</script>
+</body>
+</html>
