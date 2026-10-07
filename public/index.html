@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Snake Arena v5</title>
+<title>Snake Arena v7</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -127,7 +127,7 @@ canvas{
     </div>
     <div class="gtop"><span>🐍 Snake Arena</span><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span></div>
     <div class="board-shell"><canvas id="cv" width="720" height="720" aria-label="Игровое поле Snake"></canvas><div class="board-vignette"></div><div id="combo" class="combo">COMBO ×2</div></div>
-    <div class="gbot"><span>⌨️ Стрелки / WASD · 📱 свайп</span><button id="pauseBtn" class="pause">Ⅱ</button></div>
+    <div class="gbot"><span>⌨️ Стрелки / WASD · Space: пауза/заново · 📱 свайп</span><button id="pauseBtn" class="pause">Ⅱ</button></div>
   </div>
 </section>
 
@@ -280,17 +280,21 @@ canvas{
       score += food.type==="gold"?5:1;
       if(food.type==="coin") p.coins=(p.coins||0)+10;
       if(food.type==="gold") p.coins=(p.coins||0)+50;
-      combo++; comboTimer=22; bestRun=Math.max(bestRun,combo);
+      combo++; comboTimer=28; bestRun=Math.max(bestRun,combo);
       addParticles(food.x,food.y,food.type);
       el.score.textContent=score; el.gc.textContent=p.coins||0;
-      if(combo>=2){$("combo").textContent=`COMBO ×${combo}`;$("combo").classList.add("show")}
+      if(combo>=2){$("combo").textContent=`COMBO ×${Math.floor(combo)}`;$("combo").classList.add("show")}
       placeFood();
       try{tg?.HapticFeedback?.notificationOccurred(food.type==="gold"?"success":"light")}catch(e){}
     } else {
       snake.pop();
-      combo=Math.max(0,combo-0.02);
     }
-    if(comboTimer>0) comboTimer--; else $("combo").classList.remove("show");
+    if(comboTimer>0) {
+      comboTimer--;
+    } else if(combo>0) {
+      combo=0;
+      $("combo").classList.remove("show");
+    }
     draw();
   }
 
@@ -396,8 +400,16 @@ canvas{
   window.addEventListener("keydown",e=>{
     const k=e.key.toLowerCase();
     const map={arrowup:[0,-1],w:[0,-1],arrowdown:[0,1],s:[0,1],arrowleft:[-1,0],a:[-1,0],arrowright:[1,0],d:[1,0]};
-    if(map[k]){e.preventDefault();setdir(...map[k]);}
-    if(k===" "){e.preventDefault();pause();}
+    if(map[k]){e.preventDefault();setdir(...map[k]);return;}
+    if(k===" " || k==="enter"){
+      e.preventDefault();
+      if(el.over.classList.contains("show")){
+        start(); return;
+      }
+      if(el.game.classList.contains("active")){
+        pause(); return;
+      }
+    }
   },{passive:false});
 
   el.cv.addEventListener("touchstart",e=>{const t=e.changedTouches[0];tx=t.clientX;ty=t.clientY},{passive:true});
