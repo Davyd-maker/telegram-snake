@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Snake Arena v9</title>
+<title>Snake Arena v10</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -156,7 +156,7 @@ canvas{
     ref:$("ref"), toast:$("toast")
   };
 
-  let p = {first_name:"Игрок",coins:0,best_score:0,referrals:0,skin:"classic"};
+  let p = {first_name:"Игрок",coins:0,best_score:0,referrals:0,skin:"classic",owned_skins:["classic"]};
   const skins = [
     ["classic","Классика",0,"🐍"],["fire","Огненная",2000,"🔥"],["ice","Ледяная",5000,"❄️"],
     ["gold","Золотая",10000,"👑"],["cyber","Кибер",20000,"🤖"]
@@ -186,7 +186,7 @@ canvas{
 
   async function load(){
     const d=await api("/api/me");
-    if(d?.player) p=d.player;
+    if(d?.player) p={...p,...d.player,bot_username:d.bot_username||p.bot_username};
     else if(tg?.initDataUnsafe?.user) p.first_name=tg.initDataUnsafe.user.first_name||"Игрок";
     ui(); renderShop(); renderRating();
     el.ref.textContent=location.href.split("?")[0]+"?startapp=ref_"+(p.telegram_id||"friend");
@@ -204,13 +204,15 @@ canvas{
   }
 
   function renderShop(){
-    el.shopGrid.innerHTML=skins.map(s=>`<div class="skin"><div class="emoji">${s[3]}</div><b>${s[1]}</b><small>${s[2]?"🪙 "+s[2]:"Бесплатно"}</small><button data-skin="${s[0]}">${p.skin===s[0]?"✅ Выбрано":s[2]?"Купить":"Выбрать"}</button></div>`).join("");
+    const owned=p.owned_skins||["classic"];
+    el.shopGrid.innerHTML=skins.map(s=>{const isOwned=owned.includes(s[0]);return `<div class="skin"><div class="emoji">${s[3]}</div><b>${s[1]}</b><small>${isOwned?"✅ Открыт":s[2]?"🪙 "+s[2]:"Бесплатно"}</small><button data-skin="${s[0]}">${p.skin===s[0]?"✅ Выбрано":isOwned?"Выбрать":s[2]?"Купить":"Выбрать"}</button></div>`}).join("");
     el.shopGrid.querySelectorAll("[data-skin]").forEach(b=>b.addEventListener("click",()=>buy(b.dataset.skin)));
   }
 
   async function buy(id){
     const s=skins.find(x=>x[0]===id); if(!s || p.skin===id) return;
-    if((p.coins||0)<s[2]) return toast("Не хватает монет");
+    const owned=p.owned_skins||["classic"];
+    if(!owned.includes(id) && (p.coins||0)<s[2]) return toast("Не хватает монет");
     const d=await api("/api/profile",{method:"POST",body:JSON.stringify({skin:id})});
     if(d?.player){p=d.player;ui();renderShop();toast("Скин выбран!");}
   }
@@ -224,9 +226,10 @@ canvas{
   // ---------- V5 GAME ----------
   const ctx=el.cv.getContext("2d",{alpha:false});
   const N=24;
+  const MAX_SNAKE_LENGTH=14;
   let cell=30, snake=[], food={x:0,y:0,type:"apple"}, dir={x:1,y:0}, next={x:1,y:0};
   let score=0, timer=null, running=false, paused=false, tx=0, ty=0;
-  let particles=[], combo=0, comboTimer=0, bestRun=0, raf=0, speedMs=120;
+  let particles=[], combo=0, comboTimer=0, bestRun=0, raf=0, speedMs=120, growthFlash=0;
 
   function resizeCanvas(){
     const rect=el.cv.getBoundingClientRect();
@@ -242,7 +245,7 @@ canvas{
     const splash=$("startSplash");
     splash.style.display="none";
     snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12},{x:9,y:12}];
-    dir={x:1,y:0}; next={x:1,y:0}; score=0; combo=0; bestRun=0; running=true; paused=false;
+    dir={x:1,y:0}; next={x:1,y:0}; score=0; combo=0; bestRun=0; growthFlash=0; running=true; paused=false;
     el.score.textContent="0"; el.gc.textContent=p.coins||0; placeFood();
     speedMs=120;
     clearInterval(timer); timer=setInterval(tick,speedMs);
@@ -278,11 +281,16 @@ canvas{
     const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
     if(h.x<0||h.x>=N||h.y<0||h.y>=N||snake.some(s=>s.x===h.x&&s.y===h.y)){end();return}
     snake.unshift(h);
-    if(h.x===food.x&&h.y===food.y){
+    const ateFood = h.x===food.x && h.y===food.y;
+    if(ateFood){
       score += food.type==="gold"?5:1;
       if(food.type==="coin") p.coins=(p.coins||0)+10;
       if(food.type==="gold") p.coins=(p.coins||0)+50;
       combo++; comboTimer=30; bestRun=Math.max(bestRun,combo);
+      growthFlash=1;
+      // Combo never changes the snake length. Each food adds at most one segment,
+      // and the total length is capped so the snake cannot suddenly become huge.
+      if(snake.length > MAX_SNAKE_LENGTH) snake.length=MAX_SNAKE_LENGTH;
       // Gradual acceleration: never becomes impossibly fast.
       speedMs=Math.max(62,120-score*2);
       clearInterval(timer); timer=setInterval(tick,speedMs);
@@ -294,9 +302,10 @@ canvas{
       }
       placeFood();
       try{tg?.HapticFeedback?.notificationOccurred(food.type==="gold"?"success":"light")}catch(e){}
-    } else {
-      snake.pop();
     }
+    if(!ateFood && snake.length > MAX_SNAKE_LENGTH) snake.pop();
+    if(ateFood && snake.length > MAX_SNAKE_LENGTH) snake.length=MAX_SNAKE_LENGTH;
+    if(growthFlash>0) growthFlash=Math.max(0,growthFlash-.18);
     if(comboTimer>0) {
       comboTimer--;
     } else if(combo>0) {
@@ -350,8 +359,12 @@ canvas{
     for(let i=snake.length-1;i>=0;i--){
       const s=snake[i],pad=cell*.105,x=s.x*cell+pad,y=s.y*cell+pad,w=cell-pad*2;
       const g=ctx.createLinearGradient(x,y,x+w,y+w);g.addColorStop(0,colors[0]);g.addColorStop(1,colors[1]);
-      ctx.save();ctx.globalAlpha=1-i/Math.max(1,snake.length)*.5;ctx.fillStyle=g;ctx.shadowColor=colors[1];ctx.shadowBlur=i===0?18:7;
-      roundRect(x,y,w,w,cell*.24);ctx.fill();ctx.restore();
+      ctx.save();
+      ctx.globalAlpha=1-i/Math.max(1,snake.length)*.5;
+      ctx.fillStyle=g;ctx.shadowColor=colors[1];ctx.shadowBlur=i===0?18:7;
+      const growPulse=(growthFlash>0 && i===snake.length-1) ? (1+growthFlash*.10) : 1;
+      const dw=(w*(growPulse-1))*.5;
+      roundRect(x-dw,y-dw,w+dw*2,w+dw*2,cell*.24);ctx.fill();ctx.restore();
       if(i>0 && i%2===0){ctx.fillStyle="rgba(255,255,255,.16)";ctx.beginPath();ctx.arc(x+w*.32,y+w*.28,cell*.045,0,Math.PI*2);ctx.fill()}
     }
     const h=snake[0],x=h.x*cell,y=h.y*cell;
@@ -392,7 +405,7 @@ canvas{
     running=false;clearInterval(timer);cancelAnimationFrame(raf);$("combo").classList.remove("show");
     const reward=Math.max(5,score*5)+(bestRun>=5?100:0);
     el.final.textContent=score;el.reward.textContent=reward;el.over.classList.add("show");
-    api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward})}).then(d=>{if(d?.player){p=d.player;ui();renderRating()}});
+    api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward})}).then(d=>{if(d?.player){p={...p,...(d.player||{}),...(d.bot_username?{bot_username:d.bot_username}:{})};ui();renderRating()}});
   }
 
   function closeGame(){
@@ -400,6 +413,37 @@ canvas{
   }
 
   function pause(){if(!running)return;paused=!paused;el.pauseBtn.textContent=paused?"▶":"Ⅱ";draw();}
+
+  // ---------- INVITE ----------
+  $("inviteBtn")?.addEventListener("click", async ()=>{
+    const id = p.telegram_id || tg?.initDataUnsafe?.user?.id;
+    if(!id) return;
+    // Clean Telegram deep link. Set BOT_USERNAME in Render environment variables.
+    const botUsername = p.bot_username || window.BOT_USERNAME || "";
+    const cleanRef = `ref_${id}`;
+    const link = botUsername
+      ? `https://t.me/${botUsername}?startapp=${encodeURIComponent(cleanRef)}`
+      : `${location.origin}${location.pathname}?startapp=${encodeURIComponent(cleanRef)}`;
+
+    const text = `🐍 Присоединяйся ко мне в Snake Arena!\n🎮 Играй, набирай очки и попади в топ!`;
+    const share = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+
+    try{
+      if(tg?.openTelegramLink){
+        tg.openTelegramLink(share);
+      } else {
+        window.open(share,"_blank");
+      }
+    }catch(e){
+      try{
+        await navigator.clipboard.writeText(link);
+        $("refStatus").textContent="Ссылка скопирована 📋";
+      }catch(_){
+        $("refStatus").textContent=link;
+      }
+    }
+  });
+
   document.querySelectorAll("[data-screen]").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.screen!=="game") show(b.dataset.screen); }));
 
   $("playBtn").addEventListener("click",()=>{el.game.classList.add("active");$("startSplash").style.display="block";requestAnimationFrame(()=>resizeCanvas())});
