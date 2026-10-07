@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Snake Arena v7</title>
+<title>Snake Arena v9</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -226,7 +226,7 @@ canvas{
   const N=24;
   let cell=30, snake=[], food={x:0,y:0,type:"apple"}, dir={x:1,y:0}, next={x:1,y:0};
   let score=0, timer=null, running=false, paused=false, tx=0, ty=0;
-  let particles=[], combo=0, comboTimer=0, bestRun=0;
+  let particles=[], combo=0, comboTimer=0, bestRun=0, raf=0, speedMs=120;
 
   function resizeCanvas(){
     const rect=el.cv.getBoundingClientRect();
@@ -244,8 +244,10 @@ canvas{
     snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12},{x:9,y:12}];
     dir={x:1,y:0}; next={x:1,y:0}; score=0; combo=0; bestRun=0; running=true; paused=false;
     el.score.textContent="0"; el.gc.textContent=p.coins||0; placeFood();
-    clearInterval(timer); timer=setInterval(tick,105);
+    speedMs=120;
+    clearInterval(timer); timer=setInterval(tick,speedMs);
     requestAnimationFrame(()=>{resizeCanvas(); draw();});
+    cancelAnimationFrame(raf); raf=requestAnimationFrame(renderLoop);
   }
 
   function placeFood(){
@@ -280,10 +282,16 @@ canvas{
       score += food.type==="gold"?5:1;
       if(food.type==="coin") p.coins=(p.coins||0)+10;
       if(food.type==="gold") p.coins=(p.coins||0)+50;
-      combo++; comboTimer=28; bestRun=Math.max(bestRun,combo);
+      combo++; comboTimer=30; bestRun=Math.max(bestRun,combo);
+      // Gradual acceleration: never becomes impossibly fast.
+      speedMs=Math.max(62,120-score*2);
+      clearInterval(timer); timer=setInterval(tick,speedMs);
       addParticles(food.x,food.y,food.type);
       el.score.textContent=score; el.gc.textContent=p.coins||0;
-      if(combo>=2){$("combo").textContent=`COMBO ×${Math.floor(combo)}`;$("combo").classList.add("show")}
+      if(combo>=2){
+        $("combo").textContent=`COMBO ×${Math.floor(combo)}`;
+        $("combo").classList.add("show");
+      }
       placeFood();
       try{tg?.HapticFeedback?.notificationOccurred(food.type==="gold"?"success":"light")}catch(e){}
     } else {
@@ -295,6 +303,7 @@ canvas{
       combo=0;
       $("combo").classList.remove("show");
     }
+    if(combo < 2) $("combo").classList.remove("show");
     draw();
   }
 
@@ -371,18 +380,23 @@ canvas{
     const rect=el.cv.getBoundingClientRect(),side=Math.min(rect.width,rect.height);if(!side)return;
     drawGrid(side);drawFood();drawSnake();drawParticles(side);
     if(paused&&running){ctx.fillStyle="rgba(0,0,0,.45)";ctx.fillRect(0,0,side,side);ctx.fillStyle="#f4fff9";ctx.font="900 28px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("ПАУЗА",side/2,side/2)}
-    if(running) requestAnimationFrame(draw);
+  }
+
+  function renderLoop(){
+    if(!running) return;
+    draw();
+    raf=requestAnimationFrame(renderLoop);
   }
 
   function end(){
-    running=false;clearInterval(timer);$("combo").classList.remove("show");
+    running=false;clearInterval(timer);cancelAnimationFrame(raf);$("combo").classList.remove("show");
     const reward=Math.max(5,score*5)+(bestRun>=5?100:0);
     el.final.textContent=score;el.reward.textContent=reward;el.over.classList.add("show");
     api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward})}).then(d=>{if(d?.player){p=d.player;ui();renderRating()}});
   }
 
   function closeGame(){
-    running=false;clearInterval(timer);el.over.classList.remove("show");el.game.classList.remove("active");show("home");load();
+    running=false;clearInterval(timer);cancelAnimationFrame(raf);el.over.classList.remove("show");el.game.classList.remove("active");show("home");load();
   }
 
   function pause(){if(!running)return;paused=!paused;el.pauseBtn.textContent=paused?"▶":"Ⅱ";draw();}
