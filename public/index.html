@@ -1,1 +1,288 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Snake</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f1115);
+      --card: var(--tg-theme-secondary-bg-color, #181b22);
+      --text: var(--tg-theme-text-color, #fff);
+      --muted: var(--tg-theme-hint-color, #8d95a5);
+      --button: var(--tg-theme-button-color, #2aabee);
+      --button-text: var(--tg-theme-button-text-color, #fff);
+      --green: #35d07f;
+      --red: #ff5364;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; padding: 16px;
+      background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      overscroll-behavior: none;
+    }
+    .app { width: min(100%, 460px); margin: auto; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+    h1 { margin:0; font-size:24px; }
+    .stats { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .pill { background:var(--card); padding:7px 10px; border-radius:999px; font-size:13px; }
+    canvas {
+      display:block; width:100%; aspect-ratio:1; background:#101318;
+      border:1px solid rgba(255,255,255,.08); border-radius:16px;
+      touch-action:none;
+    }
+    .actions { display:flex; gap:8px; margin:12px 0; }
+    button {
+      border:0; border-radius:12px; min-height:46px; padding:0 16px;
+      font-size:16px; font-weight:700; background:var(--button); color:var(--button-text);
+    }
+    button.secondary { background:var(--card); color:var(--text); }
+    button:disabled { opacity:.5; }
+    .controls { display:grid; grid-template-columns:repeat(3,60px); gap:7px; justify-content:center; margin:12px 0 18px; }
+    .controls button { padding:0; font-size:22px; }
+    .empty { visibility:hidden; }
+    section { background:var(--card); border-radius:16px; padding:14px; margin-top:12px; }
+    section h2 { font-size:17px; margin:0 0 10px; }
+    #message { min-height:20px; text-align:center; color:var(--muted); font-size:14px; margin:7px 0; }
+    ol { margin:0; padding-left:25px; }
+    li { padding:6px 0; display:flex; justify-content:space-between; gap:10px; }
+    .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .score { font-weight:700; }
+  </style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>🐍 Snake</h1>
+    <div class="stats">
+      <div class="pill">⭐ <span id="score">0</span></div>
+      <div class="pill">🪙 <span id="coins">0</span></div>
+      <div class="pill">🏆 <span id="best">0</span></div>
+    </div>
+  </header>
+
+  <canvas id="game" width="400" height="400" aria-label="Игровое поле"></canvas>
+  <div id="message">Нажми «Играть»</div>
+
+  <div class="actions">
+    <button id="start">▶ Играть</button>
+    <button id="leaders" class="secondary">🏆 Лидеры</button>
+  </div>
+
+  <div class="controls">
+    <span class="empty"></span>
+    <button data-dir="up">⬆️</button>
+    <span class="empty"></span>
+    <button data-dir="left">⬅️</button>
+    <button data-dir="down">⬇️</button>
+    <button data-dir="right">➡️</button>
+  </div>
+
+  <section id="leaderboard" hidden>
+    <h2>🏆 Топ 20</h2>
+    <ol id="leaderList"></ol>
+  </section>
+</main>
+
+<script>
+(() => {
+  const tg = window.Telegram?.WebApp;
+  tg?.ready();
+  tg?.expand();
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const coinsEl = document.getElementById("coins");
+  const bestEl = document.getElementById("best");
+  const startBtn = document.getElementById("start");
+  const message = document.getElementById("message");
+  const leaderboard = document.getElementById("leaderboard");
+  const leaderList = document.getElementById("leaderList");
+
+  const GRID = 20;
+  const TILE = canvas.width / GRID;
+  let snake = [];
+  let food = {x: 5, y: 5};
+  let dir = {x:1, y:0};
+  let nextDir = {x:1, y:0};
+  let score = 0;
+  let runCoins = 0;
+  let timer = null;
+  let running = false;
+
+  const headers = () => ({
+    "Content-Type": "application/json",
+    "X-Telegram-Init-Data": tg?.initData || ""
+  });
+
+  async function api(url, options = {}) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {...headers(), ...(options.headers || {})}
+    });
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Ошибка сервера");
+    return response.json();
+  }
+
+  async function loadMe() {
+    try {
+      const data = await api("/api/me");
+      coinsEl.textContent = data.player.coins;
+      bestEl.textContent = data.player.bestScore;
+    } catch {
+      message.textContent = "Открой игру через Telegram";
+    }
+  }
+
+  async function loadLeaderboard() {
+    try {
+      const data = await fetch("/api/leaderboard").then(r => r.json());
+      leaderList.innerHTML = "";
+      data.leaderboard.forEach(p => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span class="name">${p.place}. ${escapeHtml(p.name)}</span><span class="score">${p.score} ⭐</span>`;
+        leaderList.appendChild(li);
+      });
+      leaderboard.hidden = false;
+    } catch {
+      message.textContent = "Не удалось загрузить рейтинг";
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, c => ({
+      "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+    }[c]));
+  }
+
+  function startGame() {
+    clearInterval(timer);
+    snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+    dir = {x:1,y:0};
+    nextDir = {x:1,y:0};
+    score = 0;
+    runCoins = 0;
+    scoreEl.textContent = "0";
+    createFood();
+    running = true;
+    startBtn.textContent = "↻ Заново";
+    message.textContent = "Собирай еду!";
+    timer = setInterval(tick, 120);
+    draw();
+  }
+
+  function createFood() {
+    do {
+      food = {x:Math.floor(Math.random()*GRID), y:Math.floor(Math.random()*GRID)};
+    } while (snake.some(s => s.x === food.x && s.y === food.y));
+  }
+
+  function tick() {
+    dir = nextDir;
+    const head = {x:snake[0].x + dir.x, y:snake[0].y + dir.y};
+
+    if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID ||
+        snake.some(s => s.x === head.x && s.y === head.y)) {
+      return finish();
+    }
+
+    snake.unshift(head);
+
+    if (head.x === food.x && head.y === food.y) {
+      score++;
+      runCoins++;
+      scoreEl.textContent = score;
+      createFood();
+    } else {
+      snake.pop();
+    }
+
+    draw();
+  }
+
+  async function finish() {
+    clearInterval(timer);
+    running = false;
+    startBtn.textContent = "▶ Играть снова";
+    message.textContent = `Игра окончена. Счёт: ${score}. +${runCoins} 🪙`;
+
+    try {
+      const data = await api("/api/score", {
+        method:"POST",
+        body:JSON.stringify({score, coins:runCoins})
+      });
+      coinsEl.textContent = data.coins;
+      bestEl.textContent = data.bestScore;
+    } catch {
+      message.textContent += " (результат не сохранён)";
+    }
+  }
+
+  function setDirection(name) {
+    if (!running) return;
+    const map = {
+      up:{x:0,y:-1}, down:{x:0,y:1},
+      left:{x:-1,y:0}, right:{x:1,y:0}
+    };
+    const n = map[name];
+    if (n && !(n.x === -dir.x && n.y === -dir.y)) nextDir = n;
+  }
+
+  function draw() {
+    ctx.fillStyle = "#101318";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.strokeStyle = "rgba(255,255,255,.035)";
+    for (let i=0;i<=GRID;i++) {
+      ctx.beginPath(); ctx.moveTo(i*TILE,0); ctx.lineTo(i*TILE,canvas.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,i*TILE); ctx.lineTo(canvas.width,i*TILE); ctx.stroke();
+    }
+
+    ctx.fillStyle = "#ff5364";
+    ctx.beginPath();
+    ctx.arc(food.x*TILE+TILE/2, food.y*TILE+TILE/2, TILE*.32, 0, Math.PI*2);
+    ctx.fill();
+
+    snake.forEach((p,i) => {
+      ctx.fillStyle = i === 0 ? "#2aabee" : "#35d07f";
+      ctx.fillRect(p.x*TILE+2,p.y*TILE+2,TILE-4,TILE-4);
+    });
+  }
+
+  document.addEventListener("keydown", e => {
+    const keys = {
+      ArrowUp:"up", ArrowDown:"down", ArrowLeft:"left", ArrowRight:"right"
+    };
+    if (keys[e.key]) { e.preventDefault(); setDirection(keys[e.key]); }
+  });
+
+  document.querySelectorAll("[data-dir]").forEach(b =>
+    b.addEventListener("click", () => setDirection(b.dataset.dir))
+  );
+
+  let sx=0, sy=0;
+  canvas.addEventListener("touchstart", e => {
+    sx=e.changedTouches[0].clientX;
+    sy=e.changedTouches[0].clientY;
+  }, {passive:true});
+
+  canvas.addEventListener("touchend", e => {
+    const dx=e.changedTouches[0].clientX-sx;
+    const dy=e.changedTouches[0].clientY-sy;
+    if (Math.max(Math.abs(dx),Math.abs(dy)) < 20) return;
+    setDirection(Math.abs(dx)>Math.abs(dy) ? (dx>0?"right":"left") : (dy>0?"down":"up"));
+  }, {passive:true});
+
+  startBtn.addEventListener("click", startGame);
+  document.getElementById("leaders").addEventListener("click", loadLeaderboard);
+
+  loadMe();
+  draw();
+})();
+</script>
+</body>
+</html>
 
