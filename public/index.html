@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Snake Arena</title>
+<title>Snake Arena v5</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -69,6 +69,9 @@ canvas{
 .actions .primary{background:linear-gradient(135deg,#64ffb5,#1bd778);color:#03170d}
 #toast{position:fixed;left:50%;bottom:25px;transform:translateX(-50%) translateY(15px);z-index:100;padding:10px 14px;border-radius:999px;background:#10261a;border:1px solid var(--line);opacity:0;pointer-events:none;transition:.2s}
 #toast.show{opacity:1;transform:translateX(-50%)}
+.combo{position:absolute;top:16px;left:50%;transform:translateX(-50%) scale(.8);z-index:5;font-weight:1000;font-size:18px;color:#ffe38a;text-shadow:0 0 18px rgba(255,190,50,.8);opacity:0;transition:.18s;pointer-events:none}
+.combo.show{opacity:1;transform:translateX(-50%) scale(1)}
+.startbadge{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;border-radius:999px;background:#10281c;border:1px solid var(--line);color:#9fffc8;font-weight:900;font-size:12px}
 @media(max-width:380px){.app{padding-left:10px;padding-right:10px}.logo{font-size:20px}}
 </style>
 </head>
@@ -115,8 +118,15 @@ canvas{
 
 <section id="game" class="screen">
   <div class="gamewrap">
+    <div id="startSplash" class="card" style="margin:auto;position:absolute;z-index:10;left:50%;top:50%;transform:translate(-50%,-50%);width:min(390px,92%);text-align:center;display:none">
+      <div class="startbadge">⚡ SNAKE ARENA</div>
+      <div style="font-size:62px;margin:10px 0">🐍</div>
+      <h2 style="margin:0 0 6px;font-size:28px">Готов?</h2>
+      <p class="muted" style="margin:0">Собирай яблоки, растись и побей рекорд.</p>
+      <button id="startNow" class="primary big">▶ НАЧАТЬ</button>
+    </div>
     <div class="gtop"><span>🐍 Snake Arena</span><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span></div>
-    <div class="board-shell"><canvas id="cv" width="720" height="720" aria-label="Игровое поле Snake"></canvas><div class="board-vignette"></div></div>
+    <div class="board-shell"><canvas id="cv" width="720" height="720" aria-label="Игровое поле Snake"></canvas><div class="board-vignette"></div><div id="combo" class="combo">COMBO ×2</div></div>
     <div class="gbot"><span>⌨️ Стрелки / WASD · 📱 свайп</span><button id="pauseBtn" class="pause">Ⅱ</button></div>
   </div>
 </section>
@@ -211,34 +221,38 @@ canvas{
     try{await navigator.clipboard.writeText(u);toast("Ссылка скопирована")}catch(e){toast("Скопируй ссылку из профиля")}
   }
 
-  // ---------- GAME ----------
+  // ---------- V5 GAME ----------
   const ctx=el.cv.getContext("2d",{alpha:false});
   const N=24;
-  let cell=30, snake=[], food={x:0,y:0}, dir={x:1,y:0}, next={x:1,y:0};
-  let score=0, timer=null, running=false, paused=false, tx=0, ty=0, raf=0;
+  let cell=30, snake=[], food={x:0,y:0,type:"apple"}, dir={x:1,y:0}, next={x:1,y:0};
+  let score=0, timer=null, running=false, paused=false, tx=0, ty=0;
+  let particles=[], combo=0, comboTimer=0, bestRun=0;
 
   function resizeCanvas(){
     const rect=el.cv.getBoundingClientRect();
     const dpr=Math.min(window.devicePixelRatio||1,2);
     const side=Math.max(240,Math.floor(Math.min(rect.width,rect.height)));
     el.cv.width=Math.floor(side*dpr); el.cv.height=Math.floor(side*dpr);
-    cell=side/N;
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    draw();
+    cell=side/N; ctx.setTransform(dpr,0,0,dpr,0,0); draw();
   }
 
   function start(){
-    el.over.classList.remove("show"); el.game.classList.add("active");
+    el.over.classList.remove("show");
+    el.game.classList.add("active");
+    const splash=$("startSplash");
+    splash.style.display="none";
     snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12},{x:9,y:12}];
-    dir={x:1,y:0}; next={x:1,y:0}; score=0; running=true; paused=false;
+    dir={x:1,y:0}; next={x:1,y:0}; score=0; combo=0; bestRun=0; running=true; paused=false;
     el.score.textContent="0"; el.gc.textContent=p.coins||0; placeFood();
     clearInterval(timer); timer=setInterval(tick,105);
     requestAnimationFrame(()=>{resizeCanvas(); draw();});
   }
 
   function placeFood(){
-    do food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};
-    while(snake.some(s=>s.x===food.x&&s.y===food.y));
+    do {
+      food={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N),
+        type:Math.random()<.82?"apple":(Math.random()<.5?"coin":"gold")};
+    } while(snake.some(s=>s.x===food.x&&s.y===food.y));
   }
 
   function setdir(x,y){
@@ -248,13 +262,35 @@ canvas{
     try{tg?.HapticFeedback?.impactOccurred("light")}catch(e){}
   }
 
+  function addParticles(x,y,type){
+    const count=type==="coin"?18:28;
+    for(let i=0;i<count;i++){
+      const a=Math.random()*Math.PI*2, sp=1+Math.random()*3;
+      particles.push({x:(x+.5)*cell,y:(y+.5)*cell,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,size:2+Math.random()*4,type});
+    }
+  }
+
   function tick(){
     if(!running || paused) return;
     dir=next;
     const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
     if(h.x<0||h.x>=N||h.y<0||h.y>=N||snake.some(s=>s.x===h.x&&s.y===h.y)){end();return}
     snake.unshift(h);
-    if(h.x===food.x&&h.y===food.y){score++;el.score.textContent=score;placeFood();} else snake.pop();
+    if(h.x===food.x&&h.y===food.y){
+      score += food.type==="gold"?5:1;
+      if(food.type==="coin") p.coins=(p.coins||0)+10;
+      if(food.type==="gold") p.coins=(p.coins||0)+50;
+      combo++; comboTimer=22; bestRun=Math.max(bestRun,combo);
+      addParticles(food.x,food.y,food.type);
+      el.score.textContent=score; el.gc.textContent=p.coins||0;
+      if(combo>=2){$("combo").textContent=`COMBO ×${combo}`;$("combo").classList.add("show")}
+      placeFood();
+      try{tg?.HapticFeedback?.notificationOccurred(food.type==="gold"?"success":"light")}catch(e){}
+    } else {
+      snake.pop();
+      combo=Math.max(0,combo-0.02);
+    }
+    if(comboTimer>0) comboTimer--; else $("combo").classList.remove("show");
     draw();
   }
 
@@ -265,64 +301,78 @@ canvas{
   }
 
   function drawGrid(side){
-    ctx.fillStyle="#06110b";ctx.fillRect(0,0,side,side);
-    const bg=ctx.createRadialGradient(side*.5,side*.35,10,side*.5,side*.5,side*.75);
-    bg.addColorStop(0,"rgba(26,110,67,.20)");bg.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle="#04100a";ctx.fillRect(0,0,side,side);
+    const bg=ctx.createRadialGradient(side*.5,side*.4,8,side*.5,side*.5,side*.8);
+    bg.addColorStop(0,"rgba(31,135,79,.23)");bg.addColorStop(.55,"rgba(6,39,24,.10)");bg.addColorStop(1,"rgba(0,0,0,.25)");
     ctx.fillStyle=bg;ctx.fillRect(0,0,side,side);
-    ctx.strokeStyle="rgba(110,255,180,.065)";ctx.lineWidth=1;
-    for(let i=1;i<N;i++){let p=i*cell;ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,side);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(side,p);ctx.stroke();}
+    ctx.strokeStyle="rgba(110,255,180,.055)";ctx.lineWidth=1;
+    for(let i=1;i<N;i++){let q=i*cell;ctx.beginPath();ctx.moveTo(q,0);ctx.lineTo(q,side);ctx.stroke();ctx.beginPath();ctx.moveTo(0,q);ctx.lineTo(side,q);ctx.stroke();}
   }
 
   function drawFood(){
-    const x=(food.x+.5)*cell,y=(food.y+.5)*cell,r=cell*.30;
-    ctx.save();ctx.shadowColor="rgba(255,77,103,.85)";ctx.shadowBlur=18;
-    const g=ctx.createRadialGradient(x-r*.35,y-r*.35,2,x,y,r);
-    g.addColorStop(0,"#ffb0b9");g.addColorStop(.35,"#ff5c6e");g.addColorStop(1,"#c91f43");
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;ctx.fillStyle="#5dff9d";ctx.beginPath();ctx.ellipse(x+r*.25,y-r*.9,r*.28,r*.13,-.5,0,Math.PI*2);ctx.fill();
+    const x=(food.x+.5)*cell,y=(food.y+.5)*cell;
+    ctx.save();
+    if(food.type==="apple"){
+      const r=cell*.29;ctx.shadowColor="#ff365d";ctx.shadowBlur=22;
+      const g=ctx.createRadialGradient(x-r*.35,y-r*.35,2,x,y,r);
+      g.addColorStop(0,"#ffd0d7");g.addColorStop(.3,"#ff6679");g.addColorStop(1,"#b80e35");
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;ctx.fillStyle="#66ff9e";ctx.beginPath();ctx.ellipse(x+r*.25,y-r*.9,r*.28,r*.13,-.5,0,Math.PI*2);ctx.fill();
+    } else {
+      const r=cell*.27;const gold=food.type==="gold";
+      ctx.shadowColor=gold?"#ffe16a":"#ffd84c";ctx.shadowBlur=22;
+      ctx.fillStyle=gold?"#ffd84c":"#f7c531";
+      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#fff1a0";ctx.font=`900 ${cell*.28}px system-ui`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(gold?"★":"$",x,y+1);
+    }
     ctx.restore();
   }
 
   function drawSnake(){
     const skin=p.skin||"classic";
     const colors={
-      classic:["#70ffb9","#20d77b"],fire:["#ffd166","#ff5a36"],ice:["#b8f7ff","#39b9ff"],
-      gold:["#fff1a6","#e6a92b"],cyber:["#e9b7ff","#9b5cff"]
-    }[skin]||["#70ffb9","#20d77b"];
-
+      classic:["#75ffc0","#18d978"],fire:["#ffe083","#ff4f32"],ice:["#d2fbff","#35bfff"],
+      gold:["#fff2a5","#d99b18"],cyber:["#f0c7ff","#8c52ff"]
+    }[skin]||["#75ffc0","#18d978"];
     for(let i=snake.length-1;i>=0;i--){
-      const s=snake[i], pad=cell*.12, x=s.x*cell+pad,y=s.y*cell+pad,w=cell-pad*2;
-      const t=i/Math.max(1,snake.length-1), alpha=1-t*.55;
-      ctx.save();ctx.globalAlpha=alpha;
+      const s=snake[i],pad=cell*.105,x=s.x*cell+pad,y=s.y*cell+pad,w=cell-pad*2;
       const g=ctx.createLinearGradient(x,y,x+w,y+w);g.addColorStop(0,colors[0]);g.addColorStop(1,colors[1]);
-      ctx.fillStyle=g;ctx.shadowColor=colors[1];ctx.shadowBlur=i===0?16:7;
-      roundRect(x,y,w,w,cell*.22);ctx.fill();ctx.restore();
+      ctx.save();ctx.globalAlpha=1-i/Math.max(1,snake.length)*.5;ctx.fillStyle=g;ctx.shadowColor=colors[1];ctx.shadowBlur=i===0?18:7;
+      roundRect(x,y,w,w,cell*.24);ctx.fill();ctx.restore();
+      if(i>0 && i%2===0){ctx.fillStyle="rgba(255,255,255,.16)";ctx.beginPath();ctx.arc(x+w*.32,y+w*.28,cell*.045,0,Math.PI*2);ctx.fill()}
     }
     const h=snake[0],x=h.x*cell,y=h.y*cell;
-    ctx.save();ctx.fillStyle="#fff";ctx.shadowColor="#fff";ctx.shadowBlur=4;
+    ctx.save();ctx.fillStyle="#fff";ctx.shadowColor="#fff";ctx.shadowBlur=5;
     let eyes=[[.68,.28],[.68,.68]];
-    if(dir.x<0) eyes=[[.32,.28],[.32,.68]];
-    if(dir.y<0) eyes=[[.28,.32],[.72,.32]];
-    if(dir.y>0) eyes=[[.28,.68],[.72,.68]];
+    if(dir.x<0)eyes=[[.32,.28],[.32,.68]];
+    if(dir.y<0)eyes=[[.28,.32],[.72,.32]];
+    if(dir.y>0)eyes=[[.28,.68],[.72,.68]];
     eyes.forEach(([ex,ey])=>{ctx.beginPath();ctx.arc(x+ex*cell,y+ey*cell,cell*.075,0,Math.PI*2);ctx.fill()});
-    ctx.fillStyle="#102016";ctx.shadowBlur=0;
-    eyes.forEach(([ex,ey])=>{ctx.beginPath();ctx.arc(x+ex*cell, y+ey*cell, cell*.035,0,Math.PI*2);ctx.fill()});
+    ctx.fillStyle="#08130d";ctx.shadowBlur=0;
+    eyes.forEach(([ex,ey])=>{ctx.beginPath();ctx.arc(x+ex*cell,y+ey*cell,cell*.034,0,Math.PI*2);ctx.fill()});
     ctx.restore();
   }
 
-  function draw(){
-    const rect=el.cv.getBoundingClientRect(), side=Math.min(rect.width,rect.height);
-    if(!side) return;
-    drawGrid(side);drawFood();drawSnake();
-    if(paused && running){
-      ctx.fillStyle="rgba(0,0,0,.42)";ctx.fillRect(0,0,side,side);
-      ctx.fillStyle="#f4fff9";ctx.font="900 28px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("ПАУЗА",side/2,side/2);
+  function drawParticles(side){
+    particles=particles.filter(q=>q.life>0);
+    for(const q of particles){
+      q.x+=q.vx;q.y+=q.vy;q.vy+=.04;q.life-=.035;
+      ctx.globalAlpha=Math.max(0,q.life);ctx.fillStyle=q.type==="gold"?"#ffe56b":q.type==="coin"?"#ffd34d":"#7dffbd";
+      ctx.beginPath();ctx.arc(q.x,q.y,q.size*q.life,0,Math.PI*2);ctx.fill();
     }
+    ctx.globalAlpha=1;
+  }
+
+  function draw(){
+    const rect=el.cv.getBoundingClientRect(),side=Math.min(rect.width,rect.height);if(!side)return;
+    drawGrid(side);drawFood();drawSnake();drawParticles(side);
+    if(paused&&running){ctx.fillStyle="rgba(0,0,0,.45)";ctx.fillRect(0,0,side,side);ctx.fillStyle="#f4fff9";ctx.font="900 28px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("ПАУЗА",side/2,side/2)}
+    if(running) requestAnimationFrame(draw);
   }
 
   function end(){
-    running=false;clearInterval(timer);
-    const reward=Math.max(5,score*5);
+    running=false;clearInterval(timer);$("combo").classList.remove("show");
+    const reward=Math.max(5,score*5)+(bestRun>=5?100:0);
     el.final.textContent=score;el.reward.textContent=reward;el.over.classList.add("show");
     api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward})}).then(d=>{if(d?.player){p=d.player;ui();renderRating()}});
   }
@@ -331,12 +381,11 @@ canvas{
     running=false;clearInterval(timer);el.over.classList.remove("show");el.game.classList.remove("active");show("home");load();
   }
 
-  function pause(){
-    if(!running)return;paused=!paused;el.pauseBtn.textContent=paused?"▶":"Ⅱ";draw();
-  }
+  function pause(){if(!running)return;paused=!paused;el.pauseBtn.textContent=paused?"▶":"Ⅱ";draw();}
+  document.querySelectorAll("[data-screen]").forEach(b=>b.addEventListener("click",()=>{ if(b.dataset.screen!=="game") show(b.dataset.screen); }));
 
-  document.querySelectorAll("[data-screen]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.screen)));
-  $("playBtn").addEventListener("click",start);
+  $("playBtn").addEventListener("click",()=>{el.game.classList.add("active");$("startSplash").style.display="block";requestAnimationFrame(()=>resizeCanvas())});
+  $("startNow").addEventListener("click",start);
   $("againBtn").addEventListener("click",start);
   $("menuBtn").addEventListener("click",closeGame);
   $("pauseBtn").addEventListener("click",pause);
