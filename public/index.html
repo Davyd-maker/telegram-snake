@@ -60,6 +60,15 @@ table{width:100%;border-collapse:collapse}td{padding:12px 4px;border-bottom:1px 
 .dpad .u{grid-column:2;grid-row:1}.dpad .l{grid-column:1;grid-row:2}.dpad .d{grid-column:2;grid-row:2}.dpad .r{grid-column:3;grid-row:2}
 .pad-toggle{height:48px;padding:0 14px;border-radius:16px;background:#10241a;border:1px solid var(--line);font-size:13px}
 .gbot .btns{display:flex;gap:8px}
+.daily{background:rgba(4,14,9,.72);border:1px solid var(--line);border-radius:18px;padding:14px;margin:6px 0 10px}
+.daily h3{margin:0 0 4px;font-size:16px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:10px 0}
+.day{border-radius:11px;padding:7px 0;text-align:center;background:#0b1912;border:1px solid rgba(120,255,190,.08);font-size:10px;color:var(--muted)}
+.day b{display:block;font-size:12px;color:var(--text);margin-top:3px}
+.day.done{background:#12331f;border-color:rgba(100,255,181,.35)}
+.day.today{border-color:var(--accent);box-shadow:0 0 14px rgba(85,255,173,.35);color:var(--accent)}
+.day.last b{color:#ffe38a}
+.daily .primary:disabled{opacity:.45;box-shadow:none}
 .refbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .refbtns .primary{margin:0}
 .refbtns .alt{background:#13281d;border:1px solid var(--line);border-radius:16px;padding:14px 16px;font-weight:800}
@@ -84,6 +93,65 @@ canvas{
 .combo.show{opacity:1;transform:translateX(-50%) scale(1)}
 .startbadge{display:inline-flex;gap:8px;align-items:center;padding:7px 11px;border-radius:999px;background:#10281c;border:1px solid var(--line);color:#9fffc8;font-weight:900;font-size:12px}
 @media(max-width:380px){.app{padding-left:10px;padding-right:10px}.logo{font-size:20px}}
+
+/* ===== v16 polish ===== */
+body{background:radial-gradient(900px 500px at 50% -10%,rgba(37,150,91,.22),transparent 60%),radial-gradient(600px 400px at 100% 100%,rgba(0,130,70,.12),transparent 60%),var(--bg);background-attachment:fixed}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes blink{50%{opacity:.35}}
+.screen.active:not(#game){animation:rise .3s ease both}
+button{transition:transform .12s ease,filter .12s ease,background .2s}
+button:active{transform:scale(.96)}
+.primary:hover{filter:brightness(1.06)}
+.logo{background:linear-gradient(90deg,#f3fff8,#8dffc6);-webkit-background-clip:text;background-clip:text;color:transparent}.logo span{color:inherit;-webkit-text-fill-color:#55ffad}
+.coins{box-shadow:0 0 24px rgba(255,205,70,.10) inset;font-weight:800}
+.hero{padding:20px}
+.avatar{background:linear-gradient(145deg,#15402b,#0c2217);box-shadow:0 0 22px rgba(85,255,173,.18)}
+.stats.three{grid-template-columns:repeat(3,1fr)}
+.stat{text-align:center;padding:12px 6px}.stat b{font-size:22px}.stat small{font-size:11px}
+.nav button{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:14px;min-height:92px;background:linear-gradient(150deg,rgba(14,38,26,.9),rgba(5,16,10,.9))}
+.nav button i{font-style:normal;font-size:28px;margin-bottom:4px}
+.nav button span{font-weight:900;font-size:15px}
+.nav button small{font-weight:600;font-size:11px}
+.nav button.has-dot:after{content:"";position:absolute;top:12px;right:12px;width:10px;height:10px;border-radius:50%;background:#ff4d6d;box-shadow:0 0 12px #ff4d6d;animation:blink 1.4s infinite}
+h2{margin:0 0 10px;letter-spacing:-.4px}
+.sect{margin:16px 0 2px;font-size:16px}
+/* game top bar */
+.gright{display:flex;gap:8px;align-items:center}
+.icon-btn{width:38px;height:38px;border-radius:13px;background:rgba(5,18,11,.88);border:1px solid var(--line);font-size:16px;padding:0}
+.scorepill{font-variant-numeric:tabular-nums}
+/* game over */
+.over-emoji{font-size:48px;animation:rise .4s ease both}
+.recbadge{display:inline-block;margin:4px 0 2px;padding:7px 14px;border-radius:999px;background:linear-gradient(135deg,#ffe38a,#ffb02e);color:#2b1a00;font-weight:900;font-size:13px;box-shadow:0 0 26px rgba(255,190,50,.45);animation:pop .5s ease both}
+@keyframes pop{from{transform:scale(.5);opacity:0}70%{transform:scale(1.1)}to{transform:scale(1);opacity:1}}
+.ostats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0 4px}
+.ostats div{background:rgba(4,14,9,.7);border:1px solid rgba(120,255,190,.1);border-radius:16px;padding:12px 4px}
+.ostats b{display:block;font-size:24px}.ostats small{color:var(--muted);font-size:11px}
+/* leaderboard */
+.lbme{display:flex;justify-content:space-between;align-items:center;margin:2px 0 10px;padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,rgba(100,255,181,.16),rgba(27,215,120,.06));border:1px solid rgba(100,255,181,.3);font-weight:800}
+.lbrow{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:15px;background:rgba(4,14,9,.6);border:1px solid rgba(120,255,190,.07)}
+.lbpos{width:28px;text-align:center;font-weight:900;font-size:16px;color:var(--muted)}
+.lbav{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:#12301f;font-weight:900;color:var(--accent)}
+.lbname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}.lbname em{color:var(--accent);font-style:normal;font-size:12px}
+.lbrow b{font-variant-numeric:tabular-nums}
+.lbrow.top1{background:linear-gradient(135deg,rgba(255,214,102,.2),rgba(255,214,102,.04));border-color:rgba(255,214,102,.35)}
+.lbrow.top2{background:linear-gradient(135deg,rgba(205,220,230,.15),rgba(205,220,230,.03));border-color:rgba(205,220,230,.25)}
+.lbrow.top3{background:linear-gradient(135deg,rgba(220,150,90,.17),rgba(220,150,90,.03));border-color:rgba(220,150,90,.28)}
+.lbrow.me{outline:2px solid rgba(100,255,181,.55)}
+.lbrow .lbpos{font-size:20px}
+.lbempty{text-align:center;color:var(--muted);padding:26px 0}
+/* missions */
+.msn{display:flex;align-items:center;gap:12px;padding:12px;margin-top:9px;border-radius:17px;background:rgba(4,14,9,.65);border:1px solid rgba(120,255,190,.08)}
+.msn.done{opacity:.6}
+.msn-ico{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:#12301f;font-size:22px;flex:none}
+.msn-body{flex:1;min-width:0}.msn-body b{display:block;font-size:14px;margin-bottom:6px}
+.bar{height:7px;border-radius:99px;background:#0b1912;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#1bd778,#8dffc6);transition:width .5s ease}
+.msn small{display:block;margin-top:4px;font-size:11px}
+.claim{flex:none;padding:10px 12px;border-radius:13px;background:#13281d;color:var(--muted);font-weight:800;font-size:12px}
+.claim.ready{background:linear-gradient(135deg,#64ffb5,#1bd778);color:#03170d;box-shadow:0 8px 22px rgba(40,230,126,.22);animation:pulse2 1.6s infinite}
+@keyframes pulse2{50%{transform:scale(1.05)}}
+.msn-ok{font-size:22px;flex:none}
+.skin{text-align:center}
 </style>
 </head>
 <body>
@@ -100,26 +168,26 @@ canvas{
         <div><div class="name" id="name">Игрок</div><small>Готов к новому рекорду?</small></div>
       </div>
       <button id="playBtn" class="primary big">🎮 ИГРАТЬ</button>
-      <div class="stats">
+      <div class="stats three">
         <div class="stat"><b id="best">0</b><small>🏆 Рекорд</small></div>
+        <div class="stat"><b id="streak">0</b><small>🔥 Серия</small></div>
         <div class="stat"><b id="refs">0</b><small>👥 Друзей</small></div>
       </div>
     </div>
     <div class="nav">
-      <button data-screen="rating">🏆 Рейтинг</button>
-      <button data-screen="shop">🎨 Скины</button>
-      <button data-screen="missions">🎁 Задания</button>
-      <button data-screen="profile">👤 Профиль</button>
+      <button data-screen="rating"><i>🏆</i><span>Рейтинг</span><small>Топ игроков</small></button>
+      <button data-screen="shop"><i>🎨</i><span>Скины</span><small>Оформление</small></button>
+      <button data-screen="missions"><i>🎁</i><span>Задания</span><small>Награды дня</small></button>
+      <button data-screen="profile"><i>👤</i><span>Профиль</span><small>Друзья и бонусы</small></button>
     </div>
   </section>
 
-  <section id="rating" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🏆 Рейтинг</h2><table id="table"></table></div></section>
+  <section id="rating" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🏆 Рейтинг</h2><div id="table" class="lb"></div></div></section>
   <section id="shop" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🎨 Скины</h2><p class="muted">Покупай оформление змейки за монеты.</p><div class="shop" id="shopGrid"></div></div></section>
   <section id="missions" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🎁 Задания</h2>
-    <div class="mission"><span>🎯 Набери 100 очков</span><b>+300 🪙</b></div>
-    <div class="mission"><span>🐍 Сыграй 3 раза</span><b>+500 🪙</b></div>
-    <div class="mission"><span>🍎 Съешь 30 яблок</span><b>+700 🪙</b></div>
-    <button id="bonusBtn" class="primary" style="width:100%;margin-top:14px">🎁 Ежедневный бонус</button>
+    <div id="dailyBox" class="daily"></div>
+    <h3 class="sect">🎯 Задания дня</h3><small class="muted">Обновляются каждый день</small>
+    <div id="missionList"></div>
   </div></section>
   <section id="profile" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>👤 Профиль</h2>
     <p>Рекорд: <b id="pbest">0</b></p><p>Монеты: <b id="pcoins">0</b> 🪙</p><h3>👥 Пригласи друга</h3><p class="muted" id="refInfo">Поделись ссылкой — когда друг зайдёт, вы оба получите монеты.</p>
@@ -138,7 +206,7 @@ canvas{
       <p class="muted" style="margin:0">Собирай яблоки, растись и побей рекорд.</p>
       <button id="startNow" class="primary big">▶ НАЧАТЬ</button>
     </div>
-    <div class="gtop"><span>🐍 Snake Arena</span><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span></div>
+    <div class="gtop"><span>🐍 Snake Arena</span><div class="gright"><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span><button id="sndBtn" class="icon-btn" aria-label="Звук">🔊</button></div></div>
     <div class="board-shell"><canvas id="cv" width="720" height="720" aria-label="Игровое поле Snake"></canvas><div class="board-vignette"></div><div id="combo" class="combo">COMBO ×2</div></div>
     <div class="dpad" id="dpad"><button class="u" data-d="0,-1" aria-label="Вверх">▲</button><button class="l" data-d="-1,0" aria-label="Влево">◀</button><button class="d" data-d="0,1" aria-label="Вниз">▼</button><button class="r" data-d="1,0" aria-label="Вправо">▶</button></div>
     <div class="gbot"><span>📱 Свайп по экрану · ⌨️ Стрелки/WASD</span><div class="btns"><button id="padBtn" class="pad-toggle">🎮 Кнопки</button><button id="pauseBtn" class="pause">Ⅱ</button></div></div>
@@ -147,8 +215,13 @@ canvas{
 
 <div id="over" class="overlay">
   <div class="modal">
-    <div style="font-size:44px">💥</div><h2>Игра окончена</h2>
-    <p>Очки: <b id="final">0</b></p><p>Награда: <b id="reward">0</b> 🪙</p>
+    <div class="over-emoji">💥</div><h2>Игра окончена</h2>
+    <div id="recBadge" class="recbadge" hidden>🏆 Новый рекорд!</div>
+    <div class="ostats">
+      <div><b id="final">0</b><small>Очки</small></div>
+      <div><b id="oapples">0</b><small>Съедено</small></div>
+      <div><b id="reward">0</b><small>🪙 Награда</small></div>
+    </div>
     <div class="actions"><button id="againBtn" class="primary">🔄 Играть ещё</button><button id="menuBtn">🏠 В меню</button></div>
   </div>
 </div>
@@ -195,7 +268,30 @@ canvas{
   function ui(){
     el.coins.textContent=p.coins||0; el.best.textContent=p.best_score||0; el.pbest.textContent=p.best_score||0;
     el.pcoins.textContent=p.coins||0; el.refs.textContent=p.referrals||0; $("pref").textContent=p.referrals||0; el.name.textContent=p.first_name||"Игрок";
-    el.gc.textContent=p.coins||0;
+    el.gc.textContent=p.coins||0; $("streak").textContent=p.daily?.streak||0;
+    renderDaily(); renderMissions();
+    const mb=document.querySelector('.nav [data-screen="missions"]');
+    const claimable=p.daily?.can_claim||(p.missions||[]).some(m=>m.progress>=m.target&&!m.claimed);
+    if(mb) mb.classList.toggle("has-dot",!!claimable);
+  }
+
+  function renderDaily(){
+    const box=$("dailyBox"), d=p.daily;
+    if(!d){box.innerHTML="";return}
+    const tiles=d.rewards.map((r,i)=>{
+      const done=i<d.cycle_claimed, today=d.can_claim&&i===d.cycle_claimed;
+      return `<div class="day${done?" done":""}${today?" today":""}${i===d.rewards.length-1?" last":""}">Д${i+1}<b>${done?"✅":r}</b></div>`;
+    }).join("");
+    const note=d.broken?"Серия прервалась — начинаем с 1-го дня 😢":d.can_claim?"Заходи каждый день — награда растёт. Пропустишь день — серия сбросится.":"Награда получена! Возвращайся завтра за следующей.";
+    box.innerHTML=`<h3>📅 Ежедневная награда · 🔥 серия ${d.streak}</h3><small>${note}</small><div class="days">${tiles}</div>
+      <button class="primary" id="dailyBtn" style="width:100%" ${d.can_claim?"":"disabled"}>${d.can_claim?`🎁 Забрать +${d.reward} 🪙`:"Приходи завтра ⏳"}</button>`;
+  }
+
+  async function claimDaily(){
+    const b=$("dailyBtn"); if(!b||b.disabled) return; b.disabled=true;
+    const r=await api("/api/daily",{method:"POST"});
+    if(r?.player){p={...p,...r.player}; ui(); if(r.reward) sfx.claim(); toast(r.reward?`+${r.reward} 🪙 Награда получена!`:"Уже получено сегодня");}
+    else {toast("Не удалось получить награду"); renderDaily();}
   }
 
   async function load(){
@@ -219,9 +315,32 @@ canvas{
     if(id==="rating") renderRating();
   }
 
+  const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
   async function renderRating(){
-    const d=await api("/api/leaderboard"), a=d?.leaderboard||[];
-    el.table.innerHTML=a.length ? a.map((x,i)=>`<tr><td>${i<3?["🥇","🥈","🥉"][i]:(i+1)+". "} ${x.first_name||x.username||"Игрок"}</td><td>${x.best_score||0} 🏆</td></tr>`).join("") : "<tr><td>Пока пусто</td></tr>";
+    const d=await api("/api/leaderboard"), a=d?.leaderboard||[], me=d?.me;
+    const medal=["🥇","🥈","🥉"];
+    const row=(x,i)=>{
+      const raw=String(x.first_name||x.username||"Игрок");
+      return `<div class="lbrow${i<3?" top"+(i+1):""}${x.is_me?" me":""}"><span class="lbpos">${i<3?medal[i]:i+1}</span><span class="lbav">${esc([...raw][0].toUpperCase())}</span><span class="lbname">${esc(raw)}${x.is_me?" <em>(ты)</em>":""}</span><b>${x.best_score||0} 🏆</b></div>`;
+    };
+    const head=me?`<div class="lbme"><span>Твоё место</span><span>#${me.rank} · рекорд ${me.best_score}</span></div>`:"";
+    el.table.innerHTML=head+(a.length?a.map(row).join(""):'<div class="lbempty">Пока пусто — стань первым! 🐍</div>');
+  }
+
+  function renderMissions(){
+    const list=p.missions||[];
+    $("missionList").innerHTML=list.map(m=>{
+      const pct=Math.min(100,Math.round(m.progress/m.target*100)), ready=m.progress>=m.target&&!m.claimed;
+      const right=m.claimed?'<span class="msn-ok">✅</span>':`<button class="claim${ready?" ready":""}" data-m="${m.id}" ${ready?"":"disabled"}>${ready?"Забрать ":""}+${m.reward} 🪙</button>`;
+      return `<div class="msn${m.claimed?" done":""}"><div class="msn-ico">${m.icon}</div><div class="msn-body"><b>${esc(m.title)}</b><div class="bar"><i style="width:${pct}%"></i></div><small>${m.progress} / ${m.target}</small></div>${right}</div>`;
+    }).join("");
+  }
+
+  async function claimMission(id){
+    const r=await api("/api/mission",{method:"POST",body:JSON.stringify({id})});
+    if(r?.player){p={...p,...r.player}; ui(); if(r.reward){sfx.claim();toast(`+${r.reward} 🪙 Награда получена!`);try{tg?.HapticFeedback?.notificationOccurred("success")}catch(e){}}}
+    else toast("Не удалось получить награду");
   }
 
   function renderShop(){
@@ -258,21 +377,46 @@ canvas{
     }
   }
 
-  // ---------- V5 GAME ----------
+  // ---------- ЗВУК (WebAudio, без файлов) ----------
+  let audioCtx=null, soundOn=true;
+  try{ soundOn=localStorage.getItem("snakeSound")!=="0"; }catch(e){}
+  function unlockAudio(){
+    try{ audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==="suspended") audioCtx.resume(); }catch(e){}
+  }
+  function beep(freq,dur,type="sine",vol=.06,slide=0,delay=0){
+    if(!soundOn||!audioCtx) return;
+    try{
+      const t=audioCtx.currentTime+delay, o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type=type; o.frequency.setValueAtTime(freq,t);
+      if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,freq+slide),t+dur);
+      g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+      o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t+dur+.03);
+    }catch(e){}
+  }
+  const sfx={
+    eat:()=>beep(420,.1,"square",.04,380),
+    coin:()=>{beep(988,.08,"triangle",.07);beep(1480,.14,"triangle",.07,0,.07)},
+    gold:()=>{[784,988,1175,1568].forEach((f,i)=>beep(f,.14,"triangle",.07,0,i*.06))},
+    claim:()=>{[523,659,784,1047].forEach((f,i)=>beep(f,.16,"triangle",.07,0,i*.08))},
+    over:()=>{beep(330,.45,"sawtooth",.06,-240)}
+  };
+
+  // ---------- ИГРА ----------
   const ctx=el.cv.getContext("2d",{alpha:false});
   const N=24;
   const START_LEN=4;
   const GROWTH={apple:1,coin:1,gold:3}; // сегментов за еду; растут по одному за ход
   let cell=30, snake=[], food={x:0,y:0,type:"apple"}, dir={x:1,y:0}, queue=[], pendingGrowth=0, runCoins=0;
   let score=0, timer=null, running=false, paused=false, tx=0, ty=0;
-  let particles=[], combo=0, comboTimer=0, bestRun=0, raf=0, speedMs=120, growthFlash=0;
+  let particles=[], combo=0, comboTimer=0, bestRun=0, raf=0, speedMs=120, bulges=[];
+  let apples=0, floaters=[], prevSnake=[], lastTick=0, side=0, bgc=null, foodBorn=0;
 
   function resizeCanvas(){
     const rect=el.cv.getBoundingClientRect();
     const dpr=Math.min(window.devicePixelRatio||1,2);
-    const side=Math.max(240,Math.floor(Math.min(rect.width,rect.height)));
+    side=Math.max(240,Math.floor(Math.min(rect.width,rect.height)));
     el.cv.width=Math.floor(side*dpr); el.cv.height=Math.floor(side*dpr);
-    cell=side/N; ctx.setTransform(dpr,0,0,dpr,0,0); draw();
+    cell=side/N; ctx.setTransform(dpr,0,0,dpr,0,0); buildBg(dpr); draw();
   }
 
   function start(){
@@ -281,9 +425,10 @@ canvas{
     const splash=$("startSplash");
     splash.style.display="none";
     snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12},{x:9,y:12}];
-    dir={x:1,y:0}; queue=[]; pendingGrowth=0; runCoins=0; score=0; combo=0; bestRun=0; growthFlash=0; running=true; paused=false;
+    dir={x:1,y:0}; queue=[]; pendingGrowth=0; runCoins=0; score=0; combo=0; bestRun=0; bulges=[]; apples=0; floaters=[]; particles=[]; running=true; paused=false;
     el.score.textContent="0"; el.gc.textContent=p.coins||0; placeFood();
-    speedMs=120;
+    speedMs=120; unlockAudio();
+    prevSnake=snake.map(q=>({x:q.x,y:q.y})); lastTick=performance.now();
     el.pauseBtn.textContent="Ⅱ";
     clearInterval(timer); timer=setInterval(tick,speedMs);
     requestAnimationFrame(()=>{resizeCanvas(); draw();});
@@ -295,7 +440,7 @@ canvas{
     for(let x=0;x<N;x++)for(let y=0;y<N;y++) if(!snake.some(s=>s.x===x&&s.y===y)) free.push({x,y});
     if(!free.length) return false; // поле заполнено
     const c=free[Math.floor(Math.random()*free.length)];
-    food={x:c.x,y:c.y,type:Math.random()<.82?"apple":(Math.random()<.5?"coin":"gold")};
+    food={x:c.x,y:c.y,type:Math.random()<.82?"apple":(Math.random()<.5?"coin":"gold")}; foodBorn=performance.now();
     return true;
   }
 
@@ -323,6 +468,7 @@ canvas{
     // если хвост на этом ходу уйдёт (роста нет) — в его клетку можно зайти
     const body = pendingGrowth>0 ? snake : snake.slice(0,-1);
     if(h.x<0||h.x>=N||h.y<0||h.y>=N||body.some(s=>s.x===h.x&&s.y===h.y)){end();return}
+    prevSnake=snake.map(q=>({x:q.x,y:q.y}));
     snake.unshift(h);
 
     const ateFood = h.x===food.x && h.y===food.y;
@@ -331,8 +477,11 @@ canvas{
       if(food.type==="coin"){ p.coins=(p.coins||0)+10; runCoins+=10; }
       if(food.type==="gold"){ p.coins=(p.coins||0)+50; runCoins+=50; }
       pendingGrowth += GROWTH[food.type]||1;
+      apples++;
+      floaters.push({x:food.x+.5,y:food.y+.3,life:1,text:food.type==="gold"?"+5 ⭐":food.type==="coin"?"+10 🪙":"+1"});
+      (food.type==="gold"?sfx.gold:food.type==="coin"?sfx.coin:sfx.eat)();
       combo++; comboTimer=30; bestRun=Math.max(bestRun,combo);
-      growthFlash=1;
+      bulges.push(-1); // «комок» от съеденной еды поползёт от головы к хвосту
       speedMs=Math.max(70,Math.round(120-score*1.5));
       clearInterval(timer); timer=setInterval(tick,speedMs);
       addParticles(food.x,food.y,food.type);
@@ -349,8 +498,9 @@ canvas{
 
     // Рост: хвост не убираем только пока есть "накопленный" рост — по одному сегменту за ход.
     if(pendingGrowth>0) pendingGrowth--; else snake.pop();
+    lastTick=performance.now();
 
-    if(growthFlash>0) growthFlash=Math.max(0,growthFlash-.18);
+    bulges=bulges.map(b=>b+1).filter(b=>b<snake.length+1);
     if(comboTimer>0) {
       comboTimer--;
     } else if(combo>0) {
@@ -361,97 +511,149 @@ canvas{
     draw();
   }
 
-  function roundRect(x,y,w,h,r){
-    const rr=Math.min(r,w/2,h/2);ctx.beginPath();
-    ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);
-    ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+  // ---------- ОТРИСОВКА ----------
+  const SKIN_COLORS={classic:["#7dffc4","#12c96d"],fire:["#ffe083","#ff4f32"],ice:["#d2fbff","#35bfff"],gold:["#fff2a5","#d99b18"],cyber:["#f0c7ff","#8c52ff"]};
+  const hex2rgb=h=>{const n=parseInt(h.slice(1),16);return[n>>16&255,n>>8&255,n&255]};
+  const mix=(a,b,t)=>`rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(",")})`;
+  const easeBack=t=>{const c=1.70158;t-=1;return 1+(c+1)*t*t*t+c*t*t};
+
+  // Фон рисуется один раз и кэшируется
+  function buildBg(dpr){
+    bgc=document.createElement("canvas"); bgc.width=bgc.height=Math.floor(side*dpr);
+    const b=bgc.getContext("2d"); b.setTransform(dpr,0,0,dpr,0,0);
+    b.fillStyle="#04100a"; b.fillRect(0,0,side,side);
+    b.fillStyle="rgba(110,255,180,.032)";
+    for(let x=0;x<N;x++)for(let y=0;y<N;y++) if((x+y)%2===0) b.fillRect(x*cell,y*cell,cell,cell);
+    const g=b.createRadialGradient(side*.5,side*.42,8,side*.5,side*.5,side*.78);
+    g.addColorStop(0,"rgba(31,135,79,.22)");g.addColorStop(.6,"rgba(6,39,24,.08)");g.addColorStop(1,"rgba(0,0,0,.35)");
+    b.fillStyle=g; b.fillRect(0,0,side,side);
   }
 
-  function drawGrid(side){
-    ctx.fillStyle="#04100a";ctx.fillRect(0,0,side,side);
-    const bg=ctx.createRadialGradient(side*.5,side*.4,8,side*.5,side*.5,side*.8);
-    bg.addColorStop(0,"rgba(31,135,79,.23)");bg.addColorStop(.55,"rgba(6,39,24,.10)");bg.addColorStop(1,"rgba(0,0,0,.25)");
-    ctx.fillStyle=bg;ctx.fillRect(0,0,side,side);
-    ctx.strokeStyle="rgba(110,255,180,.055)";ctx.lineWidth=1;
-    for(let i=1;i<N;i++){let q=i*cell;ctx.beginPath();ctx.moveTo(q,0);ctx.lineTo(q,side);ctx.stroke();ctx.beginPath();ctx.moveTo(0,q);ctx.lineTo(side,q);ctx.stroke();}
+  function stepAlpha(now){ return paused?1:Math.min(1,Math.max(0,(now-lastTick)/speedMs)); }
+
+  // Позиции сегментов между прошлым и текущим ходом — движение плавное, а не рывками
+  function snakePoints(now){
+    const a=stepAlpha(now), last=prevSnake[prevSnake.length-1];
+    return snake.map((q,i)=>{
+      const o=prevSnake[i]||last||q, dx=q.x-o.x, dy=q.y-o.y;
+      if(Math.abs(dx)>1||Math.abs(dy)>1) return {x:q.x,y:q.y};
+      return {x:o.x+dx*a,y:o.y+dy*a};
+    });
   }
 
-  function drawFood(){
-    const x=(food.x+.5)*cell,y=(food.y+.5)*cell;
-    ctx.save();
-    if(food.type==="apple"){
-      const r=cell*.29;ctx.shadowColor="#ff365d";ctx.shadowBlur=22;
-      const g=ctx.createRadialGradient(x-r*.35,y-r*.35,2,x,y,r);
-      g.addColorStop(0,"#ffd0d7");g.addColorStop(.3,"#ff6679");g.addColorStop(1,"#b80e35");
-      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-      ctx.shadowBlur=0;ctx.fillStyle="#66ff9e";ctx.beginPath();ctx.ellipse(x+r*.25,y-r*.9,r*.28,r*.13,-.5,0,Math.PI*2);ctx.fill();
-    } else {
-      const r=cell*.27;const gold=food.type==="gold";
-      ctx.shadowColor=gold?"#ffe16a":"#ffd84c";ctx.shadowBlur=22;
-      ctx.fillStyle=gold?"#ffd84c":"#f7c531";
-      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle="#fff1a0";ctx.font=`900 ${cell*.28}px system-ui`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(gold?"★":"$",x,y+1);
-    }
-    ctx.restore();
-  }
-
-  function drawSnake(){
+  function drawFood(now){
     if(!snake.length) return;
-    const skin=p.skin||"classic";
-    const colors={
-      classic:["#75ffc0","#18d978"],fire:["#ffe083","#ff4f32"],ice:["#d2fbff","#35bfff"],
-      gold:["#fff2a5","#d99b18"],cyber:["#f0c7ff","#8c52ff"]
-    }[skin]||["#75ffc0","#18d978"];
-    for(let i=snake.length-1;i>=0;i--){
-      const s=snake[i],pad=cell*.105,x=s.x*cell+pad,y=s.y*cell+pad,w=cell-pad*2;
-      const g=ctx.createLinearGradient(x,y,x+w,y+w);g.addColorStop(0,colors[0]);g.addColorStop(1,colors[1]);
-      ctx.save();
-      ctx.globalAlpha=1-i/Math.max(1,snake.length)*.5;
-      ctx.fillStyle=g;ctx.shadowColor=colors[1];ctx.shadowBlur=i===0?18:7;
-      const growPulse=(growthFlash>0 && i===snake.length-1) ? (1+growthFlash*.10) : 1;
-      const dw=(w*(growPulse-1))*.5;
-      roundRect(x-dw,y-dw,w+dw*2,w+dw*2,cell*.24);ctx.fill();ctx.restore();
-      if(i>0 && i%2===0){ctx.fillStyle="rgba(255,255,255,.16)";ctx.beginPath();ctx.arc(x+w*.32,y+w*.28,cell*.045,0,Math.PI*2);ctx.fill()}
+    const x=(food.x+.5)*cell, y=(food.y+.5)*cell, t=now/1000;
+    const born=Math.min(1,(now-foodBorn)/260), sc=(born<1?easeBack(born):1)*(1+Math.sin(t*5)*.05);
+    ctx.save(); ctx.translate(x,y+Math.sin(t*3)*cell*.02); ctx.scale(sc,sc);
+    if(food.type==="apple"){
+      const r=cell*.31;
+      ctx.shadowColor="#ff365d"; ctx.shadowBlur=24;
+      const g=ctx.createRadialGradient(-r*.35,-r*.35,2,0,0,r*1.05);
+      g.addColorStop(0,"#ffd0d7");g.addColorStop(.32,"#ff6679");g.addColorStop(1,"#b80e35");
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0; ctx.strokeStyle="#6b4a2b"; ctx.lineWidth=cell*.05; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(0,-r*.85); ctx.quadraticCurveTo(r*.1,-r*1.2,r*.25,-r*1.3); ctx.stroke();
+      ctx.fillStyle="#66ff9e"; ctx.beginPath(); ctx.ellipse(r*.42,-r*1.05,r*.3,r*.14,-.5,0,Math.PI*2); ctx.fill();
+    } else {
+      const gold=food.type==="gold", r=cell*.3, c=gold?"#ffd84c":"#f7c531";
+      ctx.globalAlpha=.22+.1*Math.sin(t*4); ctx.fillStyle=c; ctx.beginPath(); ctx.arc(0,0,r*1.55,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+      ctx.shadowColor=c; ctx.shadowBlur=24;
+      const g=ctx.createRadialGradient(-r*.3,-r*.3,1,0,0,r);
+      g.addColorStop(0,"#fff6b8"); g.addColorStop(1,c);
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.strokeStyle="rgba(120,80,0,.45)"; ctx.lineWidth=cell*.03; ctx.beginPath(); ctx.arc(0,0,r*.78,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle="#8a5a00"; ctx.font=`900 ${cell*.3}px system-ui`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(gold?"★":"$",0,1);
     }
-    const h=snake[0],x=h.x*cell,y=h.y*cell;
-    ctx.save();ctx.fillStyle="#fff";ctx.shadowColor="#fff";ctx.shadowBlur=5;
-    let eyes=[[.68,.28],[.68,.68]];
-    if(dir.x<0)eyes=[[.32,.28],[.32,.68]];
-    if(dir.y<0)eyes=[[.28,.32],[.72,.32]];
-    if(dir.y>0)eyes=[[.28,.68],[.72,.68]];
-    eyes.forEach(([ex,ey])=>{ctx.beginPath();ctx.arc(x+ex*cell,y+ey*cell,cell*.075,0,Math.PI*2);ctx.fill()});
-    ctx.fillStyle="#08130d";ctx.shadowBlur=0;
-    eyes.forEach(([ex,ey])=>{ctx.beginPath();ctx.arc(x+ex*cell,y+ey*cell,cell*.034,0,Math.PI*2);ctx.fill()});
     ctx.restore();
   }
 
-  function drawParticles(side){
+  function drawSnake(now){
+    if(!snake.length) return;
+    const cols=SKIN_COLORS[p.skin||"classic"]||SKIN_COLORS.classic, c0=hex2rgb(cols[0]), c1=hex2rgb(cols[1]);
+    const pts=snakePoints(now).map(q=>({x:(q.x+.5)*cell,y:(q.y+.5)*cell})), n=pts.length, a=stepAlpha(now);
+    const baseW=cell*.86;
+    const path=(ox=0,oy=0)=>{ctx.beginPath();ctx.moveTo(pts[0].x+ox,pts[0].y+oy);for(let i=1;i<n;i++)ctx.lineTo(pts[i].x+ox,pts[i].y+oy)};
+    ctx.lineCap="round"; ctx.lineJoin="round";
+    // мягкое свечение
+    ctx.save(); ctx.globalAlpha=.5; ctx.shadowColor=cols[1]; ctx.shadowBlur=cell*.9; ctx.strokeStyle=cols[1]; ctx.lineWidth=baseW*.7; path(); ctx.stroke(); ctx.restore();
+    // тело: градиент от головы к хвосту, хвост сужается, «комок» от еды едет к хвосту
+    for(let i=n-1;i>=1;i--){
+      const t=i/Math.max(1,n-1);
+      let bump=0; for(const b of bulges) bump=Math.max(bump,1-Math.abs(i-(b+a))/1.8);
+      const w=baseW*(1-.4*Math.pow(t,1.2))*(1+Math.max(0,bump)*.32);
+      ctx.strokeStyle=mix(c0,c1,t); ctx.lineWidth=w;
+      ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[i-1].x,pts[i-1].y); ctx.stroke();
+    }
+    // блик
+    ctx.save(); ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=baseW*.2; path(-cell*.1,-cell*.12); ctx.stroke(); ctx.restore();
+    // голова
+    const H=pts[0], r=baseW*.62, f={x:dir.x,y:dir.y}, pr={x:-dir.y,y:dir.x};
+    if((now%1600)<280){ // язычок
+      ctx.strokeStyle="#ff4d6d"; ctx.lineWidth=cell*.06; const tx0=H.x+f.x*r*.9, ty0=H.y+f.y*r*.9, tx1=H.x+f.x*r*1.55, ty1=H.y+f.y*r*1.55;
+      ctx.beginPath(); ctx.moveTo(tx0,ty0); ctx.lineTo(tx1,ty1); ctx.moveTo(tx1,ty1); ctx.lineTo(tx1+f.x*r*.25+pr.x*r*.25,ty1+f.y*r*.25+pr.y*r*.25);
+      ctx.moveTo(tx1,ty1); ctx.lineTo(tx1+f.x*r*.25-pr.x*r*.25,ty1+f.y*r*.25-pr.y*r*.25); ctx.stroke();
+    }
+    ctx.save(); ctx.shadowColor=cols[0]; ctx.shadowBlur=cell*.5;
+    const g=ctx.createRadialGradient(H.x-r*.3,H.y-r*.3,1,H.x,H.y,r*1.1); g.addColorStop(0,"#fff"); g.addColorStop(.25,cols[0]); g.addColorStop(1,mix(c0,c1,.3));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(H.x,H.y,r,0,Math.PI*2); ctx.fill(); ctx.restore();
+    for(const sd of [-1,1]){
+      const ex=H.x+f.x*r*.3+pr.x*r*.5*sd, ey=H.y+f.y*r*.3+pr.y*r*.5*sd;
+      ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(ex,ey,r*.27,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#08130d"; ctx.beginPath(); ctx.arc(ex+f.x*r*.08,ey+f.y*r*.08,r*.13,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  function drawParticles(){
     particles=particles.filter(q=>q.life>0);
     for(const q of particles){
       q.x+=q.vx;q.y+=q.vy;q.vy+=.04;q.life-=.035;
       ctx.globalAlpha=Math.max(0,q.life);ctx.fillStyle=q.type==="gold"?"#ffe56b":q.type==="coin"?"#ffd34d":"#7dffbd";
-      ctx.beginPath();ctx.arc(q.x,q.y,q.size*q.life,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(q.x,q.y,Math.max(0,q.size*q.life),0,Math.PI*2);ctx.fill();
     }
     ctx.globalAlpha=1;
   }
 
-  function draw(){
-    const rect=el.cv.getBoundingClientRect(),side=Math.min(rect.width,rect.height);if(!side)return;
-    drawGrid(side);drawFood();drawSnake();drawParticles(side);
-    if(paused&&running){ctx.fillStyle="rgba(0,0,0,.45)";ctx.fillRect(0,0,side,side);ctx.fillStyle="#f4fff9";ctx.font="900 28px system-ui";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("ПАУЗА",side/2,side/2)}
+  function drawFloaters(){
+    floaters=floaters.filter(f=>f.life>0);
+    ctx.save(); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.font=`900 ${cell*.55}px system-ui`;
+    for(const f of floaters){
+      f.life-=.022; const k=1-f.life;
+      ctx.globalAlpha=Math.max(0,Math.min(1,f.life*1.6)); ctx.fillStyle="#fff7c2"; ctx.shadowColor="rgba(255,190,50,.9)"; ctx.shadowBlur=10;
+      ctx.fillText(f.text,f.x*cell,(f.y-k*1.4)*cell);
+    }
+    ctx.restore();
   }
 
-  function renderLoop(){
+  function draw(now=performance.now()){
+    if(!side) return;
+    if(bgc) ctx.drawImage(bgc,0,0,side,side); else {ctx.fillStyle="#04100a";ctx.fillRect(0,0,side,side)}
+    drawFood(now); drawSnake(now); drawParticles(); drawFloaters();
+    if(paused&&running){
+      ctx.fillStyle="rgba(0,0,0,.55)";ctx.fillRect(0,0,side,side);
+      ctx.fillStyle="#f4fff9";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.font="900 30px system-ui";ctx.fillText("ПАУЗА",side/2,side/2-10);
+      ctx.fillStyle="#83a296";ctx.font="600 14px system-ui";ctx.fillText("коснись поля, чтобы продолжить",side/2,side/2+22);
+    }
+  }
+
+  function renderLoop(now){
     if(!running) return;
-    draw();
+    draw(now);
     raf=requestAnimationFrame(renderLoop);
   }
 
   function end(){
+    if(!running) return;
     running=false;clearInterval(timer);cancelAnimationFrame(raf);$("combo").classList.remove("show");
+    draw();
+    const prevBest=p.best_score||0, isRecord=score>0&&score>prevBest;
     const reward=Math.max(5,score*5)+(bestRun>=5?100:0)+runCoins;
-    el.final.textContent=score;el.reward.textContent=reward;el.over.classList.add("show");
-    api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward})}).then(d=>{if(d?.player){p={...p,...(d.player||{}),...(d.bot_username?{bot_username:d.bot_username}:{})};ui();renderRating()}});
+    sfx.over(); try{tg?.HapticFeedback?.notificationOccurred("error")}catch(e){}
+    el.final.textContent=score;$("oapples").textContent=apples;el.reward.textContent=reward;
+    $("recBadge").hidden=!isRecord;
+    el.over.classList.add("show");
+    api("/api/score",{method:"POST",body:JSON.stringify({score,coins:reward,apples})}).then(d=>{if(d?.player){p={...p,...(d.player||{}),...(d.bot_username?{bot_username:d.bot_username}:{})};ui();renderRating()}});
   }
 
   function closeGame(){
@@ -469,7 +671,10 @@ canvas{
   $("pauseBtn").addEventListener("click",pause);
   $("shareBtn").addEventListener("click",share);
   $("copyBtn").addEventListener("click",copyRef);
-  $("bonusBtn").addEventListener("click",()=>toast("Ежедневный бонус скоро будет доступен"));
+  $("dailyBox").addEventListener("click",e=>{if(e.target.closest("#dailyBtn")) claimDaily()});
+  $("missionList").addEventListener("click",e=>{const b=e.target.closest("[data-m]"); if(b&&!b.disabled) claimMission(b.dataset.m)});
+  $("sndBtn").addEventListener("click",()=>{soundOn=!soundOn;try{localStorage.setItem("snakeSound",soundOn?"1":"0")}catch(e){} $("sndBtn").textContent=soundOn?"🔊":"🔇"; if(soundOn) sfx.coin();});
+  $("sndBtn").textContent=soundOn?"🔊":"🔇";
   document.addEventListener("visibilitychange",()=>{if(document.hidden&&running&&!paused)pause()});
   window.addEventListener("resize",()=>{if(running)resizeCanvas()});
 
