@@ -1,16 +1,15 @@
-# Snake Arena v12
+# Snake Arena v13
 
-v12 keeps the PostgreSQL backend from v11 and fixes snake growth behavior.
+## Что нового
+- Змейка растёт постепенно: +1 сегмент за ход после еды (звезда даёт +3), без лимита длины.
+- Рефералы: ссылка `t.me/<бот>?startapp=ref_<id>` приходит с сервера; друг, впервые открывший игру по ссылке, засчитывается один раз (+500 🪙 пригласившему, +200 🪙 другу).
+- Управление на телефоне: свайп в любом месте экрана срабатывает сразу, можно делать серию поворотов не отрывая палец; опциональные экранные кнопки (🎮).
 
-## Growth changes
-- COMBO does not increase snake length.
-- Each food can add at most one segment.
-- Snake length is capped at 14 segments to prevent sudden oversized snakes.
-- New growth gets a tiny visual pulse.
-- Speed progression remains gradual.
+## Настройка рефералов
+Обязательно `BOT_USERNAME`. Если у Mini App есть короткое имя (BotFather → /newapp), укажи `APP_SHORT_NAME` — ссылка станет `t.me/bot/app?startapp=ref_ID`.
 
 ## Run
 npm install
 npm start
 
-Set `DATABASE_URL`, `BOT_TOKEN`, and `BOT_USERNAME` in production.
+Переменные: `DATABASE_URL`, `BOT_TOKEN`, `BOT_USERNAME`.

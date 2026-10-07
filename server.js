@@ -9,6 +9,11 @@ const PORT = Number(process.env.PORT || 3000);
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const BOT_USERNAME = (process.env.BOT_USERNAME || "").replace(/^@/, "");
 const DATABASE_URL = process.env.DATABASE_URL || "";
+// Если у Mini App есть короткое имя (BotFather → /newapp), укажи его в APP_SHORT_NAME —
+// тогда ссылка будет t.me/bot/app?startapp=ref_ID. Иначе используется t.me/bot?startapp=ref_ID.
+const APP_SHORT_NAME = (process.env.APP_SHORT_NAME || "").replace(/^\//, "");
+const REF_REWARD = Number(process.env.REF_REWARD || 500); // пригласившему
+const REF_BONUS = Number(process.env.REF_BONUS || 200);   // приглашённому
 
 if (!DATABASE_URL) {
   console.error("DATABASE_URL is required. Create a Render Postgres database and add its Internal Database URL to the web service environment.");
@@ -45,6 +50,7 @@ async function initDb() {
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS owned_skins TEXT[] NOT NULL DEFAULT ARRAY['classic']::TEXT[]`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS missions JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS daily_bonus_claimed_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS referred_by TEXT`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`UPDATE players SET owned_skins=ARRAY['classic']::TEXT[] WHERE owned_skins IS NULL OR cardinality(owned_skins)=0`);
@@ -74,7 +80,10 @@ function telegramUser(req) {
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
 
     const u = JSON.parse(params.get("user") || "{}");
-    return u?.id ? u : null;
+    if (!u?.id) return null;
+    // start_param входит в подписанные initData, поэтому ему можно доверять
+    u.start_param = params.get("start_param") || "";
+    return u;
   } catch {
     return null;
   }
@@ -82,23 +91,61 @@ function telegramUser(req) {
 
 async function getPlayer(u) {
   const id = String(u.id);
-  await pool.query(
+  const ins = await pool.query(
     `INSERT INTO players (telegram_id, username, first_name)
      VALUES ($1,$2,$3)
      ON CONFLICT (telegram_id) DO UPDATE SET
        username=EXCLUDED.username,
        first_name=EXCLUDED.first_name,
-       updated_at=NOW()`,
+       updated_at=NOW()
+     RETURNING (xmax = 0) AS inserted`,
     [id, u.username || "", u.first_name || ""]
   );
+  // Реферал засчитывается один раз — только когда игрок впервые зашёл по ссылке друга
+  if (ins.rows[0]?.inserted) await applyReferral(id, u.start_param);
   const { rows } = await pool.query(`SELECT * FROM players WHERE telegram_id=$1`, [id]);
   return rows[0];
+}
+
+async function applyReferral(newId, startParam) {
+  const m = /^ref_(\d{1,20})$/.exec(String(startParam || ""));
+  if (!m || m[1] === newId) return;
+  const refId = m[1];
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(
+      `UPDATE players SET referrals=referrals+1, coins=coins+$1, updated_at=NOW() WHERE telegram_id=$2 RETURNING 1`,
+      [REF_REWARD, refId]
+    );
+    if (r.rowCount) {
+      await client.query(
+        `UPDATE players SET referred_by=$1, coins=coins+$2 WHERE telegram_id=$3 AND referred_by IS NULL`,
+        [refId, REF_BONUS, newId]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("referral error", e);
+  } finally {
+    client.release();
+  }
+}
+
+function refLink(id) {
+  if (!BOT_USERNAME) return "";
+  const base = APP_SHORT_NAME ? `https://t.me/${BOT_USERNAME}/${APP_SHORT_NAME}` : `https://t.me/${BOT_USERNAME}`;
+  return `${base}?startapp=ref_${id}`;
 }
 
 function responsePlayer(p) {
   if (!p) return p;
   return {
     ...p,
+    ref_link: refLink(p.telegram_id),
+    ref_reward: REF_REWARD,
+    ref_bonus: REF_BONUS,
     owned_skins: Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"]
   };
 }
@@ -145,8 +192,9 @@ app.post("/api/score", async (req, res) => {
 
   try {
     const p = await getPlayer(u);
-    const score = Math.max(0, Math.min(100000, Number(req.body?.score) || 0));
-    const coins = Math.max(0, Math.min(10000, Number(req.body?.coins) || 0));
+    const score = Math.max(0, Math.min(575, Math.floor(Number(req.body?.score) || 0)));
+    // Максимум за очко ~15 монет (золото: 5 очков = 25 + 50) + бонус 100 — режем накрутку.
+    const coins = Math.max(0, Math.min(Math.floor(score * 16 + 110), Math.floor(Number(req.body?.coins) || 0)));
 
     await pool.query(
       `UPDATE players
