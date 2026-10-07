@@ -1,84 +1,8 @@
-# 🐍 Telegram Snake Mini App
+# Snake Arena v2
+Telegram Mini App Snake with keyboard/WASD, swipe controls, coins, leaderboard, skins, missions UI and referral UI.
+Render: `npm install` / `npm start`. Set `BOT_TOKEN` in Environment.
 
-Готовая стартовая игра для Telegram Mini Apps.
 
-## Что внутри
+## Node.js / Render
 
-- Snake на Canvas
-- Управление кнопками, клавиатурой и свайпами
-- Telegram WebApp API
-- Авторизация через Telegram `initData`
-- SQLite база
-- Личный рекорд
-- Монеты за съеденную еду
-- Топ-20 игроков
-
-## 1. Установка
-
-Нужен Node.js 20+.
-
-```bash
-npm install
-```
-
-## 2. Настройка
-
-Скопируй `.env.example` в `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Заполни:
-
-```env
-BOT_TOKEN=токен_от_BotFather
-PORT=3000
-WEBAPP_URL=https://твой-домен.example
-```
-
-## 3. Запуск
-
-```bash
-npm start
-```
-
-Для разработки:
-
-```bash
-npm run dev
-```
-
-Игра будет доступна на:
-
-```text
-http://localhost:3000
-```
-
-## 4. Подключение к Telegram
-
-Для Telegram Mini App нужен публичный HTTPS-адрес.
-
-В @BotFather:
-
-1. Создай бота командой `/newbot`.
-2. Получи BOT TOKEN.
-3. Открой настройки бота.
-4. Настрой Menu Button / Web App.
-5. Укажи HTTPS-адрес своего приложения.
-
-Например:
-
-```text
-https://snake.example.com
-```
-
-После этого открой бота и нажми кнопку игры.
-
-## Важно про безопасность
-
-Сейчас сервер проверяет подпись Telegram `initData`, поэтому игрок должен быть настоящим пользователем Telegram.
-
-Но отправляемые клиентом `score` и `coins` нельзя считать полностью защищёнными от читов: клиентскую игру можно модифицировать.
-
-Для полноценной коммерческой игры следующий этап — сделать серверную валидацию игрового раунда, rate limit и защиту от накрутки.
+This version pins Node.js to 24.21.0 and uses better-sqlite3 13.0.3. If Render has a `NODE_VERSION` environment variable set to 26.x, change it to `24.21.0` (or remove it so `.node-version` is used).
