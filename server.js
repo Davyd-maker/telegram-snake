@@ -12,6 +12,13 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 // Если у Mini App есть короткое имя (BotFather → /newapp), укажи его в APP_SHORT_NAME —
 // тогда ссылка будет t.me/bot/app?startapp=ref_ID. Иначе используется t.me/bot?startapp=ref_ID.
 const APP_SHORT_NAME = (process.env.APP_SHORT_NAME || "").replace(/^\//, "");
+const DAILY_TZ = process.env.DAILY_TZ || "UTC"; // часовой пояс, по которому «новый день» (например Europe/Moscow)
+const DAILY_REWARDS = [100, 200, 300, 500, 750, 1000, 2000]; // награда за дни серии 1..7, дальше цикл заново
+const MISSIONS = [
+  { id: "score",  icon: "🎯", title: "Набери 50 очков за раунд", target: 50, reward: 300 },
+  { id: "games",  icon: "🐍", title: "Сыграй 3 раунда",          target: 3,  reward: 500 },
+  { id: "apples", icon: "🍎", title: "Съешь 30 яблок",           target: 30, reward: 700 }
+];
 const REF_REWARD = Number(process.env.REF_REWARD || 500); // пригласившему
 const REF_BONUS = Number(process.env.REF_BONUS || 200);   // приглашённому
 
@@ -51,6 +58,7 @@ async function initDb() {
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS missions JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS daily_bonus_claimed_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS referred_by TEXT`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS daily_streak INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`UPDATE players SET owned_skins=ARRAY['classic']::TEXT[] WHERE owned_skins IS NULL OR cardinality(owned_skins)=0`);
@@ -103,8 +111,48 @@ async function getPlayer(u) {
   );
   // Реферал засчитывается один раз — только когда игрок впервые зашёл по ссылке друга
   if (ins.rows[0]?.inserted) await applyReferral(id, u.start_param);
-  const { rows } = await pool.query(`SELECT * FROM players WHERE telegram_id=$1`, [id]);
+  const { rows } = await pool.query(
+    `SELECT *,
+            to_char(daily_bonus_claimed_at AT TIME ZONE $2, 'YYYY-MM-DD') AS last_day,
+            to_char(NOW() AT TIME ZONE $2, 'YYYY-MM-DD') AS today
+     FROM players WHERE telegram_id=$1`,
+    [id, DAILY_TZ]
+  );
   return rows[0];
+}
+
+// Состояние ежедневной награды. Серия растёт, если заходить каждый день; пропуск дня сбрасывает на 1-й день.
+// Задания дня: прогресс хранится в JSONB и сбрасывается при смене дня
+function missionState(p) {
+  const m = p.missions && typeof p.missions === "object" ? p.missions : {};
+  if (m.day !== p.today) return { day: p.today, score: 0, games: 0, apples: 0, claimed: {} };
+  return { day: m.day, score: +m.score || 0, games: +m.games || 0, apples: +m.apples || 0, claimed: m.claimed || {} };
+}
+function missionList(p) {
+  const s = missionState(p);
+  return MISSIONS.map((x) => ({ ...x, progress: Math.min(x.target, s[x.id]), claimed: !!s.claimed[x.id] }));
+}
+
+function dayDiff(a, b) { // b - a в днях, строки YYYY-MM-DD
+  return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+}
+function dailyInfo(p) {
+  const streak = Number(p.daily_streak) || 0;
+  const diff = p.last_day ? dayDiff(p.last_day, p.today) : null;
+  const claimedToday = diff === 0;
+  const canClaim = !claimedToday;
+  const broken = canClaim && streak > 0 && diff !== 1;
+  const nextStreak = canClaim ? (diff === 1 ? streak + 1 : 1) : streak;
+  const idx = (nextStreak - 1) % DAILY_REWARDS.length;
+  return {
+    streak: broken ? 0 : streak,
+    can_claim: canClaim,
+    broken,
+    next_streak: nextStreak,
+    reward: canClaim ? DAILY_REWARDS[idx] : 0,
+    cycle_claimed: canClaim ? idx : ((streak - 1) % DAILY_REWARDS.length) + 1,
+    rewards: DAILY_REWARDS
+  };
 }
 
 async function applyReferral(newId, startParam) {
@@ -144,6 +192,8 @@ function responsePlayer(p) {
   return {
     ...p,
     ref_link: refLink(p.telegram_id),
+    daily: dailyInfo(p),
+    missions: missionList(p),
     ref_reward: REF_REWARD,
     ref_bonus: REF_BONUS,
     owned_skins: Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"]
@@ -171,15 +221,32 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
-app.get("/api/leaderboard", async (_req, res) => {
+app.get("/api/leaderboard", async (req, res) => {
   try {
+    const u = telegramUser(req);
     const { rows } = await pool.query(
-      `SELECT username,first_name,best_score,coins
+      `SELECT telegram_id,username,first_name,best_score,coins
        FROM players
+       WHERE best_score>0
        ORDER BY best_score DESC, coins DESC
        LIMIT 20`
     );
-    res.json({ leaderboard: rows });
+    let me = null;
+    if (u) {
+      const r = await pool.query(`SELECT best_score,coins FROM players WHERE telegram_id=$1`, [String(u.id)]);
+      if (r.rows[0]) {
+        const { best_score, coins } = r.rows[0];
+        const rk = await pool.query(
+          `SELECT COUNT(*)::int+1 AS rank FROM players WHERE best_score>$1 OR (best_score=$1 AND coins>$2)`,
+          [best_score, coins]
+        );
+        me = { rank: rk.rows[0].rank, best_score };
+      }
+    }
+    res.json({
+      leaderboard: rows.map(({ telegram_id, ...x }) => ({ ...x, is_me: !!u && telegram_id === String(u.id) })),
+      me
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ leaderboard: [] });
@@ -196,13 +263,20 @@ app.post("/api/score", async (req, res) => {
     // Максимум за очко ~15 монет (золото: 5 очков = 25 + 50) + бонус 100 — режем накрутку.
     const coins = Math.max(0, Math.min(Math.floor(score * 16 + 110), Math.floor(Number(req.body?.coins) || 0)));
 
+    const apples = Math.max(0, Math.min(score, Math.floor(Number(req.body?.apples) || 0)));
+    const ms = missionState(p);
+    ms.score = Math.max(ms.score, score);
+    if (score >= 1) ms.games += 1;
+    ms.apples += apples;
+
     await pool.query(
       `UPDATE players
        SET best_score=GREATEST(best_score,$1),
            coins=coins+$2,
+           missions=$4::jsonb,
            updated_at=NOW()
        WHERE telegram_id=$3`,
-      [score, coins, String(u.id)]
+      [score, coins, String(u.id), JSON.stringify(ms)]
     );
 
     const updated = await getPlayer(u);
@@ -210,6 +284,76 @@ app.post("/api/score", async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Database error" });
+  }
+});
+
+app.post("/api/daily", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+  const client = await pool.connect();
+  try {
+    await getPlayer(u); // гарантируем, что игрок есть
+    await client.query("BEGIN");
+    // блокировка строки — двойной тап не даст забрать награду дважды
+    const { rows } = await client.query(
+      `SELECT *,
+              to_char(daily_bonus_claimed_at AT TIME ZONE $2, 'YYYY-MM-DD') AS last_day,
+              to_char(NOW() AT TIME ZONE $2, 'YYYY-MM-DD') AS today
+       FROM players WHERE telegram_id=$1 FOR UPDATE`,
+      [String(u.id), DAILY_TZ]
+    );
+    const info = dailyInfo(rows[0]);
+    if (!info.can_claim) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Already claimed today", player: responsePlayer(await getPlayer(u)) });
+    }
+    await client.query(
+      `UPDATE players SET coins=coins+$1, daily_streak=$2, daily_bonus_claimed_at=NOW(), updated_at=NOW() WHERE telegram_id=$3`,
+      [info.reward, info.next_streak, String(u.id)]
+    );
+    await client.query("COMMIT");
+    res.json({ reward: info.reward, player: responsePlayer(await getPlayer(u)) });
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(e);
+    res.status(500).json({ error: "Database error" });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/mission", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+  const def = MISSIONS.find((x) => x.id === String(req.body?.id || ""));
+  if (!def) return res.status(400).json({ error: "Bad mission" });
+  const client = await pool.connect();
+  try {
+    await getPlayer(u);
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `SELECT *, to_char(NOW() AT TIME ZONE $2, 'YYYY-MM-DD') AS today
+       FROM players WHERE telegram_id=$1 FOR UPDATE`,
+      [String(u.id), DAILY_TZ]
+    );
+    const ms = missionState(rows[0]);
+    if (ms[def.id] < def.target || ms.claimed[def.id]) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Not available", player: responsePlayer(await getPlayer(u)) });
+    }
+    ms.claimed[def.id] = true;
+    await client.query(
+      `UPDATE players SET coins=coins+$1, missions=$2::jsonb, updated_at=NOW() WHERE telegram_id=$3`,
+      [def.reward, JSON.stringify(ms), String(u.id)]
+    );
+    await client.query("COMMIT");
+    res.json({ reward: def.reward, player: responsePlayer(await getPlayer(u)) });
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(e);
+    res.status(500).json({ error: "Database error" });
+  } finally {
+    client.release();
   }
 });
 
