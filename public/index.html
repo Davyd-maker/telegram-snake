@@ -131,6 +131,9 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
 .lbrow{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:15px;background:rgba(4,14,9,.6);border:1px solid rgba(120,255,190,.07)}
 .lbpos{width:28px;text-align:center;font-weight:900;font-size:16px;color:var(--muted)}
 .lbav{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:#12301f;font-weight:900;color:var(--accent)}
+.lbhd{position:relative;flex:none;width:34px;height:34px;border-radius:50% 46% 46% 50%;overflow:hidden;box-shadow:0 0 0 2px rgba(0,0,0,.3)}
+.lbhd:before,.lbhd:after{content:"";position:absolute;right:5px;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 62% 50%,#08130d 0 2.4px,#fff 3px)}
+.lbhd:before{top:6px}.lbhd:after{bottom:6px}
 .lbname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}.lbname em{color:var(--accent);font-style:normal;font-size:12px}
 .lbrow b{font-variant-numeric:tabular-nums}
 .lbrow.top1{background:linear-gradient(135deg,rgba(255,214,102,.2),rgba(255,214,102,.04));border-color:rgba(255,214,102,.35)}
@@ -411,7 +414,8 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
     const medal=["🥇","🥈","🥉"];
     const row=(x,i)=>{
       const raw=String(x.first_name||x.username||"Игрок");
-      return `<div class="lbrow${i<3?" top"+(i+1):""}${x.is_me?" me":""}"><span class="lbpos">${i<3?medal[i]:i+1}</span><span class="lbav">${esc([...raw][0].toUpperCase())}</span><span class="lbname">${esc(raw)}${x.is_me?" <em>(ты)</em>":""}</span><b>${x.best_score||0} 🏆</b></div>`;
+      const known=(p.skins||DEFAULT_SKINS).map(k=>k.id), sk=known.includes(x.skin)?x.skin:"classic";
+      return `<div class="lbrow${i<3?" top"+(i+1):""}${x.is_me?" me":""}"><span class="lbpos">${i<3?medal[i]:i+1}</span><span class="lbhd pv-${sk}" title="${esc(sk)}"></span><span class="lbname">${esc(raw)}${x.is_me?" <em>(ты)</em>":""}</span><b>${x.best_score||0} 🏆</b></div>`;
     };
     const head=me?`<div class="lbme"><span>Твоё место</span><span>#${me.rank} · рекорд ${me.best_score}</span></div>`:"";
     el.table.innerHTML=head+(a.length?a.map(row).join(""):'<div class="lbempty">Пока пусто — стань первым! 🐍</div>');
@@ -540,9 +544,15 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
     ghost:{icon:"👻",color:"#c58bff",dur:6000,name:"Призрак"}
   };
   const PU_LIFE=9000;
+  const SPEED_START=120, SPEED_MIN=75; // мс на ход
   const COMBO_WINDOW=40, COMBO_MAX=5; // яблок подряд: окно в ходах и максимальный множитель
   const stepMs=()=>speedMs*(fx.slow>gameTime?1.6:1);
   const ghostOn=()=>fx.ghost>gameTime;
+  // Скорость растёт плавно вместе с длиной: 120 мс/ход на старте → ~102 на 24 сегментах → ~91 на 44 → стремится к 75
+  function updateSpeed(){
+    const len=snake.length+pendingGrowth;
+    speedMs=Math.round(SPEED_MIN+(SPEED_START-SPEED_MIN)*Math.exp(-Math.max(0,len-START_LEN)/40));
+  }
   function schedule(){ clearInterval(timer); timer=setInterval(tick,stepMs()); }
 
   function resizeCanvas(){
@@ -663,7 +673,7 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
       floaters.push({x:food.x+.5,y:food.y+.3,life:1,text:(food.type==="gold"?`+${pts} ⭐`:food.type==="coin"?`+${pts} · ${10*mult}🪙`:`+${pts}`)+(cm>1?` ×${cm}`:"")});
       (food.type==="gold"?sfx.gold:food.type==="coin"?sfx.coin:sfx.eat)();
       bulges.push(-1); // «комок» от съеденной еды поползёт от головы к хвосту
-      speedMs=Math.max(70,Math.round(120-apples*1.5)); // разгон от съеденного, а не от очков
+      updateSpeed(); // умеренный разгон по длине змеи
       schedule();
       addParticles(food.x,food.y,food.type);
       el.score.textContent=score; el.gc.textContent=p.coins||0;
@@ -735,7 +745,10 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
   function snakePoints(now){
     const a=stepAlpha(now), last=prevSnake[prevSnake.length-1];
     return snake.map((q,i)=>{
-      const o=prevSnake[i]||last||q, dx=q.x-o.x, dy=q.y-o.y;
+      const o=prevSnake[i]||last||q; let dx=q.x-o.x, dy=q.y-o.y;
+      // переход через край поля (тор): считаем кратчайший путь, а не прыжок через всё поле
+      if(Math.abs(dx)>N/2) dx-=Math.sign(dx)*N;
+      if(Math.abs(dy)>N/2) dy-=Math.sign(dy)*N;
       if(Math.abs(dx)>1||Math.abs(dy)>1) return {x:q.x,y:q.y};
       return {x:o.x+dx*a,y:o.y+dy*a};
     });
@@ -841,8 +854,31 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
     const colAt=t=>epic?epic.color(t,now):mix(c0,c1,t);
     const glow=epic?epic.glow(now):cols[1], headCol=epic?epic.color(0,now):cols[0];
     const pts=snakePoints(now).map(q=>({x:(q.x+.5)*cell,y:(q.y+.5)*cell})), n=pts.length, a=stepAlpha(now);
+    // «разворачиваем» тор: каждая точка — рядом с предыдущей, тогда линия не пересекает всё поле при переходе через край
+    for(let i=1;i<n;i++){
+      pts[i].x-=Math.round((pts[i].x-pts[i-1].x)/side)*side;
+      pts[i].y-=Math.round((pts[i].y-pts[i-1].y)/side)*side;
+    }
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    for(const q of pts){ if(q.x<minX)minX=q.x; if(q.x>maxX)maxX=q.x; if(q.y<minY)minY=q.y; if(q.y>maxY)maxY=q.y; }
+    // копии змейки со сдвигом на размер поля — часть, ушедшая за край, появляется с противоположной стороны
+    const offs=[], pad=cell;
+    for(let kx=Math.floor((-pad-maxX)/side);kx<=Math.ceil((side+pad-minX)/side);kx++)
+      for(let ky=Math.floor((-pad-maxY)/side);ky<=Math.ceil((side+pad-minY)/side);ky++){
+        if(maxX+kx*side<-pad||minX+kx*side>side+pad||maxY+ky*side<-pad||minY+ky*side>side+pad) continue;
+        offs.push([kx*side,ky*side]);
+      }
+    if(!offs.length) offs.push([0,0]);
     const sp=chaikin(pts,n>50?1:2), m=sp.length; // сглаженная осевая линия
     const baseW=cell*.86;
+    // голова: направление берётся по изгибу тела и плавно доворачивается (считаем один раз)
+    const H0=sp[0], r0=baseW*.62;
+    const ref=sp[Math.min(m-1,4)]; let tx=H0.x-ref.x, ty=H0.y-ref.y; const tl=Math.hypot(tx,ty);
+    if(tl>.01){ tx/=tl; ty/=tl; } else { tx=dir.x; ty=dir.y; }
+    headDir.x+=(tx-headDir.x)*.35; headDir.y+=(ty-headDir.y)*.35;
+    const hl=Math.hypot(headDir.x,headDir.y)||1, f={x:headDir.x/hl,y:headDir.y/hl}, pr={x:-f.y,y:f.x};
+    for(const [ox,oy] of offs){
+      ctx.save(); if(ox||oy) ctx.translate(ox,oy);
     const path=(ox=0,oy=0)=>{ctx.beginPath();ctx.moveTo(sp[0].x+ox,sp[0].y+oy);for(let i=1;i<m;i++)ctx.lineTo(sp[i].x+ox,sp[i].y+oy)};
     ctx.lineCap="round"; ctx.lineJoin="round";
     // мягкое свечение
@@ -858,12 +894,7 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
     if(epic) epicFx(skin,pts,n,now,baseW);
     // блик
     ctx.save(); ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=baseW*.2; path(-cell*.1,-cell*.12); ctx.stroke(); ctx.restore();
-    // голова: направление берётся по изгибу тела и плавно доворачивается
     const H=sp[0], r=baseW*.62;
-    const ref=sp[Math.min(m-1,4)]; let tx=H.x-ref.x, ty=H.y-ref.y; const tl=Math.hypot(tx,ty);
-    if(tl>.01){ tx/=tl; ty/=tl; } else { tx=dir.x; ty=dir.y; }
-    headDir.x+=(tx-headDir.x)*.35; headDir.y+=(ty-headDir.y)*.35;
-    const hl=Math.hypot(headDir.x,headDir.y)||1, f={x:headDir.x/hl,y:headDir.y/hl}, pr={x:-f.y,y:f.x};
     if((now%1600)<280){ // язычок
       ctx.strokeStyle="#ff4d6d"; ctx.lineWidth=cell*.06; const tx0=H.x+f.x*r*.9, ty0=H.y+f.y*r*.9, tx1=H.x+f.x*r*1.55, ty1=H.y+f.y*r*1.55;
       ctx.beginPath(); ctx.moveTo(tx0,ty0); ctx.lineTo(tx1,ty1); ctx.moveTo(tx1,ty1); ctx.lineTo(tx1+f.x*r*.25+pr.x*r*.25,ty1+f.y*r*.25+pr.y*r*.25);
@@ -876,6 +907,8 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
       const ex=H.x+f.x*r*.3+pr.x*r*.5*sd, ey=H.y+f.y*r*.3+pr.y*r*.5*sd;
       ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(ex,ey,r*.27,0,Math.PI*2); ctx.fill();
       ctx.fillStyle="#08130d"; ctx.beginPath(); ctx.arc(ex+f.x*r*.08,ey+f.y*r*.08,r*.13,0,Math.PI*2); ctx.fill();
+    }
+      ctx.restore();
     }
   }
 
