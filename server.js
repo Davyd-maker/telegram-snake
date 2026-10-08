@@ -26,6 +26,7 @@ const REMINDERS_ON = process.env.REMINDERS !== "off";
 const REMINDER_HOUR = Number(process.env.REMINDER_HOUR || 18); // с этого часа (по DAILY_TZ) шлём напоминание о серии
 const WEBHOOK_SECRET = BOT_TOKEN ? crypto.createHash("sha256").update("wh:" + BOT_TOKEN).digest("hex").slice(0, 48) : "";
 const RUN_KEY = crypto.createHash("sha256").update("run:" + (BOT_TOKEN || "dev")).digest();
+const ADMIN_IDS = new Set(String(process.env.ADMIN_TELEGRAM_ID || process.env.ADMIN_TELEGRAM_IDS || "").split(",").map(x=>x.trim()).filter(Boolean));
 
 // Каталог скинов — единый источник правды. currency: coins — за монеты, stars — за Telegram Stars (XTR)
 const SKIN_CATALOG = [
@@ -41,9 +42,33 @@ const SKIN_CATALOG = [
   { id: "rainbow", name: "Радуга",    emoji: "🌈", price: 50,    currency: "stars", epic: true, desc: "Переливается всеми цветами" },
   { id: "galaxy",  name: "Галактика", emoji: "🌌", price: 100,   currency: "stars", epic: true, desc: "Мерцающие звёзды по телу" },
   { id: "inferno", name: "Дракон",    emoji: "🐲", price: 150,   currency: "stars", epic: true, desc: "Огонь и искры за хвостом" },
-  { id: "diamond", name: "Алмаз",     emoji: "💎", price: 250,   currency: "stars", epic: true, desc: "Сверкающие грани и блики" }
+  { id: "diamond", name: "Алмаз",     emoji: "💎", price: 250,   currency: "stars", epic: true, desc: "Сверкающие грани и блики" },
+  { id: "aurora", name: "Аврора", emoji: "🌌", price: 120, currency: "stars", epic: true, desc: "Северное сияние переливается по телу" },
+  { id: "samurai", name: "Самурай", emoji: "⚔️", price: 180, currency: "stars", epic: true, desc: "Алый клинок и искры за хвостом" },
+  { id: "void", name: "Пустота", emoji: "🕳️", price: 220, currency: "stars", epic: true, desc: "Тёмная энергия и фиолетовое свечение" },
+  { id: "prism", name: "Призма", emoji: "🔷", price: 300, currency: "stars", epic: true, desc: "Радужные грани и кристальные вспышки" },
+  { id: "season_champion", name: "Корона сезона", emoji: "👑", price: null, currency: "season", epic: true, seasonRank: 1, desc: "Эксклюзив за 1-е место сезона" },
+  { id: "season_elite", name: "Фантом сезона", emoji: "👻", price: null, currency: "season", epic: true, seasonRank: 3, desc: "Эксклюзив за топ-3 сезона" },
+  { id: "season_master", name: "Неоновый мастер", emoji: "⚡", price: null, currency: "season", epic: true, seasonRank: 10, desc: "Эксклюзив за топ-10 сезона" }
 ];
 const SKIN_BY_ID = Object.fromEntries(SKIN_CATALOG.map((s) => [s.id, s]));
+const ARTIFACT_CATALOG = [
+  { id:"magnet", name:"Магнит", emoji:"🧲", rarity:"rare", desc:"Подбирает еду на расстоянии 1 клетки.", color:"#55d6ff" },
+  { id:"berserk", name:"Берсерк", emoji:"🔥", rarity:"epic", desc:"После 3+ комбо каждый следующий предмет даёт +25% очков.", color:"#ff7a32" },
+  { id:"phantom", name:"Фантом", emoji:"👻", rarity:"legendary", desc:"Один раз за забег спасает от столкновения со стеной или телом.", color:"#b48cff" }
+];
+const ARTIFACT_BY_ID = Object.fromEntries(ARTIFACT_CATALOG.map(a=>[a.id,a]));
+function weeklySkinFor(season){
+  const seed = Number(season?.id || 1);
+  const palettes = [
+    ["#9affd0","#00a878","🌿","Нефритовый дух"],["#ffd1ef","#ff4f9a","🌸","Розовый комет"],
+    ["#c8f5ff","#247cff","🌊","Лазурный шторм"],["#fff0a8","#ff7a00","☀️","Солнечный рейдер"],
+    ["#e2c7ff","#713cff","🔮","Астральный кристалл"],["#d8ff8b","#39a900","☣️","Токсичный спектр"],
+    ["#ffffff","#9ca8ff","🌙","Лунный призрак"],["#ffb4a8","#d71920","🌹","Алый феникс"]
+  ];
+  const q=palettes[(seed-1)%palettes.length], week=String(season?.starts_at||'').slice(0,10).replaceAll('-','');
+  return {id:`weekly_${week||seed}`,name:`${q[3]} · ${week||'Weekly'}`,emoji:q[2],price:null,currency:"season",epic:true,weekly:true,seasonId:season?.id,desc:"Уникальный скин этой недели. После сезона получить его нельзя.",palette:q.slice(0,2)};
+}
 
 // Каталог игровых полей. Все «красивые» поля покупаются за Telegram Stars,
 // одно простое («Графит») — за 25 000 монет. Цены меняй здесь.
@@ -54,7 +79,11 @@ const FIELD_CATALOG = [
   { id: "frost",    name: "Мороз",    emoji: "❄️", price: 75,    currency: "stars", epic: true, desc: "Ледяное поле, идёт снег" },
   { id: "desert",   name: "Пустыня",  emoji: "🏜️", price: 75,    currency: "stars", epic: true, desc: "Тёплый песок и закат" },
   { id: "lava",     name: "Лава",     emoji: "🌋", price: 100,   currency: "stars", epic: true, desc: "Жар поднимается снизу" },
-  { id: "space",    name: "Космос",   emoji: "🌌", price: 150,   currency: "stars", epic: true, desc: "Мерцающие звёзды" }
+  { id: "space",    name: "Космос",   emoji: "🌌", price: 150,   currency: "stars", epic: true, desc: "Мерцающие звёзды" },
+  { id: "aurora_field", name: "Аврора", emoji: "🌌", price: 110, currency: "stars", epic: true, desc: "Сияющие волны северного света" },
+  { id: "cyber_field", name: "Киберпанк", emoji: "🏙️", price: 130, currency: "stars", epic: true, desc: "Неоновый мегаполис и сканирующая сетка" },
+  { id: "volcano_field", name: "Вулкан", emoji: "🌋", price: 175, currency: "stars", epic: true, desc: "Лава, пепел и раскалённые трещины" },
+  { id: "crystal_field", name: "Кристалл", emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" }
 ];
 const FIELD_BY_ID = Object.fromEntries(FIELD_CATALOG.map((f) => [f.id, f]));
 
@@ -112,12 +141,24 @@ async function initDb() {
     )
   `);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS daily_streak INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS xp INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS achievements JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS weekly JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS games_played INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS total_apples INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS best_combo INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS owned_artifacts TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS equipped_artifact TEXT NOT NULL DEFAULT 'magnet'`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS seasons (id SERIAL PRIMARY KEY, name TEXT NOT NULL, starts_at TIMESTAMPTZ NOT NULL, ends_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS season_scores (season_id INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE, telegram_id TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(season_id,telegram_id))`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS challenges (id TEXT PRIMARY KEY, creator_id TEXT NOT NULL, creator_score INTEGER NOT NULL, accepted_by TEXT, accepted_score INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL)`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`UPDATE players SET owned_skins=ARRAY['classic']::TEXT[] WHERE owned_skins IS NULL OR cardinality(owned_skins)=0`);
   await pool.query(`UPDATE players SET owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY['classic']::TEXT[])) WHERE NOT ('classic' = ANY(owned_skins))`);
   await pool.query(`UPDATE players SET owned_fields=ARRAY['classic']::TEXT[] WHERE owned_fields IS NULL OR cardinality(owned_fields)=0`);
   await pool.query(`UPDATE players SET owned_fields=ARRAY(SELECT DISTINCT unnest(owned_fields || ARRAY['classic']::TEXT[])) WHERE NOT ('classic' = ANY(owned_fields))`);
+  await pool.query(`UPDATE players SET owned_artifacts=ARRAY['magnet']::TEXT[] WHERE owned_artifacts IS NULL OR cardinality(owned_artifacts)=0`);
 }
 
 app.use(express.json({ limit: "100kb" }));
@@ -262,6 +303,48 @@ function refLink(id) {
   return `https://t.me/${BOT_USERNAME}?start=ref_${id}`;
 }
 
+
+function currentSeasonBounds(now=new Date()) {
+  const d = new Date(now); const day = d.getUTCDay();
+  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((day + 6) % 7)));
+  const starts = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate()));
+  const ends = new Date(starts); ends.setUTCDate(ends.getUTCDate()+7); return {starts,ends};
+}
+async function ensureSeason() {
+  const {starts,ends}=currentSeasonBounds();
+  let r=await pool.query(`SELECT * FROM seasons WHERE starts_at=$1 AND ends_at=$2 LIMIT 1`,[starts,ends]);
+  if(!r.rows[0]) r=await pool.query(`INSERT INTO seasons(name,starts_at,ends_at) VALUES($1,$2,$3) RETURNING *`,[`Неделя ${starts.toISOString().slice(0,10)}`,starts,ends]);
+  return r.rows[0];
+}
+function levelInfo(xp=0){ const x=Math.max(0,Number(xp)||0); const level=Math.floor(Math.sqrt(x/100))+1; const cur=(level-1)*(level-1)*100, next=level*level*100; return {level,xp:x,current:cur,next,progress:Math.min(100,Math.round((x-cur)/(next-cur)*100))}; }
+const ACHIEVEMENTS=[
+ {id:'first',icon:'🐣',title:'Первый забег',need:p=>p.games>=1,reward:250},
+ {id:'apples100',icon:'🍎',title:'100 яблок',need:p=>p.total_apples>=100,reward:500},
+ {id:'score500',icon:'🔥',title:'500 очков',need:p=>p.best_score>=500,reward:750},
+ {id:'combo5',icon:'⚡',title:'Комбо ×5',need:p=>p.best_combo>=5,reward:1000},
+ {id:'friends5',icon:'👥',title:'5 друзей',need:p=>p.referrals>=5,reward:1500}
+];
+function achievementList(p){const a=p.achievements||{};return ACHIEVEMENTS.map(x=>({...x,claimed:!!a[x.id]}));}
+
+function seasonRewards(season){
+  const weekly=weeklySkinFor(season);
+  return [
+    {rank:1, icon:weekly.emoji, title:weekly.name, skin:weekly.id, coins:6000, label:"Топ-1 · эксклюзив недели"},
+    {rank:3, icon:"👻", title:"Фантом сезона", skin:"season_elite", coins:3000, label:"Топ-3"},
+    {rank:10, icon:"⚡", title:"Неоновый мастер", skin:"season_master", coins:1500, label:"Топ-10"}
+  ].map(x=>({...x,season_id:season.id,weekly:x.skin===weekly.id}));
+}
+async function enrichPlayer(p){
+  const season=await ensureSeason();
+  const r=await pool.query(`SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2`,[season.id,String(p.telegram_id)]);
+  const rank=await pool.query(`SELECT COUNT(*)::int+1 rank FROM season_scores WHERE season_id=$1 AND score>$2`,[season.id,r.rows[0]?.score||0]);
+  const stats=await pool.query(`SELECT COALESCE((missions->>'games')::int,0) games FROM players WHERE telegram_id=$1`,[String(p.telegram_id)]);
+  p.season_score=r.rows[0]?.score||0; p.season_rank=rank.rows[0]?.rank||1; p.level=levelInfo(p.xp||0); p.achievements_list=achievementList(p); p.season={id:season.id,name:season.name,ends_at:season.ends_at};
+  const autoArtifacts=["magnet", ...(p.level.level>=3?["berserk"]:[]), ...(p.level.level>=7?["phantom"]:[])];
+  p.owned_artifacts=Array.from(new Set([...(p.owned_artifacts||[]),...autoArtifacts]));
+  await pool.query(`UPDATE players SET owned_artifacts=$1::text[] WHERE telegram_id=$2`,[p.owned_artifacts,String(p.telegram_id)]);
+  return p;
+}
 function responsePlayer(p) {
   if (!p) return p;
   return {
@@ -269,7 +352,10 @@ function responsePlayer(p) {
     ref_link: refLink(p.telegram_id),
     invited_by: p.invited_by || null,
     daily: dailyInfo(p),
-    skins: SKIN_CATALOG,
+    skins: [...SKIN_CATALOG, weeklySkinFor(p.season || {id:1,starts_at:new Date().toISOString()})],
+    artifacts: ARTIFACT_CATALOG,
+    owned_artifacts: Array.isArray(p.owned_artifacts) && p.owned_artifacts.length ? p.owned_artifacts : ["magnet"],
+    equipped_artifact: ARTIFACT_BY_ID[p.equipped_artifact] ? p.equipped_artifact : "magnet",
     fields: FIELD_CATALOG,
     field_skin: FIELD_BY_ID[p.field_skin] ? p.field_skin : "classic",
     stars_enabled: !!BOT_TOKEN,
@@ -277,7 +363,8 @@ function responsePlayer(p) {
     ref_reward: REF_REWARD,
     ref_bonus: REF_BONUS,
     owned_skins: Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"],
-    owned_fields: Array.isArray(p.owned_fields) && p.owned_fields.length ? p.owned_fields : ["classic"]
+    owned_fields: Array.isArray(p.owned_fields) && p.owned_fields.length ? p.owned_fields : ["classic"],
+    level: levelInfo(p.xp||0), achievements_list: achievementList(p), xp: Number(p.xp||0), games_played:Number(p.games_played||0), total_apples:Number(p.total_apples||0), best_combo:Number(p.best_combo||0), season_score:Number(p.season_score||0), season:p.season||null
   };
 }
 
@@ -295,6 +382,8 @@ app.get("/api/me", async (req, res) => {
   if (!u) return res.status(401).json({ error: "Telegram authorization required" });
   try {
     const p = await getPlayer(u);
+    const season=await ensureSeason(); const sr=await pool.query(`SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2`,[season.id,String(u.id)]);
+    p.season_score=sr.rows[0]?.score||0; p.season=season;
     res.json({ player: responsePlayer(p), bot_username: BOT_USERNAME });
   } catch (e) {
     console.error(e);
@@ -349,6 +438,28 @@ app.get("/api/leaderboard", async (req, res) => {
     res.status(500).json({ leaderboard: [] });
   }
 });
+
+
+app.get('/api/season', async (req,res)=>{try{const u=telegramUser(req); const season=await ensureSeason(); const {rows}=await pool.query(`SELECT s.score,p.first_name,p.username,ss.telegram_id FROM season_scores s JOIN players p ON p.telegram_id=s.telegram_id JOIN season_scores ss ON ss.telegram_id=s.telegram_id AND ss.season_id=s.season_id WHERE s.season_id=$1 ORDER BY s.score DESC LIMIT 20`,[season.id]); let me=null;if(u){const r=await pool.query(`SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2`,[season.id,String(u.id)]); if(r.rows[0]){const q=await pool.query(`SELECT COUNT(*)::int+1 rank FROM season_scores WHERE season_id=$1 AND score>$2`,[season.id,r.rows[0].score]);me={rank:q.rows[0].rank,score:r.rows[0].score};}}res.json({season,leaderboard:rows,me,rewards:seasonRewards(season)});}catch(e){console.error(e);res.status(500).json({leaderboard:[]})}});
+app.post('/api/season/claim',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});try{const season=await ensureSeason();if(new Date(season.ends_at)>new Date())return res.status(400).json({error:'Season is still active'});const rankQ=await pool.query(`SELECT COUNT(*)::int+1 rank FROM season_scores WHERE season_id=$1 AND score>(SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2)`,[season.id,String(u.id)]);const rank=rankQ.rows[0]?.rank||999999;const reward=seasonRewards(season).find(x=>rank<=x.rank);if(!reward)return res.status(400).json({error:'No reward'});const key=`season:${season.id}:${reward.skin}`;const p=await getPlayer(u);const claimed=p.achievements||{};if(claimed[key])return res.status(400).json({error:'Already claimed',player:responsePlayer(p)});claimed[key]=true;await pool.query(`UPDATE players SET achievements=$1::jsonb,coins=coins+$2,owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$3]::TEXT[])),skin=$3,xp=xp+$2,updated_at=NOW() WHERE telegram_id=$4`,[JSON.stringify(claimed),reward.coins,reward.skin,String(u.id)]);res.json({reward,rank,player:responsePlayer(await getPlayer(u))});}catch(e){console.error(e);res.status(500).json({error:'Database error'})}});
+
+app.get('/api/achievements',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});try{const p=await getPlayer(u);res.json({achievements:achievementList(p)})}catch(e){res.status(500).json({achievements:[]})}});
+app.post('/api/achievement',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});const def=ACHIEVEMENTS.find(x=>x.id===String(req.body?.id));if(!def)return res.status(400).json({error:'Bad achievement'});try{const p=await getPlayer(u);const a=p.achievements||{}; if(a[def.id])return res.status(400).json({error:'Already claimed',player:responsePlayer(p)}); const stats={games:Number(p.games_played||0),total_apples:Number(p.total_apples||0),best_score:Number(p.best_score||0),best_combo:Number(p.best_combo||0),referrals:Number(p.referrals||0)}; if(!def.need(stats))return res.status(400).json({error:'Not ready',player:responsePlayer(p)});a[def.id]=true;await pool.query(`UPDATE players SET achievements=$1::jsonb,coins=coins+$2,xp=xp+$2 WHERE telegram_id=$3`,[JSON.stringify(a),def.reward,String(u.id)]);res.json({reward:def.reward,player:responsePlayer(await getPlayer(u))})}catch(e){console.error(e);res.status(500).json({error:'Database error'})}});
+app.get('/api/artifacts', async (req,res)=>{
+  const u=telegramUser(req); if(!u)return res.status(401).json({error:'Telegram authorization required'});
+  try{ const p=await getPlayer(u); res.json({artifacts:ARTIFACT_CATALOG,owned:p.owned_artifacts||['magnet'],equipped:p.equipped_artifact||'magnet'}); }
+  catch(e){res.status(500).json({error:'Database error'});}
+});
+app.post('/api/artifact/equip', async(req,res)=>{
+  const u=telegramUser(req); if(!u)return res.status(401).json({error:'Telegram authorization required'});
+  const id=String(req.body?.id||''); if(!ARTIFACT_BY_ID[id])return res.status(400).json({error:'Bad artifact'});
+  try{ const p=await getPlayer(u); const owned=p.owned_artifacts||['magnet']; if(!owned.includes(id))return res.status(403).json({error:'Artifact not owned'}); await pool.query(`UPDATE players SET equipped_artifact=$1,updated_at=NOW() WHERE telegram_id=$2`,[id,String(u.id)]); res.json({ok:true,player:responsePlayer(await getPlayer(u))}); }
+  catch(e){console.error(e);res.status(500).json({error:'Database error'});}
+});
+
+app.get('/api/challenge/:id',async(req,res)=>{try{const r=await pool.query(`SELECT creator_score,expires_at FROM challenges WHERE id=$1 AND expires_at>NOW()`,[String(req.params.id)]);if(!r.rowCount)return res.status(404).json({error:'Challenge not found'});res.json({challenge:r.rows[0]})}catch(e){res.status(500).json({error:'Database error'})}});
+app.post('/api/challenge',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});const score=Math.max(0,Math.min(3000,Math.floor(Number(req.body?.score)||0)));if(!score)return res.status(400).json({error:'Bad score'});const id=crypto.randomBytes(5).toString('hex');await pool.query(`INSERT INTO challenges(id,creator_id,creator_score,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '48 hours')`,[id,String(u.id),score]);res.json({id,score});});
+app.post('/api/challenge/:id',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});const score=Math.max(0,Math.min(3000,Math.floor(Number(req.body?.score)||0)));const r=await pool.query(`UPDATE challenges SET accepted_by=$1,accepted_score=$2 WHERE id=$3 AND expires_at>NOW() AND accepted_by IS NULL RETURNING *`,[String(u.id),score,String(req.params.id)]);if(!r.rowCount)return res.status(400).json({error:'Challenge expired or already played'});res.json({ok:true,win:score>r.rows[0].creator_score,creator_score:r.rows[0].creator_score,score});});
 
 // ---- Базовая проверка забега: сервер выдаёт подписанный токен при старте, а при финише
 // сверяет заявленные очки с реально прошедшим временем. Не идеальная защита, но убирает
@@ -410,16 +521,12 @@ app.post("/api/score", async (req, res) => {
     if (score >= 1) ms.games += 1;
     ms.apples += apples;
 
+    const gainedXp=Math.max(5,Math.floor(score/2)+apples*3);
     await pool.query(
-      `UPDATE players
-       SET best_score=GREATEST(best_score,$1),
-           best_nowalls=GREATEST(best_nowalls,$5),
-           coins=coins+$2,
-           missions=$4::jsonb,
-           updated_at=NOW()
-       WHERE telegram_id=$3`,
-      [mode === "classic" ? score : 0, coins, String(u.id), JSON.stringify(ms), mode === "nowalls" ? score : 0]
+      `UPDATE players SET best_score=GREATEST(best_score,$1), best_nowalls=GREATEST(best_nowalls,$5), coins=coins+$2, missions=$4::jsonb, xp=xp+$6, games_played=games_played+$7, total_apples=total_apples+$8, best_combo=GREATEST(best_combo,$9), updated_at=NOW() WHERE telegram_id=$3`,
+      [mode === "classic" ? score : 0, coins, String(u.id), JSON.stringify(ms), mode === "nowalls" ? score : 0, gainedXp, score>0?1:0, apples, bestRun]
     );
+    if(mode==='classic' && score>0){ const season=await ensureSeason(); await pool.query(`INSERT INTO season_scores(season_id,telegram_id,score) VALUES($1,$2,$3) ON CONFLICT(season_id,telegram_id) DO UPDATE SET score=GREATEST(season_scores.score,EXCLUDED.score)`,[season.id,String(u.id),score]); }
 
     const updated = await getPlayer(u);
     res.json({ player: responsePlayer(updated), bot_username: BOT_USERNAME });
@@ -504,11 +611,15 @@ app.post("/api/profile", async (req, res) => {
   if (!u) return res.status(401).json({ error: "Telegram authorization required" });
 
   const skin = String(req.body?.skin || "");
-  const def = SKIN_BY_ID[skin];
+  const p0 = await getPlayer(u);
+  const season0 = await ensureSeason();
+  const dynamicSkins = Object.fromEntries([weeklySkinFor(season0)].map(x=>[x.id,x]));
+  const def = SKIN_BY_ID[skin] || dynamicSkins[skin];
   if (!def) return res.status(400).json({ error: "Bad skin" });
+  if (def.currency === "season" && !((p0.owned_skins||[]).includes(skin))) return res.status(403).json({ error: "Season reward only" });
 
   try {
-    const p = await getPlayer(u);
+    const p = p0;
     const owned = Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"];
 
     if (!owned.includes(skin)) {
@@ -576,6 +687,44 @@ app.post("/api/field", async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+// ================= Admin =================
+function isAdmin(req) {
+  const u = telegramUser(req);
+  return !!(u && ADMIN_IDS.has(String(u.id)));
+}
+function adminOnly(req,res){ if(!isAdmin(req)){ res.status(403).json({error:"Admin access required"}); return false; } return true; }
+
+app.get("/api/admin/me", async (req,res)=>{
+  const u=telegramUser(req); res.json({admin:!!(u&&ADMIN_IDS.has(String(u.id))), user_id:u?.id||null});
+});
+app.get("/api/admin/stats", async (req,res)=>{ if(!adminOnly(req,res))return; try{
+  const [players,payments,seasons]=await Promise.all([
+    pool.query(`SELECT COUNT(*)::int count, COALESCE(SUM(coins),0)::bigint coins FROM players`),
+    pool.query(`SELECT COUNT(*)::int count, COALESCE(SUM(stars),0)::bigint stars FROM payments`),
+    pool.query(`SELECT COUNT(*)::int count FROM seasons`)
+  ]);
+  res.json({players:players.rows[0],payments:payments.rows[0],seasons:seasons.rows[0],catalog:{skins:SKIN_CATALOG.filter(x=>x.currency==='stars').length,fields:FIELD_CATALOG.filter(x=>x.currency==='stars').length}});
+ }catch(e){console.error(e);res.status(500).json({error:"Database error"});}});
+app.get("/api/admin/players", async (req,res)=>{ if(!adminOnly(req,res))return; try{
+  const q=String(req.query.q||"").trim(); const lim=Math.min(50,Math.max(1,Number(req.query.limit)||20));
+  const r= q ? await pool.query(`SELECT telegram_id,username,first_name,coins,xp,best_score,skin,field_skin,created_at FROM players WHERE telegram_id=$1 OR username ILIKE $2 OR first_name ILIKE $2 ORDER BY updated_at DESC LIMIT $3`,[q,`%${q}%`,lim]) : await pool.query(`SELECT telegram_id,username,first_name,coins,xp,best_score,skin,field_skin,created_at FROM players ORDER BY updated_at DESC LIMIT $1`,[lim]);
+  res.json({players:r.rows});
+ }catch(e){console.error(e);res.status(500).json({error:"Database error"});}});
+app.post("/api/admin/player/grant", async (req,res)=>{ if(!adminOnly(req,res))return; try{
+  const id=String(req.body?.telegram_id||"").trim(); if(!/^\d{1,20}$/.test(id))return res.status(400).json({error:"Bad telegram_id"});
+  const coins=Math.trunc(Number(req.body?.coins)||0), xp=Math.trunc(Number(req.body?.xp)||0);
+  const skin=String(req.body?.skin||""); const field=String(req.body?.field||"");
+  if(skin && !SKIN_BY_ID[skin])return res.status(400).json({error:"Bad skin"});
+  if(field && !FIELD_BY_ID[field])return res.status(400).json({error:"Bad field"});
+  await pool.query(`INSERT INTO players(telegram_id) VALUES($1) ON CONFLICT DO NOTHING`,[id]);
+  await pool.query(`UPDATE players SET coins=GREATEST(0,coins+$1),xp=GREATEST(0,xp+$2),updated_at=NOW() WHERE telegram_id=$3`,[coins,xp,id]);
+  if(skin) await pool.query(`UPDATE players SET owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$1]::text[])),skin=$1 WHERE telegram_id=$2`,[skin,id]);
+  if(field) await pool.query(`UPDATE players SET owned_fields=ARRAY(SELECT DISTINCT unnest(owned_fields || ARRAY[$1]::text[])),field_skin=$1 WHERE telegram_id=$2`,[field,id]);
+  const r=await pool.query(`SELECT telegram_id,username,first_name,coins,xp,best_score,skin,field_skin,owned_skins,owned_fields FROM players WHERE telegram_id=$1`,[id]);
+  res.json({ok:true,player:r.rows[0]});
+ }catch(e){console.error(e);res.status(500).json({error:"Database error"});}});
+app.get("/admin", (req,res)=>res.sendFile(path.join(__dirname,"public","admin.html")));
 
 // ================= Telegram Bot API / Stars =================
 async function tgApi(method, params) {
