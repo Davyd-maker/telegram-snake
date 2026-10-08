@@ -43,7 +43,7 @@ const SKIN_CATALOG = [
   { id: "galaxy",  name: "Галактика", emoji: "🌌", price: 100,   currency: "stars", epic: true, desc: "Мерцающие звёзды по телу" },
   { id: "inferno", name: "Дракон",    emoji: "🐲", price: 150,   currency: "stars", epic: true, desc: "Огонь и искры за хвостом" },
   { id: "diamond", name: "Алмаз",     emoji: "💎", price: 250,   currency: "stars", epic: true, desc: "Сверкающие грани и блики" },
-  { id: "aurora", name: "Аврора", emoji: "🌌", price: 120, currency: "stars", epic: true, desc: "Северное сияние переливается по телу" },
+  { id: "aurora", name: "Аврора", emoji: "🌠", price: 120, currency: "stars", epic: true, desc: "Северное сияние переливается по телу" },
   { id: "samurai", name: "Самурай", emoji: "⚔️", price: 180, currency: "stars", epic: true, desc: "Алый клинок и искры за хвостом" },
   { id: "void", name: "Пустота", emoji: "🕳️", price: 220, currency: "stars", epic: true, desc: "Тёмная энергия и фиолетовое свечение" },
   { id: "prism", name: "Призма", emoji: "🔷", price: 300, currency: "stars", epic: true, desc: "Радужные грани и кристальные вспышки" },
@@ -53,22 +53,36 @@ const SKIN_CATALOG = [
 ];
 const SKIN_BY_ID = Object.fromEntries(SKIN_CATALOG.map((s) => [s.id, s]));
 const ARTIFACT_CATALOG = [
-  { id:"magnet", name:"Магнит", emoji:"🧲", rarity:"rare", desc:"Подбирает еду на расстоянии 1 клетки.", color:"#55d6ff" },
+  { id:"magnet", name:"Магнит", emoji:"🧲", rarity:"rare", desc:"Подтягивает еду, если она в 2 клетках по прямой.", color:"#55d6ff" },
   { id:"berserk", name:"Берсерк", emoji:"🔥", rarity:"epic", desc:"После 3+ комбо каждый следующий предмет даёт +25% очков.", color:"#ff7a32" },
   { id:"phantom", name:"Фантом", emoji:"👻", rarity:"legendary", desc:"Один раз за забег спасает от столкновения со стеной или телом.", color:"#b48cff" }
 ];
 const ARTIFACT_BY_ID = Object.fromEntries(ARTIFACT_CATALOG.map(a=>[a.id,a]));
-function weeklySkinFor(season){
-  const seed = Number(season?.id || 1);
-  const palettes = [
-    ["#9affd0","#00a878","🌿","Нефритовый дух"],["#ffd1ef","#ff4f9a","🌸","Розовый комет"],
-    ["#c8f5ff","#247cff","🌊","Лазурный шторм"],["#fff0a8","#ff7a00","☀️","Солнечный рейдер"],
-    ["#e2c7ff","#713cff","🔮","Астральный кристалл"],["#d8ff8b","#39a900","☣️","Токсичный спектр"],
-    ["#ffffff","#9ca8ff","🌙","Лунный призрак"],["#ffb4a8","#d71920","🌹","Алый феникс"]
-  ];
-  const q=palettes[(seed-1)%palettes.length], week=String(season?.starts_at||'').slice(0,10).replaceAll('-','');
-  return {id:`weekly_${week||seed}`,name:`${q[3]} · ${week||'Weekly'}`,emoji:q[2],price:null,currency:"season",epic:true,weekly:true,seasonId:season?.id,desc:"Уникальный скин этой недели. После сезона получить его нельзя.",palette:q.slice(0,2)};
+// Скин недели: палитра зависит только от даты начала недели (понедельник, UTC), поэтому id и цвета
+// восстанавливаются без БД — прошлые недельные скины остаются доступными тем, кто их получил.
+const WEEKLY_PALETTES = [
+  ["#9affd0","#00a878","🌿","Нефритовый дух"],["#ffd1ef","#ff4f9a","🌸","Розовый комет"],
+  ["#c8f5ff","#247cff","🌊","Лазурный шторм"],["#fff0a8","#ff7a00","☀️","Солнечный рейдер"],
+  ["#e2c7ff","#713cff","🔮","Астральный кристалл"],["#d8ff8b","#39a900","☣️","Токсичный спектр"],
+  ["#ffffff","#9ca8ff","🌙","Лунный призрак"],["#ffb4a8","#d71920","🌹","Алый феникс"]
+];
+function weeklySkinForDate(ymd){ // ymd = "YYYYMMDD"
+  const t = Date.UTC(+ymd.slice(0,4), +ymd.slice(4,6)-1, +ymd.slice(6,8));
+  const q = WEEKLY_PALETTES[((Math.floor(t/604800000) % 8) + 8) % 8];
+  return { id:`weekly_${ymd}`, name:`${q[3]} · ${ymd.slice(6,8)}.${ymd.slice(4,6)}`, emoji:q[2], price:null, currency:"season", epic:true, weekly:true,
+           desc:"Уникальный скин недели. После окончания сезона получить его нельзя.", palette:q.slice(0,2) };
 }
+function weeklySkinFor(season){
+  const d = new Date(season?.starts_at || currentSeasonBounds().starts);
+  return weeklySkinForDate(d.toISOString().slice(0,10).replaceAll("-",""));
+}
+function weeklySkinById(id){
+  const m = /^weekly_(\d{8})$/.exec(String(id||""));
+  return m ? weeklySkinForDate(m[1]) : null;
+}
+function skinDef(id){ return SKIN_BY_ID[id] || weeklySkinById(id) || null; }
+// стиль головы для рейтинга: цвета берём из каталога, у недельных — из палитры
+function skinPalette(id){ const w=weeklySkinById(id); return w ? w.palette : null; }
 
 // Каталог игровых полей. Все «красивые» поля покупаются за Telegram Stars,
 // одно простое («Графит») — за 25 000 монет. Цены меняй здесь.
@@ -80,9 +94,9 @@ const FIELD_CATALOG = [
   { id: "desert",   name: "Пустыня",  emoji: "🏜️", price: 75,    currency: "stars", epic: true, desc: "Тёплый песок и закат" },
   { id: "lava",     name: "Лава",     emoji: "🌋", price: 100,   currency: "stars", epic: true, desc: "Жар поднимается снизу" },
   { id: "space",    name: "Космос",   emoji: "🌌", price: 150,   currency: "stars", epic: true, desc: "Мерцающие звёзды" },
-  { id: "aurora_field", name: "Аврора", emoji: "🌌", price: 110, currency: "stars", epic: true, desc: "Сияющие волны северного света" },
+  { id: "aurora_field", name: "Аврора", emoji: "🎇", price: 110, currency: "stars", epic: true, desc: "Сияющие волны северного света" },
   { id: "cyber_field", name: "Киберпанк", emoji: "🏙️", price: 130, currency: "stars", epic: true, desc: "Неоновый мегаполис и сканирующая сетка" },
-  { id: "volcano_field", name: "Вулкан", emoji: "🌋", price: 175, currency: "stars", epic: true, desc: "Лава, пепел и раскалённые трещины" },
+  { id: "volcano_field", name: "Вулкан", emoji: "🔥", price: 175, currency: "stars", epic: true, desc: "Лава, пепел и раскалённые трещины" },
   { id: "crystal_field", name: "Кристалл", emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" }
 ];
 const FIELD_BY_ID = Object.fromEntries(FIELD_CATALOG.map((f) => [f.id, f]));
@@ -152,6 +166,14 @@ async function initDb() {
   await pool.query(`CREATE TABLE IF NOT EXISTS seasons (id SERIAL PRIMARY KEY, name TEXT NOT NULL, starts_at TIMESTAMPTZ NOT NULL, ends_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   await pool.query(`CREATE TABLE IF NOT EXISTS season_scores (season_id INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE, telegram_id TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(season_id,telegram_id))`);
   await pool.query(`CREATE TABLE IF NOT EXISTS challenges (id TEXT PRIMARY KEY, creator_id TEXT NOT NULL, creator_score INTEGER NOT NULL, accepted_by TEXT, accepted_score INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL)`);
+  // уникальность сезона по дате старта (дубликаты, если были, убираем — оставляем самый старый)
+  try {
+    await pool.query(`DELETE FROM seasons a USING seasons b WHERE a.starts_at=b.starts_at AND a.id>b.id`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS seasons_starts_at_uq ON seasons(starts_at)`);
+  } catch (e) { console.warn("seasons index:", e.message); }
+  await pool.query(`CREATE INDEX IF NOT EXISTS players_best_idx ON players (best_score DESC, coins DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS season_scores_rank_idx ON season_scores (season_id, score DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS players_referred_idx ON players (referred_by)`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`UPDATE players SET owned_skins=ARRAY['classic']::TEXT[] WHERE owned_skins IS NULL OR cardinality(owned_skins)=0`);
@@ -162,7 +184,7 @@ async function initDb() {
 }
 
 app.use(express.json({ limit: "100kb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), { maxAge: "5m" }));
 
 function telegramUser(req) {
   try {
@@ -219,8 +241,20 @@ async function getPlayer(u) {
      FROM players WHERE telegram_id=$1`,
     [id, DAILY_TZ]
   );
-  if (rows[0]) rows[0].ref_applied = refApplied; // не колонка: кто пригласил, если реферал засчитан сейчас
-  return rows[0];
+  const row = rows[0];
+  if (row) {
+    row.ref_applied = refApplied; // не колонка: кто пригласил, если реферал засчитан сейчас
+    // артефакты открываются по уровню: 🔥 с 3-го, 👻 с 7-го
+    const lvl = levelInfo(row.xp || 0).level;
+    const auto = ["magnet", ...(lvl >= 3 ? ["berserk"] : []), ...(lvl >= 7 ? ["phantom"] : [])];
+    const have = Array.isArray(row.owned_artifacts) ? row.owned_artifacts : [];
+    const merged = Array.from(new Set([...have, ...auto]));
+    if (merged.length !== have.length) {
+      await pool.query(`UPDATE players SET owned_artifacts=$1::text[] WHERE telegram_id=$2`, [merged, id]);
+      row.owned_artifacts = merged;
+    }
+  }
+  return row;
 }
 
 // Состояние ежедневной награды. Серия растёт, если заходить каждый день; пропуск дня сбрасывает на 1-й день.
@@ -312,8 +346,9 @@ function currentSeasonBounds(now=new Date()) {
 }
 async function ensureSeason() {
   const {starts,ends}=currentSeasonBounds();
-  let r=await pool.query(`SELECT * FROM seasons WHERE starts_at=$1 AND ends_at=$2 LIMIT 1`,[starts,ends]);
-  if(!r.rows[0]) r=await pool.query(`INSERT INTO seasons(name,starts_at,ends_at) VALUES($1,$2,$3) RETURNING *`,[`Неделя ${starts.toISOString().slice(0,10)}`,starts,ends]);
+  // ON CONFLICT: два одновременных запроса в начале недели не создадут два сезона
+  await pool.query(`INSERT INTO seasons(name,starts_at,ends_at) VALUES($1,$2,$3) ON CONFLICT (starts_at) DO NOTHING`,[`Неделя ${starts.toISOString().slice(0,10)}`,starts,ends]);
+  const r=await pool.query(`SELECT * FROM seasons WHERE starts_at=$1 LIMIT 1`,[starts]);
   return r.rows[0];
 }
 function levelInfo(xp=0){ const x=Math.max(0,Number(xp)||0); const level=Math.floor(Math.sqrt(x/100))+1; const cur=(level-1)*(level-1)*100, next=level*level*100; return {level,xp:x,current:cur,next,progress:Math.min(100,Math.round((x-cur)/(next-cur)*100))}; }
@@ -324,26 +359,23 @@ const ACHIEVEMENTS=[
  {id:'combo5',icon:'⚡',title:'Комбо ×5',need:p=>p.best_combo>=5,reward:1000},
  {id:'friends5',icon:'👥',title:'5 друзей',need:p=>p.referrals>=5,reward:1500}
 ];
-function achievementList(p){const a=p.achievements||{};return ACHIEVEMENTS.map(x=>({...x,claimed:!!a[x.id]}));}
+function achStats(p){return {games:Number(p.games_played||0),total_apples:Number(p.total_apples||0),best_score:Number(p.best_score||0),best_combo:Number(p.best_combo||0),referrals:Number(p.referrals||0)};}
+function achievementList(p){const a=p.achievements||{},st=achStats(p);return ACHIEVEMENTS.map(({need,...x})=>({...x,claimed:!!a[x.id],ready:!!need(st)}));}
 
 function seasonRewards(season){
   const weekly=weeklySkinFor(season);
   return [
-    {rank:1, icon:weekly.emoji, title:weekly.name, skin:weekly.id, coins:6000, label:"Топ-1 · эксклюзив недели"},
-    {rank:3, icon:"👻", title:"Фантом сезона", skin:"season_elite", coins:3000, label:"Топ-3"},
-    {rank:10, icon:"⚡", title:"Неоновый мастер", skin:"season_master", coins:1500, label:"Топ-10"}
+    {rank:1, icon:weekly.emoji, title:weekly.name, skin:weekly.id, extra:["season_champion"], coins:6000, label:"Топ-1 · скин недели + Корона сезона"},
+    {rank:3, icon:"👻", title:"Фантом сезона", skin:"season_elite", extra:[], coins:3000, label:"Топ-3"},
+    {rank:10, icon:"⚡", title:"Неоновый мастер", skin:"season_master", extra:[], coins:1500, label:"Топ-10"}
   ].map(x=>({...x,season_id:season.id,weekly:x.skin===weekly.id}));
 }
-async function enrichPlayer(p){
-  const season=await ensureSeason();
-  const r=await pool.query(`SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2`,[season.id,String(p.telegram_id)]);
-  const rank=await pool.query(`SELECT COUNT(*)::int+1 rank FROM season_scores WHERE season_id=$1 AND score>$2`,[season.id,r.rows[0]?.score||0]);
-  const stats=await pool.query(`SELECT COALESCE((missions->>'games')::int,0) games FROM players WHERE telegram_id=$1`,[String(p.telegram_id)]);
-  p.season_score=r.rows[0]?.score||0; p.season_rank=rank.rows[0]?.rank||1; p.level=levelInfo(p.xp||0); p.achievements_list=achievementList(p); p.season={id:season.id,name:season.name,ends_at:season.ends_at};
-  const autoArtifacts=["magnet", ...(p.level.level>=3?["berserk"]:[]), ...(p.level.level>=7?["phantom"]:[])];
-  p.owned_artifacts=Array.from(new Set([...(p.owned_artifacts||[]),...autoArtifacts]));
-  await pool.query(`UPDATE players SET owned_artifacts=$1::text[] WHERE telegram_id=$2`,[p.owned_artifacts,String(p.telegram_id)]);
-  return p;
+// Каталог скинов игрока: общий + скин текущей недели + прошлые недельные, которые он уже получил
+function catalogFor(p) {
+  const now = weeklySkinFor({ starts_at: currentSeasonBounds().starts });
+  const extra = (Array.isArray(p.owned_skins) ? p.owned_skins : [])
+    .filter((id) => id !== now.id).map(weeklySkinById).filter(Boolean);
+  return [...SKIN_CATALOG, now, ...extra];
 }
 function responsePlayer(p) {
   if (!p) return p;
@@ -352,7 +384,7 @@ function responsePlayer(p) {
     ref_link: refLink(p.telegram_id),
     invited_by: p.invited_by || null,
     daily: dailyInfo(p),
-    skins: [...SKIN_CATALOG, weeklySkinFor(p.season || {id:1,starts_at:new Date().toISOString()})],
+    skins: catalogFor(p),
     artifacts: ARTIFACT_CATALOG,
     owned_artifacts: Array.isArray(p.owned_artifacts) && p.owned_artifacts.length ? p.owned_artifacts : ["magnet"],
     equipped_artifact: ARTIFACT_BY_ID[p.equipped_artifact] ? p.equipped_artifact : "magnet",
@@ -383,7 +415,8 @@ app.get("/api/me", async (req, res) => {
   try {
     const p = await getPlayer(u);
     const season=await ensureSeason(); const sr=await pool.query(`SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2`,[season.id,String(u.id)]);
-    p.season_score=sr.rows[0]?.score||0; p.season=season;
+    p.season_score=sr.rows[0]?.score||0; p.season={...season,number:await seasonNumber(season.starts_at)};
+    p.season_rank=(await seasonRank(season.id,String(u.id)))?.rank||null;
     res.json({ player: responsePlayer(p), bot_username: BOT_USERNAME });
   } catch (e) {
     console.error(e);
@@ -411,16 +444,16 @@ app.get("/api/leaderboard", async (req, res) => {
   try {
     const u = telegramUser(req);
     const { rows } = await pool.query(
-      `SELECT telegram_id,username,first_name,best_score,coins,skin
+      `SELECT telegram_id,username,first_name,best_score,skin
        FROM players
        WHERE best_score>0
-       ORDER BY best_score DESC, coins DESC
+       ORDER BY best_score DESC, coins DESC, telegram_id
        LIMIT 20`
     );
     let me = null;
     if (u) {
       const r = await pool.query(`SELECT best_score,coins FROM players WHERE telegram_id=$1`, [String(u.id)]);
-      if (r.rows[0]) {
+      if (r.rows[0] && r.rows[0].best_score > 0) {
         const { best_score, coins } = r.rows[0];
         const rk = await pool.query(
           `SELECT COUNT(*)::int+1 AS rank FROM players WHERE best_score>$1 OR (best_score=$1 AND coins>$2)`,
@@ -430,7 +463,13 @@ app.get("/api/leaderboard", async (req, res) => {
       }
     }
     res.json({
-      leaderboard: rows.map(({ telegram_id, ...x }) => ({ ...x, is_me: !!u && telegram_id === String(u.id) })),
+      leaderboard: rows.map((x) => ({
+        name: x.first_name || x.username || "Игрок",
+        best_score: x.best_score,
+        skin: skinDef(x.skin) ? x.skin : "classic",
+        palette: skinPalette(x.skin),
+        is_me: !!u && x.telegram_id === String(u.id)
+      })),
       me
     });
   } catch (e) {
@@ -439,12 +478,114 @@ app.get("/api/leaderboard", async (req, res) => {
   }
 });
 
+// Последний завершённый сезон (за него можно забрать награду)
+async function previousSeason() {
+  const r = await pool.query(`SELECT * FROM seasons WHERE ends_at<=NOW() ORDER BY ends_at DESC LIMIT 1`);
+  return r.rows[0] || null;
+}
+// Порядковый номер сезона (по дате старта) — id в таблице может иметь пропуски
+async function seasonNumber(startsAt) {
+  const r = await pool.query(`SELECT COUNT(*)::int AS n FROM seasons WHERE starts_at<=$1`, [startsAt]);
+  return r.rows[0].n;
+}
+async function seasonRank(seasonId, uid) {
+  const r = await pool.query(`SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2`, [seasonId, uid]);
+  if (!r.rows[0] || !(r.rows[0].score > 0)) return null;
+  const q = await pool.query(`SELECT COUNT(*)::int+1 AS rank FROM season_scores WHERE season_id=$1 AND score>$2`, [seasonId, r.rows[0].score]);
+  return { rank: q.rows[0].rank, score: r.rows[0].score };
+}
 
-app.get('/api/season', async (req,res)=>{try{const u=telegramUser(req); const season=await ensureSeason(); const {rows}=await pool.query(`SELECT s.score,p.first_name,p.username,ss.telegram_id FROM season_scores s JOIN players p ON p.telegram_id=s.telegram_id JOIN season_scores ss ON ss.telegram_id=s.telegram_id AND ss.season_id=s.season_id WHERE s.season_id=$1 ORDER BY s.score DESC LIMIT 20`,[season.id]); let me=null;if(u){const r=await pool.query(`SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2`,[season.id,String(u.id)]); if(r.rows[0]){const q=await pool.query(`SELECT COUNT(*)::int+1 rank FROM season_scores WHERE season_id=$1 AND score>$2`,[season.id,r.rows[0].score]);me={rank:q.rows[0].rank,score:r.rows[0].score};}}res.json({season,leaderboard:rows,me,rewards:seasonRewards(season)});}catch(e){console.error(e);res.status(500).json({leaderboard:[]})}});
-app.post('/api/season/claim',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});try{const season=await ensureSeason();if(new Date(season.ends_at)>new Date())return res.status(400).json({error:'Season is still active'});const rankQ=await pool.query(`SELECT COUNT(*)::int+1 rank FROM season_scores WHERE season_id=$1 AND score>(SELECT score FROM season_scores WHERE season_id=$1 AND telegram_id=$2)`,[season.id,String(u.id)]);const rank=rankQ.rows[0]?.rank||999999;const reward=seasonRewards(season).find(x=>rank<=x.rank);if(!reward)return res.status(400).json({error:'No reward'});const key=`season:${season.id}:${reward.skin}`;const p=await getPlayer(u);const claimed=p.achievements||{};if(claimed[key])return res.status(400).json({error:'Already claimed',player:responsePlayer(p)});claimed[key]=true;await pool.query(`UPDATE players SET achievements=$1::jsonb,coins=coins+$2,owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$3]::TEXT[])),skin=$3,xp=xp+$2,updated_at=NOW() WHERE telegram_id=$4`,[JSON.stringify(claimed),reward.coins,reward.skin,String(u.id)]);res.json({reward,rank,player:responsePlayer(await getPlayer(u))});}catch(e){console.error(e);res.status(500).json({error:'Database error'})}});
+app.get("/api/season", async (req, res) => {
+  try {
+    const u = telegramUser(req);
+    const season = await ensureSeason();
+    const { rows } = await pool.query(
+      `SELECT ss.score, ss.telegram_id, p.first_name, p.username, p.skin
+       FROM season_scores ss JOIN players p ON p.telegram_id=ss.telegram_id
+       WHERE ss.season_id=$1 AND ss.score>0
+       ORDER BY ss.score DESC, ss.telegram_id LIMIT 20`,
+      [season.id]
+    );
+    let me = null, claim = null;
+    if (u) {
+      me = await seasonRank(season.id, String(u.id));
+      const prev = await previousSeason();
+      if (prev) {
+        const pr = await seasonRank(prev.id, String(u.id));
+        const reward = pr && seasonRewards(prev).find((x) => pr.rank <= x.rank);
+        if (reward) {
+          const { rows: pl } = await pool.query(`SELECT achievements FROM players WHERE telegram_id=$1`, [String(u.id)]);
+          const done = !!(pl[0]?.achievements || {})[`season:${prev.id}:${reward.skin}`];
+          claim = { season_id: prev.id, season_name: prev.name, rank: pr.rank, reward, claimed: done };
+        }
+      }
+    }
+    const number = await seasonNumber(season.starts_at);
+    res.json({
+      season: { ...season, number },
+      leaderboard: rows.map((x) => ({
+        name: x.first_name || x.username || "Игрок",
+        score: x.score,
+        skin: skinDef(x.skin) ? x.skin : "classic",
+        palette: skinPalette(x.skin),
+        is_me: !!u && x.telegram_id === String(u.id)
+      })),
+      me, claim, rewards: seasonRewards(season)
+    });
+  } catch (e) { console.error(e); res.status(500).json({ leaderboard: [] }); }
+});
+
+// История сезонов игрока: его место и очки в каждом закончившемся сезоне
+app.get("/api/season/history", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+  try {
+    const { rows } = await pool.query(
+      `SELECT s.id, s.name, s.starts_at, s.ends_at, ss.score,
+              (SELECT COUNT(*)::int FROM seasons x WHERE x.starts_at<=s.starts_at) AS number,
+              (SELECT COUNT(*)::int+1 FROM season_scores o WHERE o.season_id=s.id AND o.score>ss.score) AS rank,
+              (SELECT COUNT(*)::int FROM season_scores o WHERE o.season_id=s.id AND o.score>0) AS players
+       FROM seasons s JOIN season_scores ss ON ss.season_id=s.id AND ss.telegram_id=$1 AND ss.score>0
+       WHERE s.ends_at<=NOW() ORDER BY s.starts_at DESC LIMIT 30`, [String(u.id)]);
+    res.json({ history: rows });
+  } catch (e) { console.error(e); res.status(500).json({ history: [] }); }
+});
+
+// Награда за прошлый (уже закончившийся) сезон. Раньше проверялся текущий сезон, который по определению не закончен — награду нельзя было забрать.
+app.post("/api/season/claim", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+  const client = await pool.connect();
+  try {
+    await getPlayer(u);
+    const prev = await previousSeason();
+    if (!prev) return res.status(400).json({ error: "No finished season" });
+    const pr = await seasonRank(prev.id, String(u.id));
+    const reward = pr && seasonRewards(prev).find((x) => pr.rank <= x.rank);
+    if (!reward) return res.status(400).json({ error: "No reward" });
+    const key = `season:${prev.id}:${reward.skin}`;
+    await client.query("BEGIN");
+    const { rows } = await client.query(`SELECT achievements FROM players WHERE telegram_id=$1 FOR UPDATE`, [String(u.id)]);
+    const ach = rows[0]?.achievements || {};
+    if (ach[key]) { await client.query("ROLLBACK"); return res.status(400).json({ error: "Already claimed", player: responsePlayer(await getPlayer(u)) }); }
+    ach[key] = true;
+    const skins = [reward.skin, ...(reward.extra || [])];
+    await client.query(
+      `UPDATE players SET achievements=$1::jsonb, coins=coins+$2, xp=xp+$2,
+         owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || $3::text[])), skin=$4, updated_at=NOW()
+       WHERE telegram_id=$5`,
+      [JSON.stringify(ach), reward.coins, skins, reward.skin, String(u.id)]
+    );
+    await client.query("COMMIT");
+    res.json({ reward, rank: pr.rank, player: responsePlayer(await getPlayer(u)) });
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error(e); res.status(500).json({ error: "Database error" });
+  } finally { client.release(); }
+});
 
 app.get('/api/achievements',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});try{const p=await getPlayer(u);res.json({achievements:achievementList(p)})}catch(e){res.status(500).json({achievements:[]})}});
-app.post('/api/achievement',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});const def=ACHIEVEMENTS.find(x=>x.id===String(req.body?.id));if(!def)return res.status(400).json({error:'Bad achievement'});try{const p=await getPlayer(u);const a=p.achievements||{}; if(a[def.id])return res.status(400).json({error:'Already claimed',player:responsePlayer(p)}); const stats={games:Number(p.games_played||0),total_apples:Number(p.total_apples||0),best_score:Number(p.best_score||0),best_combo:Number(p.best_combo||0),referrals:Number(p.referrals||0)}; if(!def.need(stats))return res.status(400).json({error:'Not ready',player:responsePlayer(p)});a[def.id]=true;await pool.query(`UPDATE players SET achievements=$1::jsonb,coins=coins+$2,xp=xp+$2 WHERE telegram_id=$3`,[JSON.stringify(a),def.reward,String(u.id)]);res.json({reward:def.reward,player:responsePlayer(await getPlayer(u))})}catch(e){console.error(e);res.status(500).json({error:'Database error'})}});
+app.post('/api/achievement',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});const def=ACHIEVEMENTS.find(x=>x.id===String(req.body?.id));if(!def)return res.status(400).json({error:'Bad achievement'});try{const p=await getPlayer(u);const a=p.achievements||{}; if(a[def.id])return res.status(400).json({error:'Already claimed',player:responsePlayer(p)}); const stats=achStats(p); if(!def.need(stats))return res.status(400).json({error:'Not ready',player:responsePlayer(p)});a[def.id]=true;await pool.query(`UPDATE players SET achievements=$1::jsonb,coins=coins+$2,xp=xp+$2 WHERE telegram_id=$3`,[JSON.stringify(a),def.reward,String(u.id)]);res.json({reward:def.reward,player:responsePlayer(await getPlayer(u))})}catch(e){console.error(e);res.status(500).json({error:'Database error'})}});
 app.get('/api/artifacts', async (req,res)=>{
   const u=telegramUser(req); if(!u)return res.status(401).json({error:'Telegram authorization required'});
   try{ const p=await getPlayer(u); res.json({artifacts:ARTIFACT_CATALOG,owned:p.owned_artifacts||['magnet'],equipped:p.equipped_artifact||'magnet'}); }
@@ -457,9 +598,35 @@ app.post('/api/artifact/equip', async(req,res)=>{
   catch(e){console.error(e);res.status(500).json({error:'Database error'});}
 });
 
-app.get('/api/challenge/:id',async(req,res)=>{try{const r=await pool.query(`SELECT creator_score,expires_at FROM challenges WHERE id=$1 AND expires_at>NOW()`,[String(req.params.id)]);if(!r.rowCount)return res.status(404).json({error:'Challenge not found'});res.json({challenge:r.rows[0]})}catch(e){res.status(500).json({error:'Database error'})}});
-app.post('/api/challenge',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});const score=Math.max(0,Math.min(3000,Math.floor(Number(req.body?.score)||0)));if(!score)return res.status(400).json({error:'Bad score'});const id=crypto.randomBytes(5).toString('hex');await pool.query(`INSERT INTO challenges(id,creator_id,creator_score,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '48 hours')`,[id,String(u.id),score]);res.json({id,score});});
-app.post('/api/challenge/:id',async(req,res)=>{const u=telegramUser(req);if(!u)return res.status(401).json({error:'Telegram authorization required'});const score=Math.max(0,Math.min(3000,Math.floor(Number(req.body?.score)||0)));const r=await pool.query(`UPDATE challenges SET accepted_by=$1,accepted_score=$2 WHERE id=$3 AND expires_at>NOW() AND accepted_by IS NULL RETURNING *`,[String(u.id),score,String(req.params.id)]);if(!r.rowCount)return res.status(400).json({error:'Challenge expired or already played'});res.json({ok:true,win:score>r.rows[0].creator_score,creator_score:r.rows[0].creator_score,score});});
+// ---- Вызовы друзьям: результат проверяется сервером вместе с забегом (см. /api/score)
+function challengeLink(id) {
+  if (!BOT_USERNAME) return PUBLIC_URL ? `${PUBLIC_URL}/?challenge=${id}` : "";
+  if (APP_SHORT_NAME) return `https://t.me/${BOT_USERNAME}/${APP_SHORT_NAME}?startapp=ch_${id}`;
+  if (REF_MODE === "startapp") return `https://t.me/${BOT_USERNAME}?startapp=ch_${id}`;
+  return `https://t.me/${BOT_USERNAME}?start=ch_${id}`;
+}
+app.get("/api/challenge/:id", async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT c.creator_score, c.expires_at, p.first_name AS creator_name FROM challenges c
+       LEFT JOIN players p ON p.telegram_id=c.creator_id WHERE c.id=$1 AND c.expires_at>NOW()`, [String(req.params.id)]);
+    if (!r.rowCount) return res.status(404).json({ error: "Challenge not found" });
+    res.json({ challenge: r.rows[0] });
+  } catch (e) { res.status(500).json({ error: "Database error" }); }
+});
+app.post("/api/challenge", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+  try {
+    const p = await getPlayer(u);
+    // вызвать можно только результатом, который у игрока реально есть
+    const score = Math.max(0, Math.min(3000, Math.floor(Number(req.body?.score) || 0), Number(p.best_score) || 0));
+    if (!score) return res.status(400).json({ error: "Bad score" });
+    const id = crypto.randomBytes(5).toString("hex");
+    await pool.query(`INSERT INTO challenges(id,creator_id,creator_score,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '48 hours')`, [id, String(u.id), score]);
+    res.json({ id, score, link: challengeLink(id) });
+  } catch (e) { console.error(e); res.status(500).json({ error: "Database error" }); }
+});
 
 // ---- Базовая проверка забега: сервер выдаёт подписанный токен при старте, а при финише
 // сверяет заявленные очки с реально прошедшим временем. Не идеальная защита, но убирает
@@ -516,6 +683,7 @@ app.post("/api/score", async (req, res) => {
     const coinCap = validTicks ? score * 16 + 110 : 10;
     const coins = Math.max(0, Math.min(coinCap, Math.floor(Number(body.coins) || 0)));
 
+    const bestRun = Math.max(0, Math.min(500, Math.floor(Number(body.combo) || 0), apples));
     const ms = missionState(p);
     ms.score = Math.max(ms.score, score);
     if (score >= 1) ms.games += 1;
@@ -528,8 +696,28 @@ app.post("/api/score", async (req, res) => {
     );
     if(mode==='classic' && score>0){ const season=await ensureSeason(); await pool.query(`INSERT INTO season_scores(season_id,telegram_id,score) VALUES($1,$2,$3) ON CONFLICT(season_id,telegram_id) DO UPDATE SET score=GREATEST(season_scores.score,EXCLUDED.score)`,[season.id,String(u.id),score]); }
 
+    // вызов друга: результат засчитывается по проверенным очкам забега
+    let challenge_result = null;
+    const cid = String(body.challenge || "");
+    if (/^[0-9a-f]{10}$/.test(cid) && mode === "classic" && score > 0) {
+      const cr = await pool.query(
+        `UPDATE challenges SET accepted_by=$1, accepted_score=$2
+         WHERE id=$3 AND expires_at>NOW() AND accepted_by IS NULL AND creator_id<>$1
+         RETURNING creator_id, creator_score`,
+        [String(u.id), score, cid]
+      );
+      if (cr.rowCount) {
+        const c = cr.rows[0], win = score > c.creator_score;
+        challenge_result = { win, creator_score: c.creator_score, score };
+        if (BOT_TOKEN) tgApi("sendMessage", {
+          chat_id: c.creator_id,
+          text: `⚔️ ${p.first_name || "Друг"} принял твой вызов: ${score} против ${c.creator_score}.\n${win ? "Он победил — отыграйся! 🐍" : "Ты победил! 🏆"}`
+        }).catch(() => {});
+      }
+    }
+
     const updated = await getPlayer(u);
-    res.json({ player: responsePlayer(updated), bot_username: BOT_USERNAME });
+    res.json({ player: responsePlayer(updated), bot_username: BOT_USERNAME, challenge_result });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Database error" });
@@ -611,15 +799,12 @@ app.post("/api/profile", async (req, res) => {
   if (!u) return res.status(401).json({ error: "Telegram authorization required" });
 
   const skin = String(req.body?.skin || "");
-  const p0 = await getPlayer(u);
-  const season0 = await ensureSeason();
-  const dynamicSkins = Object.fromEntries([weeklySkinFor(season0)].map(x=>[x.id,x]));
-  const def = SKIN_BY_ID[skin] || dynamicSkins[skin];
+  const def = skinDef(skin);
   if (!def) return res.status(400).json({ error: "Bad skin" });
-  if (def.currency === "season" && !((p0.owned_skins||[]).includes(skin))) return res.status(403).json({ error: "Season reward only" });
 
   try {
-    const p = p0;
+    const p = await getPlayer(u);
+    if (def.currency === "season" && !((p.owned_skins || []).includes(skin))) return res.status(403).json({ error: "Season reward only" });
     const owned = Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"];
 
     if (!owned.includes(skin)) {
@@ -715,7 +900,7 @@ app.post("/api/admin/player/grant", async (req,res)=>{ if(!adminOnly(req,res))re
   const id=String(req.body?.telegram_id||"").trim(); if(!/^\d{1,20}$/.test(id))return res.status(400).json({error:"Bad telegram_id"});
   const coins=Math.trunc(Number(req.body?.coins)||0), xp=Math.trunc(Number(req.body?.xp)||0);
   const skin=String(req.body?.skin||""); const field=String(req.body?.field||"");
-  if(skin && !SKIN_BY_ID[skin])return res.status(400).json({error:"Bad skin"});
+  if(skin && !skinDef(skin))return res.status(400).json({error:"Bad skin"});
   if(field && !FIELD_BY_ID[field])return res.status(400).json({error:"Bad field"});
   await pool.query(`INSERT INTO players(telegram_id) VALUES($1) ON CONFLICT DO NOTHING`,[id]);
   await pool.query(`UPDATE players SET coins=GREATEST(0,coins+$1),xp=GREATEST(0,xp+$2),updated_at=NOW() WHERE telegram_id=$3`,[coins,xp,id]);
@@ -765,7 +950,7 @@ app.post("/api/invoice", async (req, res) => {
 });
 
 function parseItemPayload(payload, userId) {
-  const m = /^(skin|field):([a-z]+):(\d+)$/.exec(String(payload || ""));
+  const m = /^(skin|field):([a-z_]+):(\d+)$/.exec(String(payload || ""));
   if (!m || m[3] !== String(userId)) return null;
   const def = (m[1] === "field" ? FIELD_BY_ID : SKIN_BY_ID)[m[2]];
   return def && def.currency === "stars" ? { kind: m[1], def } : null;
@@ -841,11 +1026,17 @@ async function handleUpdate(upd) {
     const param = m.text.split(/\s+/)[1] || "";
     const pl = await getPlayer({ id: m.from.id, username: m.from.username, first_name: m.from.first_name, start_param: param });
     let text = "🐍 Snake Arena — собирай яблоки, копи серию, бей рекорды!";
+    const ch = /^ch_([0-9a-f]{10})$/.exec(param);
+    let appUrl = PUBLIC_URL;
+    if (ch && PUBLIC_URL) {
+      appUrl = `${PUBLIC_URL}/?challenge=${ch[1]}`;
+      text = "⚔️ Тебя вызвали на дуэль в Snake Arena! Жми «Играть» и побей результат друга.";
+    }
     if (pl?.ref_applied) text = `🎉 Тебя пригласил${pl.invited_by ? " " + pl.invited_by : " друг"} — тебе уже начислено +${REF_BONUS} 🪙!\n\n` + text;
     await tgApi("sendMessage", {
       chat_id: m.chat.id,
       text,
-      reply_markup: PUBLIC_URL ? { inline_keyboard: [[{ text: "🎮 Играть", web_app: { url: PUBLIC_URL } }]] } : undefined
+      reply_markup: appUrl ? { inline_keyboard: [[{ text: "🎮 Играть", web_app: { url: appUrl } }]] } : undefined
     }).catch(() => {});
   }
 }
