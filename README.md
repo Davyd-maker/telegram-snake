@@ -1,3 +1,5 @@
+Snake Arena v24 — hotfix: fixed canvas rendering ReferenceError in drawFood(), so the snake renders correctly.
+
 
 ## v23 — Админка и новый Stars-каталог
 - Закрытая админка: `/admin`, доступ только Telegram ID из `ADMIN_TELEGRAM_ID` / `ADMIN_TELEGRAM_IDS`.
