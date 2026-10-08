@@ -302,7 +302,7 @@ app.get("/api/leaderboard", async (req, res) => {
   try {
     const u = telegramUser(req);
     const { rows } = await pool.query(
-      `SELECT telegram_id,username,first_name,best_score,coins
+      `SELECT telegram_id,username,first_name,best_score,coins,skin
        FROM players
        WHERE best_score>0
        ORDER BY best_score DESC, coins DESC
