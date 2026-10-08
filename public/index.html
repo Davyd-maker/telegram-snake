@@ -911,10 +911,15 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
   function drawFood(now){
     if(!snake.length) return;
     const x=(food.x+.5)*cell, y=(food.y+.5)*cell, t=now/1000;
+    // Радиус задаём до позиционирования: раньше r использовался здесь до объявления,
+    // из-за чего drawFood() выбрасывал ReferenceError и полностью останавливал отрисовку змейки.
+    const r=food.type==="apple" ? cell*.34 : cell*.30;
     const born=Math.min(1,(now-foodBorn)/260), sc=(born<1?easeBack(born):1)*(1+Math.sin(t*5)*.05);
-    ctx.save(); ctx.translate(Math.max(r+cell*.06,Math.min(side-r-cell*.06,x)),Math.max(r+cell*.06,Math.min(side-r-cell*.06,y+Math.sin(t*3)*cell*.02))); ctx.scale(sc,sc);
+    const px=Math.max(r+cell*.06,Math.min(side-r-cell*.06,x));
+    const py=Math.max(r+cell*.06,Math.min(side-r-cell*.06,y+Math.sin(t*3)*cell*.02));
+    ctx.save(); ctx.translate(px,py); ctx.scale(sc,sc);
     if(food.type==="apple"){
-      const r=Math.min(cell*.34, cell*.34);
+      const r=cell*.34;
       ctx.shadowColor="#ff244f"; ctx.shadowBlur=16;
       ctx.fillStyle="rgba(0,0,0,.38)"; ctx.beginPath(); ctx.arc(0,0,r+cell*.055,0,Math.PI*2); ctx.fill();
       const g=ctx.createRadialGradient(-r*.38,-r*.42,1,0,0,r*1.08);
