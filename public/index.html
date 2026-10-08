@@ -74,11 +74,11 @@ table{width:100%;border-collapse:collapse}td{padding:12px 4px;border-bottom:1px 
 .refbtns .alt{background:#13281d;border:1px solid var(--line);border-radius:16px;padding:14px 16px;font-weight:800}
 canvas{
   display:block;width:100%;height:100%;aspect-ratio:1;
-  border-radius:26px;border:1px solid rgba(91,255,170,.3);
+  border-radius:10px;border:1px solid rgba(91,255,170,.3);
   background:#06100b;touch-action:none;
   box-shadow:0 0 0 1px rgba(255,255,255,.025),0 22px 80px rgba(0,0,0,.55),0 0 65px rgba(35,220,125,.1);
 }
-.board-vignette{pointer-events:none;position:absolute;inset:0;border-radius:26px;box-shadow:inset 0 0 34px rgba(0,0,0,.18)}
+.board-vignette{pointer-events:none;position:absolute;inset:0;border-radius:10px;box-shadow:inset 0 0 18px rgba(0,0,0,.12)}
 .gbot{display:flex;align-items:center;justify-content:space-between;padding:10px 2px 3px;font-size:12px;color:var(--muted)}
 .pause{width:48px;height:48px;border-radius:16px;background:#10241a;border:1px solid var(--line);font-size:18px}
 .overlay{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
@@ -1015,6 +1015,13 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
     const born=Math.min(1,(now-foodBorn)/260), sc=(foodBorn?(born<1?easeBack(born):1):1)*(1+Math.sin(t*5)*.05)*fade;
     const px=Math.max(r+cell*.06,Math.min(side-r-cell*.06,x));
     const py=Math.max(r+cell*.06,Math.min(side-r-cell*.06,y+Math.sin(t*3)*cell*.02));
+    // мягкое пульсирующее кольцо под едой — заметно на любом поле, в том числе в углах
+    if(fade>=1){
+      const hr=cell*(.62+.1*Math.sin(t*4)), hc=food.type==="apple"?"255,70,100":"255,216,76";
+      const hg=ctx.createRadialGradient(px,py,cell*.1,px,py,hr);
+      hg.addColorStop(0,`rgba(${hc},.38)`); hg.addColorStop(1,`rgba(${hc},0)`);
+      ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(px,py,hr,0,Math.PI*2); ctx.fill();
+    }
     ctx.save(); ctx.translate(px,py); ctx.scale(sc,sc);
     if(food.type==="apple"){
       const r=cell*.34;
