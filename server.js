@@ -45,6 +45,19 @@ const SKIN_CATALOG = [
 ];
 const SKIN_BY_ID = Object.fromEntries(SKIN_CATALOG.map((s) => [s.id, s]));
 
+// Каталог игровых полей. Все «красивые» поля покупаются за Telegram Stars,
+// одно простое («Графит») — за 25 000 монет. Цены меняй здесь.
+const FIELD_CATALOG = [
+  { id: "classic",  name: "Классика", emoji: "🟩", price: 0,     currency: "coins", desc: "Стандартное зелёное поле" },
+  { id: "graphite", name: "Графит",   emoji: "⬛", price: 25000, currency: "coins", desc: "Простое тёмное поле" },
+  { id: "neon",     name: "Неон",     emoji: "🌃", price: 50,    currency: "stars", epic: true, desc: "Светящаяся сетка и сканер" },
+  { id: "frost",    name: "Мороз",    emoji: "❄️", price: 75,    currency: "stars", epic: true, desc: "Ледяное поле, идёт снег" },
+  { id: "desert",   name: "Пустыня",  emoji: "🏜️", price: 75,    currency: "stars", epic: true, desc: "Тёплый песок и закат" },
+  { id: "lava",     name: "Лава",     emoji: "🌋", price: 100,   currency: "stars", epic: true, desc: "Жар поднимается снизу" },
+  { id: "space",    name: "Космос",   emoji: "🌌", price: 150,   currency: "stars", epic: true, desc: "Мерцающие звёзды" }
+];
+const FIELD_BY_ID = Object.fromEntries(FIELD_CATALOG.map((f) => [f.id, f]));
+
 const REF_REWARD = Number(process.env.REF_REWARD || 500); // пригласившему
 const REF_BONUS = Number(process.env.REF_BONUS || 200);   // приглашённому
 
@@ -87,6 +100,8 @@ async function initDb() {
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS best_nowalls INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_run_ts BIGINT NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS last_reminded_day TEXT`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS field_skin TEXT NOT NULL DEFAULT 'classic'`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS owned_fields TEXT[] NOT NULL DEFAULT ARRAY['classic']::TEXT[]`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS payments (
       charge_id TEXT PRIMARY KEY,
@@ -101,6 +116,8 @@ async function initDb() {
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`UPDATE players SET owned_skins=ARRAY['classic']::TEXT[] WHERE owned_skins IS NULL OR cardinality(owned_skins)=0`);
   await pool.query(`UPDATE players SET owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY['classic']::TEXT[])) WHERE NOT ('classic' = ANY(owned_skins))`);
+  await pool.query(`UPDATE players SET owned_fields=ARRAY['classic']::TEXT[] WHERE owned_fields IS NULL OR cardinality(owned_fields)=0`);
+  await pool.query(`UPDATE players SET owned_fields=ARRAY(SELECT DISTINCT unnest(owned_fields || ARRAY['classic']::TEXT[])) WHERE NOT ('classic' = ANY(owned_fields))`);
 }
 
 app.use(express.json({ limit: "100kb" }));
@@ -253,11 +270,14 @@ function responsePlayer(p) {
     invited_by: p.invited_by || null,
     daily: dailyInfo(p),
     skins: SKIN_CATALOG,
+    fields: FIELD_CATALOG,
+    field_skin: FIELD_BY_ID[p.field_skin] ? p.field_skin : "classic",
     stars_enabled: !!BOT_TOKEN,
     missions: missionList(p),
     ref_reward: REF_REWARD,
     ref_bonus: REF_BONUS,
-    owned_skins: Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"]
+    owned_skins: Array.isArray(p.owned_skins) && p.owned_skins.length ? p.owned_skins : ["classic"],
+    owned_fields: Array.isArray(p.owned_fields) && p.owned_fields.length ? p.owned_fields : ["classic"]
   };
 }
 
@@ -519,6 +539,44 @@ app.post("/api/profile", async (req, res) => {
   }
 });
 
+// Выбор / покупка игрового поля. За монеты — только поля с currency: "coins"; за Stars — через /api/invoice + вебхук
+app.post("/api/field", async (req, res) => {
+  const u = telegramUser(req);
+  if (!u) return res.status(401).json({ error: "Telegram authorization required" });
+
+  const id = String(req.body?.field || "");
+  const def = FIELD_BY_ID[id];
+  if (!def) return res.status(400).json({ error: "Bad field" });
+
+  try {
+    const p = await getPlayer(u);
+    const owned = Array.isArray(p.owned_fields) && p.owned_fields.length ? p.owned_fields : ["classic"];
+
+    if (!owned.includes(id)) {
+      if (def.currency === "stars") return res.status(402).json({ error: "Buy with Telegram Stars" });
+      const r = await pool.query(
+        `UPDATE players
+         SET coins=coins-$1,
+             field_skin=$2,
+             owned_fields=ARRAY(SELECT DISTINCT unnest(owned_fields || ARRAY[$2]::TEXT[])),
+             updated_at=NOW()
+         WHERE telegram_id=$3 AND coins>=$1
+         RETURNING 1`,
+        [def.price, id, String(u.id)]
+      );
+      if (!r.rowCount) return res.status(400).json({ error: "Not enough coins" });
+    } else {
+      await pool.query(`UPDATE players SET field_skin=$1, updated_at=NOW() WHERE telegram_id=$2`, [id, String(u.id)]);
+    }
+
+    const updated = await getPlayer(u);
+    res.json({ player: responsePlayer(updated), bot_username: BOT_USERNAME });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 // ================= Telegram Bot API / Stars =================
 async function tgApi(method, params) {
   if (!BOT_TOKEN) throw new Error("BOT_TOKEN is not set");
@@ -536,15 +594,17 @@ async function tgApi(method, params) {
 app.post("/api/invoice", async (req, res) => {
   const u = telegramUser(req);
   if (!u) return res.status(401).json({ error: "Telegram authorization required" });
-  const def = SKIN_BY_ID[String(req.body?.skin || "")];
-  if (!def || def.currency !== "stars") return res.status(400).json({ error: "Bad skin" });
+  const kind = req.body?.field ? "field" : "skin";
+  const def = kind === "field" ? FIELD_BY_ID[String(req.body.field || "")] : SKIN_BY_ID[String(req.body?.skin || "")];
+  if (!def || def.currency !== "stars") return res.status(400).json({ error: kind === "field" ? "Bad field" : "Bad skin" });
   try {
     const p = await getPlayer(u);
-    if ((p.owned_skins || []).includes(def.id)) return res.status(400).json({ error: "Already owned" });
+    const have = kind === "field" ? p.owned_fields : p.owned_skins;
+    if ((have || []).includes(def.id)) return res.status(400).json({ error: "Already owned" });
     const url = await tgApi("createInvoiceLink", {
-      title: `Скин «${def.name}»`,
-      description: `${def.emoji} ${def.desc || "Эпический скин змейки"} — навсегда в Snake Arena`,
-      payload: `skin:${def.id}:${u.id}`,
+      title: kind === "field" ? `Поле «${def.name}»` : `Скин «${def.name}»`,
+      description: `${def.emoji} ${def.desc || (kind === "field" ? "Игровое поле" : "Эпический скин змейки")} — навсегда в Snake Arena`,
+      payload: `${kind}:${def.id}:${u.id}`,
       currency: "XTR", // Telegram Stars; provider_token для Stars не нужен
       prices: [{ label: def.name, amount: def.price }]
     });
@@ -555,30 +615,39 @@ app.post("/api/invoice", async (req, res) => {
   }
 });
 
-function parseSkinPayload(payload, userId) {
-  const m = /^skin:([a-z]+):(\d+)$/.exec(String(payload || ""));
-  if (!m || m[2] !== String(userId)) return null;
-  const def = SKIN_BY_ID[m[1]];
-  return def && def.currency === "stars" ? def : null;
+function parseItemPayload(payload, userId) {
+  const m = /^(skin|field):([a-z]+):(\d+)$/.exec(String(payload || ""));
+  if (!m || m[3] !== String(userId)) return null;
+  const def = (m[1] === "field" ? FIELD_BY_ID : SKIN_BY_ID)[m[2]];
+  return def && def.currency === "stars" ? { kind: m[1], def } : null;
 }
 
-async function grantPaidSkin(userId, def, chargeId, stars) {
+async function grantPaidItem(userId, kind, def, chargeId, stars) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     await client.query(`INSERT INTO players (telegram_id) VALUES ($1) ON CONFLICT DO NOTHING`, [String(userId)]);
-    // charge_id уникален — повторная доставка вебхука не выдаст скин дважды
+    // charge_id уникален — повторная доставка вебхука не выдаст покупку дважды
     const ins = await client.query(
       `INSERT INTO payments (charge_id, telegram_id, skin, stars) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING 1`,
-      [chargeId, String(userId), def.id, stars]
+      [chargeId, String(userId), kind === "field" ? "field:" + def.id : def.id, stars]
     );
     if (ins.rowCount) {
-      await client.query(
-        `UPDATE players
-         SET skin=$1, owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$1]::TEXT[])), updated_at=NOW()
-         WHERE telegram_id=$2`,
-        [def.id, String(userId)]
-      );
+      if (kind === "field") {
+        await client.query(
+          `UPDATE players
+           SET field_skin=$1, owned_fields=ARRAY(SELECT DISTINCT unnest(owned_fields || ARRAY[$1]::TEXT[])), updated_at=NOW()
+           WHERE telegram_id=$2`,
+          [def.id, String(userId)]
+        );
+      } else {
+        await client.query(
+          `UPDATE players
+           SET skin=$1, owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$1]::TEXT[])), updated_at=NOW()
+           WHERE telegram_id=$2`,
+          [def.id, String(userId)]
+        );
+      }
     }
     await client.query("COMMIT");
     return !!ins.rowCount;
@@ -594,8 +663,8 @@ async function handleUpdate(upd) {
   // 1) Telegram спрашивает «можно ли списать?» — отвечаем за 10 секунд
   if (upd.pre_checkout_query) {
     const q = upd.pre_checkout_query;
-    const def = parseSkinPayload(q.invoice_payload, q.from?.id);
-    const ok = !!def && q.currency === "XTR" && Number(q.total_amount) === def.price;
+    const it = parseItemPayload(q.invoice_payload, q.from?.id);
+    const ok = !!it && q.currency === "XTR" && Number(q.total_amount) === it.def.price;
     await tgApi("answerPreCheckoutQuery", ok
       ? { pre_checkout_query_id: q.id, ok: true }
       : { pre_checkout_query_id: q.id, ok: false, error_message: "Не удалось подтвердить заказ, попробуй ещё раз" });
@@ -606,13 +675,16 @@ async function handleUpdate(upd) {
   // 2) Платёж прошёл — выдаём скин
   if (m.successful_payment) {
     const sp = m.successful_payment;
-    const def = parseSkinPayload(sp.invoice_payload, m.from?.id);
-    if (!def || sp.currency !== "XTR" || Number(sp.total_amount) !== def.price) {
+    const it = parseItemPayload(sp.invoice_payload, m.from?.id);
+    if (!it || sp.currency !== "XTR" || Number(sp.total_amount) !== it.def.price) {
       console.error("suspicious payment", JSON.stringify(sp));
       return;
     }
-    const fresh = await grantPaidSkin(m.from.id, def, sp.telegram_payment_charge_id, def.price);
-    if (fresh) await tgApi("sendMessage", { chat_id: m.chat.id, text: `${def.emoji} Скин «${def.name}» твой! Он уже надет — запускай игру 🐍` }).catch(() => {});
+    const { kind, def } = it;
+    const fresh = await grantPaidItem(m.from.id, kind, def, sp.telegram_payment_charge_id, def.price);
+    if (fresh) await tgApi("sendMessage", { chat_id: m.chat.id, text: kind === "field"
+      ? `${def.emoji} Поле «${def.name}» твоё! Оно уже включено — запускай игру 🐍`
+      : `${def.emoji} Скин «${def.name}» твой! Он уже надет — запускай игру 🐍` }).catch(() => {});
     return;
   }
   // 3) /start [ref_ID] — регистрируем игрока, засчитываем реферал и даём кнопку запуска игры
