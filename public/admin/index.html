@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Snake Arena · Админка</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#06100b;--card:#0d2117;--line:#244a36;--ink:#f3fff8;--mute:#8fb3a0;--acc:#4ade80;--warn:#fbbf24;--bad:#f87171;--blue:#60a5fa;--inp:#07130c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:14px 14px 80px}
+.wrap{max-width:980px;margin:0 auto}
+h1{font-size:19px;margin:4px 0 10px}h2{font-size:16px;margin:0 0 10px}h3{font-size:14px;margin:14px 0 6px;color:var(--mute);font-weight:600}
+.top{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;position:sticky;top:0;background:var(--bg);z-index:5;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--mute);cursor:pointer;font:inherit}
+.tab[aria-selected=true]{background:var(--acc);color:#052e16;border-color:var(--acc);font-weight:600}
+.tab .dot{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--bad);color:#fff;font-size:12px;text-align:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:0 0 12px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.kpi{background:var(--inp);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.kpi span{color:var(--mute);font-size:12px}
+button,input,select,textarea{font:inherit;color:var(--ink);background:var(--inp);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+textarea{width:100%;min-height:110px;resize:vertical}
+button{cursor:pointer}button:hover{border-color:var(--acc)}button:disabled{opacity:.5;cursor:default}
+button.pri{background:var(--acc);color:#052e16;border-color:var(--acc);font-weight:600}
+button.dng{border-color:var(--bad);color:var(--bad)}button.sm{padding:5px 9px;font-size:13px;border-radius:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>input,.row>select{flex:1 1 120px}
+.mute{color:var(--mute)}.ok{color:var(--acc)}.bad{color:var(--bad)}.warn{color:var(--warn)}.small{font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:500;font-size:12px}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line);color:var(--mute)}
+.pill.bad{border-color:var(--bad);color:var(--bad)}.pill.ok{border-color:var(--acc);color:var(--acc)}.pill.warn{border-color:var(--warn);color:var(--warn)}
+.chart{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mute);margin-top:4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}.bar>i{display:block;height:100%;background:var(--acc)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#12301f;border:1px solid var(--acc);padding:10px 16px;border-radius:12px;max-width:90vw;z-index:20}
+.toast.err{border-color:var(--bad);background:#33100f}
+[hidden]{display:none!important}
+.deny{text-align:center;margin-top:20vh}
+.newsprev{white-space:pre-wrap;font:inherit;font-size:13px;background:var(--inp);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0;max-height:260px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="deny" class="deny" hidden><h1>⛔ Доступ запрещён</h1><p class="mute">Открой админку из Telegram-бота с аккаунта администратора.</p></div>
+  <div id="app" hidden>
+    <div class="top"><h1>🐍 Snake Arena · Админка</h1><button class="sm" id="back">← В игру</button></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <main id="view"></main>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+const tg = window.Telegram?.WebApp; try { tg?.ready(); tg?.expand(); } catch {}
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (n) => Number(n || 0).toLocaleString("ru-RU");
+const dt = (s) => s ? new Date(s).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+const who = (p) => esc(p.first_name || p.username || p.telegram_id) + (p.username ? ` <span class="mute small">@${esc(p.username)}</span>` : "");
+
+async function api(url, body) {
+  const opt = { headers: { ...(tg?.initData ? { "X-Telegram-Init-Data": tg.initData } : {}) } };
+  if (body !== undefined) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(url, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Ошибка " + r.status);
+  return j;
+}
+let toastT;
+function toast(msg, err) { const t = $("#toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
+const run = async (fn) => { try { return await fn(); } catch (e) { toast(e.message, true); } };
+const ask = (msg) => new Promise((ok) => tg?.showConfirm ? tg.showConfirm(msg, ok) : ok(confirm(msg)));
+
+let CAT = null, STATE = { tab: "overview", days: 30 };
+const TABS = [["overview", "Обзор"], ["retention", "Удержание"], ["players", "Игроки"], ["cheat", "Античит"], ["season", "Сезон"], ["events", "События"], ["payments", "Платежи"], ["broadcast", "Рассылка"], ["log", "Журнал"]];
+
+function drawTabs(badge) {
+  $("#tabs").innerHTML = TABS.map(([id, name]) =>
+    `<button class="tab" role="tab" data-t="${id}" aria-selected="${STATE.tab === id}">${name}${id === "payments" && badge ? `<span class="dot">${badge}</span>` : ""}</button>`).join("");
+}
+$("#tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b) { STATE.tab = b.dataset.t; show(); } });
+$("#back").onclick = () => { location.href = "/"; };
+
+// ---------- графики (inline SVG, без библиотек) ----------
+function chart(series, keys, colors, opts = {}) {
+  const W = 640, H = 170, pl = 34, pr = 8, pt = 8, pb = 22, n = series.length;
+  const max = Math.max(1, ...series.flatMap((d) => keys.map((k) => d[k])));
+  const nice = (m) => { const p = Math.pow(10, Math.floor(Math.log10(m))); const f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
+  const top = nice(max), x = (i) => pl + (n === 1 ? 0 : i * (W - pl - pr) / (n - 1)), y = (v) => pt + (H - pt - pb) * (1 - v / top);
+  let g = "";
+  for (let i = 0; i <= 4; i++) { const v = top * i / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="#244a36" stroke-width="1"/><text x="${pl - 5}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#8fb3a0">${fmt(Math.round(v))}</text>`; }
+  const step = Math.ceil(n / 7);
+  series.forEach((d, i) => { if (i % step === 0 || i === n - 1) g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#8fb3a0">${d.day.slice(8)}.${d.day.slice(5, 7)}</text>`; });
+  if (opts.bars) {
+    const bw = Math.max(2, (W - pl - pr) / n * 0.7);
+    series.forEach((d, i) => { const v = d[keys[0]]; g += `<rect x="${x(i) - bw / 2}" y="${y(v)}" width="${bw}" height="${Math.max(0, y(0) - y(v))}" rx="2" fill="${colors[0]}"><title>${d.day}: ${v}</title></rect>`; });
+  } else {
+    keys.forEach((k, ki) => {
+      g += `<polyline fill="none" stroke="${colors[ki]}" stroke-width="2" stroke-linejoin="round" points="${series.map((d, i) => `${x(i)},${y(d[k])}`).join(" ")}"/>`;
+      g += series.map((d, i) => `<circle cx="${x(i)}" cy="${y(d[k])}" r="${n > 31 ? 1.5 : 2.5}" fill="${colors[ki]}"><title>${d.day}: ${d[k]}</title></circle>`).join("");
+    });
+  }
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label || "")}">${g}</svg>`;
+}
+const legend = (items) => `<div class="legend">${items.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join("")}</div>`;
+
+// ---------- Обзор ----------
+async function viewOverview() {
+  const s = await api("/api/admin/stats?days=" + STATE.days);
+  drawTabs(s.today.open_errors);
+  const sum = (k) => s.series.reduce((a, d) => a + d[k], 0);
+  $("#view").innerHTML = `
+    <div class="card"><div class="grid">
+      <div class="kpi"><b>${fmt(s.players.count)}</b><span>игроков всего</span></div>
+      <div class="kpi"><b>${fmt(s.today.dau_today)}</b><span>активны сегодня</span></div>
+      <div class="kpi"><b>${fmt(s.today.wau)}</b><span>активны за 7 дней</span></div>
+      <div class="kpi"><b>${fmt(s.today.new_today)}</b><span>новых сегодня</span></div>
+      <div class="kpi"><b>${fmt(s.today.games_today)}</b><span>игр сегодня</span></div>
+      <div class="kpi"><b class="${s.today.rejected_today ? "warn" : ""}">${fmt(s.today.rejected_today)}</b><span>забегов отклонено сегодня</span></div>
+      <div class="kpi"><b class="${s.today.flagged_week ? "warn" : ""}">${fmt(s.today.flagged_week)}</b><span>подозрительных за 7 дней</span></div>
+      <div class="kpi"><b>${fmt(s.payments.stars)} ⭐</b><span>выручка · покупок: ${fmt(s.payments.count)}</span></div>
+      <div class="kpi"><b>${fmt(s.payments.refunded_stars)} ⭐</b><span>возвраты · шт.: ${fmt(s.payments.refunded_count)}</span></div>
+      <div class="kpi"><b class="${s.today.open_errors ? "bad" : ""}">${fmt(s.today.open_errors)}</b><span>ошибок платежей</span></div>
+      <div class="kpi"><b>${fmt(s.players.banned)}</b><span>в бане</span></div>
+      <div class="kpi"><b>${fmt(s.players.bot_blocked)}</b><span>заблокировали бота</span></div>
+    </div></div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>Динамика</h2>
+        <select id="days">${[7, 14, 30, 60, 90].map((d) => `<option value="${d}" ${d === s.days ? "selected" : ""}>${d} дн.</option>`).join("")}</select></div>
+      <h3>Активные игроки и новые · за период новых: ${fmt(sum("new_players"))}</h3>
+      ${chart(s.series, ["dau", "new_players"], ["#4ade80", "#60a5fa"], { label: "Активные и новые игроки по дням" })}
+      ${legend([["#4ade80", "активные за день"], ["#60a5fa", "новые игроки"]])}
+      <h3>Сыграно игр · за период: ${fmt(sum("games"))}</h3>
+      ${chart(s.series, ["games"], ["#fbbf24"], { bars: true, label: "Игры по дням" })}
+      <h3>Выручка, ⭐ · за период: ${fmt(sum("stars"))}</h3>
+      ${chart(s.series, ["stars"], ["#c084fc"], { bars: true, label: "Выручка в Stars по дням" })}
+      <p class="small mute">Активность и игры считаются с момента обновления до v26; дни до него будут пустыми. Дни — по часовому поясу ${esc(CAT.tz)}.</p>
+    </div>`;
+  $("#days").onchange = (e) => { STATE.days = +e.target.value; show(); };
+}
+
+// ---------- Игроки ----------
+const itemOptions = (list) => `<option value="">—</option>` + list.map((x) => `<option value="${esc(x.id)}">${esc(x.emoji)} ${esc(x.name)}</option>`).join("");
+function playerRows(list) {
+  if (!list.length) return `<p class="mute">Никого не найдено</p>`;
+  return `<div class="scroll"><table><tr><th>Игрок</th><th class="n">Монеты</th><th class="n">Рекорд</th><th class="n">Игр</th><th></th></tr>${list.map((p) =>
+    `<tr><td>${who(p)}<br><span class="mute small">${esc(p.telegram_id)}</span> ${p.banned ? '<span class="pill bad">бан</span>' : ""}${p.bot_blocked ? ' <span class="pill">бот заблокирован</span>' : ""}</td>
+     <td class="n">${fmt(p.coins)}</td><td class="n">${fmt(p.best_score)}</td><td class="n">${fmt(p.games_played)}</td>
+     <td><button class="sm" data-open="${esc(p.telegram_id)}">Открыть</button></td></tr>`).join("")}</table></div>`;
+}
+async function viewPlayers() {
+  drawTabs();
+  $("#view").innerHTML = `<div class="card"><div class="row"><input id="q" placeholder="ID, имя или @username" value="${esc(STATE.q || "")}"><button class="pri" id="go">Найти</button>
+    <label class="small mute"><input type="checkbox" id="bn" ${STATE.banned ? "checked" : ""} style="padding:0"> только баны</label></div><div id="list" style="margin-top:10px"></div></div><div id="detail"></div>`;
+  const search = () => run(async () => {
+    STATE.q = $("#q").value.trim(); STATE.banned = $("#bn").checked;
+    const r = await api(`/api/admin/players?q=${encodeURIComponent(STATE.q)}&limit=30${STATE.banned ? "&banned=1" : ""}`);
+    $("#list").innerHTML = playerRows(r.players);
+  });
+  $("#go").onclick = search; $("#q").onkeydown = (e) => e.key === "Enter" && search(); $("#bn").onchange = search;
+  $("#list").onclick = (e) => { const b = e.target.closest("[data-open]"); if (b) openPlayer(b.dataset.open); };
+  await search();
+  if (STATE.open) openPlayer(STATE.open, false);
+}
+async function openPlayer(id, scroll = true) {
+  STATE.open = id;
+  await run(async () => {
+    const d = await api("/api/admin/player/" + encodeURIComponent(id)), p = d.player;
+    const own = (list, def) => (list || []).filter((x) => x !== "classic").map((x) => `<span class="pill">${esc(x)}</span>`).join(" ") || '<span class="mute">—</span>';
+    $("#detail").innerHTML = `<div class="card" id="pcard">
+      <div class="row" style="justify-content:space-between"><h2>${who(p)} ${p.banned ? '<span class="pill bad">бан</span>' : ""}</h2><button class="sm" id="close">✕</button></div>
+      <p class="small mute">ID ${esc(p.telegram_id)} · создан ${dt(p.created_at)} · был ${dt(p.updated_at)} · приглашено ${fmt(p.referrals)}${p.referred_by ? " · пригласил " + esc(p.referred_by) : ""}</p>
+      ${p.banned ? `<p class="bad small">Причина: ${esc(p.ban_reason || "не указана")} (${dt(p.banned_at)})</p>` : ""}
+      <div class="grid"><div class="kpi"><b>${fmt(p.coins)}</b><span>монет</span></div><div class="kpi"><b>${fmt(p.xp)}</b><span>XP</span></div>
+        <div class="kpi"><b>${fmt(p.best_score)}</b><span>рекорд</span></div><div class="kpi"><b>${fmt(p.best_nowalls)}</b><span>без стен</span></div>
+        <div class="kpi"><b>${fmt(p.games_played)}</b><span>игр</span></div><div class="kpi"><b>${fmt(p.best_combo)}</b><span>макс. комбо</span></div></div>
+      <h3>Скины</h3><div>${own(p.owned_skins)}</div><h3>Поля</h3><div>${own(p.owned_fields)}</div>
+
+      <h3>Выдать / забрать</h3>
+      <div class="row"><input id="gc" type="number" placeholder="Монеты (±)"><input id="gx" type="number" placeholder="XP (±)"></div>
+      <div class="row" style="margin-top:6px"><select id="gs">${itemOptions(CAT.skins)}</select><select id="gf">${itemOptions(CAT.fields)}</select></div>
+      <div class="row" style="margin-top:6px"><button class="pri" id="grant">Выдать</button><button class="dng" id="revoke">Забрать выбранные скин/поле</button></div>
+
+      <h3>Модерация</h3>
+      <div class="row"><input id="reason" placeholder="Причина бана" maxlength="200" value="${esc(p.ban_reason || "")}">
+        ${p.banned ? '<button class="pri" id="unban">Разбанить</button>' : '<button class="dng" id="ban">Забанить</button>'}</div>
+      <div class="row" style="margin-top:6px"><button class="dng" id="rs">Обнулить рекорды и сезонные очки</button><button class="dng" id="rf">Полный сброс прогресса</button></div>
+      <p class="small mute">Бан скрывает игрока из рейтингов и блокирует игру. Полный сброс обнуляет монеты, XP, достижения и задания; купленные за Stars предметы остаются.</p>
+
+      <h3>Последние игры</h3>${d.games.length ? `<div class="scroll"><table><tr><th>Когда</th><th class="n">Очки</th><th class="n">Яблок</th><th>Режим</th><th></th></tr>${d.games.map((g) =>
+        `<tr><td>${dt(g.created_at)}</td><td class="n">${fmt(g.score)}</td><td class="n">${g.apples}</td><td>${esc(MODE_NAMES[g.mode] || g.mode)}${g.diff && g.diff !== "normal" ? " · " + esc(g.diff) : ""}${g.kind && g.kind !== "free" ? " · " + esc(KINDS[g.kind] || g.kind) : ""}</td><td>${g.verified ? "" : `<span class="pill warn" title="Сервер переиграл забег и не принял его">отклонён${g.reject ? ": " + esc(REJECT[g.reject] || g.reject) : ""}</span>`}${flagPills(g)}${g.has_log ? ` <a class="pill" href="/?areplay=${g.id}" target="_blank" rel="noopener">▶ реплей</a>` : ""}</td></tr>`).join("")}</table></div>` : '<p class="mute">Нет данных</p>'}
+      <h3>Покупки</h3>${d.payments.length ? `<div class="scroll"><table>${d.payments.map((x) => `<tr><td>${dt(x.created_at)}</td><td>${esc(x.item)}</td><td class="n">${x.stars} ⭐</td><td>${x.refunded_at ? '<span class="pill">возврат</span>' : ""}</td></tr>`).join("")}</table></div>` : '<p class="mute">Нет</p>'}
+      <h3>Сезоны</h3>${d.seasons.length ? d.seasons.map((s) => `<div>${esc(s.name)} — <b>${fmt(s.score)}</b></div>`).join("") : '<p class="mute">Нет</p>'}
+    </div>`;
+    const pid = p.telegram_id, post = (url, body, msg) => run(async () => { await api(url, { telegram_id: pid, ...body }); toast(msg); await openPlayer(pid, false); const l = $("#list"); if (l) STATE.tab === "players" && search2(); });
+    const search2 = async () => { const r = await api(`/api/admin/players?q=${encodeURIComponent(STATE.q || "")}&limit=30${STATE.banned ? "&banned=1" : ""}`); $("#list").innerHTML = playerRows(r.players); };
+    $("#close").onclick = () => { STATE.open = null; $("#detail").innerHTML = ""; };
+    $("#grant").onclick = () => { const coins = +$("#gc").value || 0, xp = +$("#gx").value || 0, skin = $("#gs").value, field = $("#gf").value;
+      if (!coins && !xp && !skin && !field) return toast("Нечего выдавать", true); post("/api/admin/player/grant", { coins, xp, skin, field }, "Выдано"); };
+    $("#revoke").onclick = async () => { const skin = $("#gs").value, field = $("#gf").value; if (!skin && !field) return toast("Выбери скин или поле", true);
+      if (await ask("Забрать выбранное у игрока?")) post("/api/admin/player/revoke", { skin, field }, "Забрано"); };
+    const b1 = $("#ban"), b2 = $("#unban");
+    if (b1) b1.onclick = async () => { if (await ask("Забанить игрока?")) post("/api/admin/player/ban", { banned: true, reason: $("#reason").value }, "Игрок забанен"); };
+    if (b2) b2.onclick = () => post("/api/admin/player/ban", { banned: false }, "Бан снят");
+    $("#rs").onclick = async () => { if (await ask("Обнулить рекорды и очки во всех сезонах?")) post("/api/admin/player/reset", { scope: "scores" }, "Рекорды обнулены"); };
+    $("#rf").onclick = async () => { if (await ask("Полный сброс: монеты, XP, достижения, задания. Точно?")) post("/api/admin/player/reset", { scope: "full" }, "Прогресс сброшен"); };
+    if (scroll) $("#pcard").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+// ---------- Сезон ----------
+async function viewSeason() {
+  const s = await api("/api/admin/season"); drawTabs();
+  const cur = s.season;
+  $("#view").innerHTML = `<div class="card"><h2>Сезон №${cur.number}: ${esc(cur.name)}</h2>
+      <p class="small mute">${dt(cur.starts_at)} — ${dt(cur.ends_at)} · игроков с очками: ${fmt(cur.players)}</p>
+      ${s.top.length ? `<table>${s.top.map((r, i) => `<tr><td>${i + 1}</td><td>${who(r)} ${r.banned ? '<span class="pill bad">бан</span>' : ""}</td><td class="n"><b>${fmt(r.score)}</b></td>
+        <td><button class="sm" data-open="${esc(r.telegram_id)}">Открыть</button></td></tr>`).join("")}</table>` : '<p class="mute">Пока никто не играл</p>'}
+      ${s.rewards?.length ? `<h3>Награды сезона</h3>${s.rewards.map((r) => `<div class="small">${esc(r.icon)} ${esc(r.label)} — ${esc(r.title)}, ${fmt(r.coins)} 🪙</div>`).join("")}` : ""}
+      <h3>Закрыть сезон досрочно</h3>
+      <p class="small mute">Текущий сезон завершится сейчас, начнётся новый. Победители получат сообщение от бота и смогут забрать награду. Забаненные игроки в итоги не попадают.</p>
+      <button class="dng" id="close">Закрыть сезон сейчас</button></div>
+    <div class="card"><h2>Прошлые сезоны</h2>${s.history.length ? `<div class="scroll"><table><tr><th>Сезон</th><th>Окончание</th><th class="n">Игроков</th><th>Победитель</th></tr>${s.history.map((h) =>
+      `<tr><td>${esc(h.name)}</td><td>${dt(h.ends_at)}</td><td class="n">${fmt(h.players)}</td><td>${h.winner ? esc(h.winner.name) + " — " + fmt(h.winner.score) : "—"}</td></tr>`).join("")}</table></div>` : '<p class="mute">Пока нет</p>'}</div>`;
+  $("#view").onclick = (e) => { const b = e.target.closest("[data-open]"); if (b) { STATE.tab = "players"; STATE.q = b.dataset.open; STATE.open = b.dataset.open; show(); } };
+  $("#close").onclick = async () => { if (await ask("Закрыть текущий сезон прямо сейчас? Это нельзя отменить.")) run(async () => { await api("/api/admin/season/close", { confirm: true }); toast("Сезон закрыт"); show(); }); };
+}
+
+// ---------- Платежи ----------
+async function viewPayments() {
+  const [pay, err] = await Promise.all([api("/api/admin/payments?limit=50" + (STATE.pstatus ? "&status=" + STATE.pstatus : "")), api("/api/admin/payment-errors")]);
+  drawTabs(err.errors.length);
+  $("#view").innerHTML = `
+    <div class="card"><h2>Ошибки платежей ${err.errors.length ? `<span class="pill bad">${err.errors.length}</span>` : ""}</h2>
+      ${err.errors.length ? err.errors.map((e) => `<div style="border-top:1px solid var(--line);padding:10px 0">
+        <div><b>${esc(e.kind)}</b> · ${dt(e.created_at)} · ${who({ first_name: e.first_name, username: e.username, telegram_id: e.telegram_id })} <span class="mute small">${esc(e.telegram_id)}</span></div>
+        <div class="small warn">${esc(e.reason)}</div>
+        <div class="small mute">${esc(e.item || e.payload)} · ${fmt(e.stars)} ⭐ ${e.charge_id ? "· " + esc(e.charge_id) : ""}</div>
+        <div class="row" style="margin-top:6px">${e.can_grant ? `<button class="sm pri" data-grant="${e.id}">Выдать покупку</button>` : ""}
+          ${e.charge_id && CAT.bot ? `<button class="sm dng" data-erefund="${esc(e.charge_id)}" data-eid="${e.id}">Вернуть Stars</button>` : ""}
+          <button class="sm" data-resolve="${e.id}">Закрыть без действий</button></div></div>`).join("") : '<p class="mute">Открытых ошибок нет 🎉</p>'}</div>
+    <div class="card"><div class="row" style="justify-content:space-between"><h2>Платежи</h2>
+      <select id="ps"><option value="">все</option><option value="paid" ${STATE.pstatus === "paid" ? "selected" : ""}>оплачены</option><option value="refunded" ${STATE.pstatus === "refunded" ? "selected" : ""}>возвраты</option></select></div>
+      ${pay.payments.length ? `<div class="scroll"><table><tr><th>Когда</th><th>Игрок</th><th>Покупка</th><th class="n">⭐</th><th></th></tr>${pay.payments.map((x) =>
+        `<tr><td>${dt(x.created_at)}</td><td>${who(x)}</td><td>${esc(x.item)}</td><td class="n">${x.stars}</td>
+         <td>${x.refunded_at ? `<span class="pill">возврат ${dt(x.refunded_at)}</span>` : pay.refunds_enabled ? `<button class="sm dng" data-refund="${esc(x.charge_id)}">Вернуть</button>` : ""}</td></tr>`).join("")}</table></div>` : '<p class="mute">Платежей нет</p>'}
+      <p class="small mute">Возврат отправляет Stars игроку через Telegram и забирает купленный предмет.</p></div>`;
+  $("#ps").onchange = (e) => { STATE.pstatus = e.target.value; show(); };
+  $("#view").onclick = async (e) => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.grant) { if (await ask("Выдать предмет игроку по этой записи?")) run(async () => { const r = await api(`/api/admin/payment-errors/${t.dataset.grant}/grant`, {}); toast(r.fresh ? "Выдано" : "Уже было выдано"); show(); }); }
+    else if (t.dataset.resolve) run(async () => { await api(`/api/admin/payment-errors/${t.dataset.resolve}/resolve`, {}); show(); });
+    else if (t.dataset.erefund) { if (await ask("Вернуть Stars по этому платежу?")) run(async () => { await api("/api/admin/payments/refund", { charge_id: t.dataset.erefund }); await api(`/api/admin/payment-errors/${t.dataset.eid}/resolve`, {}); toast("Возврат выполнен"); show(); }); }
+    else if (t.dataset.refund) { if (await ask("Вернуть Stars и забрать предмет у игрока?")) run(async () => { await api("/api/admin/payments/refund", { charge_id: t.dataset.refund }); toast("Возврат выполнен"); show(); }); }
+  };
+}
+
+// ---------- Рассылка ----------
+const bstatus = { running: ["идёт", "warn"], done: ["готово", "ok"], cancelled: ["отменена", ""], interrupted: ["прервана", "bad"], error: ["ошибка", "bad"] };
+async function viewBroadcast() {
+  const [b, nw] = await Promise.all([api("/api/admin/broadcasts"), api("/api/admin/news")]); drawTabs();
+  const newsCard = `<div class="card"><h2>📰 Новость обновления v${esc(nw.version)}</h2>
+      <p class="small ${nw.sent ? "ok" : "mute"}">${nw.sent ? `Разослана${nw.broadcast ? ` ${dt(nw.broadcast.created_at)} · получателей ${nw.broadcast.total}` : ""}` : nw.auto ? "Разошлётся автоматически через минуту после запуска сервера" : "Автоматическая рассылка выключена (ANNOUNCE_UPDATES=off)"}</p>
+      <pre class="newsprev">${esc(nw.preview)}</pre>
+      <p class="small mute">Каждый получит текст на своём языке (русский или английский). Не получат те, кто отключил сообщения бота. Текст — в src/changelog.js.</p>
+      <button id="newsSend" ${b.running ? "disabled" : ""}>${nw.sent ? "Разослать ещё раз" : "Разослать сейчас"}</button></div>`;
+  $("#view").innerHTML = newsCard + `<div class="card"><h2>Новая рассылка</h2>
+      ${CAT.bot ? "" : '<p class="bad">BOT_TOKEN не задан — рассылка недоступна.</p>'}
+      <div class="row"><select id="aud">${CAT.audiences.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join("")}</select><span id="cnt" class="mute small"></span></div>
+      <textarea id="txt" maxlength="3500" placeholder="Текст сообщения (до 3500 символов)" style="margin-top:8px"></textarea>
+      <div class="row small mute" style="justify-content:space-between"><label><input type="checkbox" id="btn" checked style="padding:0"> кнопка «Играть»</label><span id="len">0 / 3500</span></div>
+      <div class="row" style="margin-top:8px"><button id="test">Отправить себе</button><button class="pri" id="send" ${b.running ? "disabled" : ""}>Отправить всем</button>${b.running ? '<button class="dng" id="cancel">Остановить</button>' : ""}</div>
+      <p class="small mute">Забаненные и заблокировавшие бота в рассылку не попадают. Скорость ограничена лимитом Telegram.</p></div>
+    <div class="card"><h2>История</h2>${b.broadcasts.length ? `<div class="scroll"><table><tr><th>Когда</th><th>Текст</th><th class="n">Итог</th></tr>${b.broadcasts.map((x) => {
+      const [t, c] = bstatus[x.status] || [x.status, ""], pct = x.total ? Math.round((x.sent + x.failed + x.blocked) / x.total * 100) : 100;
+      return `<tr><td>${dt(x.created_at)}<br><span class="pill ${c}">${t}</span></td><td>${esc(x.text.slice(0, 90))}${x.text.length > 90 ? "…" : ""}<div class="bar" style="margin-top:5px"><i style="width:${pct}%"></i></div></td>
+        <td class="n">${x.sent}/${x.total}<br><span class="small mute">блок ${x.blocked} · ош. ${x.failed}</span></td></tr>`; }).join("")}</table></div>` : '<p class="mute">Рассылок ещё не было</p>'}</div>`;
+  const cnt = () => run(async () => { const r = await api("/api/admin/broadcast/count?audience=" + $("#aud").value); $("#cnt").textContent = `получателей: ${fmt(r.count)}`; });
+  $("#aud").onchange = cnt; cnt();
+  $("#txt").oninput = () => $("#len").textContent = `${$("#txt").value.length} / 3500`;
+  const payload = () => ({ text: $("#txt").value.trim(), audience: $("#aud").value, with_button: $("#btn").checked });
+  $("#test").onclick = () => run(async () => { const p = payload(); if (!p.text) return toast("Введи текст", true); const r = await api("/api/admin/broadcast", { ...p, test: true }); toast(r.ok ? "Отправлено тебе" : "Не удалось: " + r.result, !r.ok); });
+  $("#send").onclick = async () => { const p = payload(); if (!p.text) return toast("Введи текст", true);
+    if (await ask(`Отправить ${$("#cnt").textContent.replace("получателей: ", "")} получателям? Остановить уже отправленное нельзя.`)) run(async () => { const r = await api("/api/admin/broadcast", { ...p, confirm: true }); toast(`Запущено: ${r.total} получателей`); show(); }); };
+  $("#newsSend").onclick = async () => { if (await ask(nw.sent ? "Новость уже рассылалась. Отправить ещё раз всем?" : "Разослать новость всем игрокам?")) run(async () => { const r = await api("/api/admin/news/send", { confirm: true }); toast(`Запущено: ${r.total} получателей`); show(); }); };
+  const c = $("#cancel"); if (c) c.onclick = () => run(async () => { await api("/api/admin/broadcast/cancel", {}); toast("Останавливаю…"); show(); });
+  if (b.running) { clearTimeout(STATE.poll); STATE.poll = setTimeout(() => STATE.tab === "broadcast" && show(), 3000); }
+}
+
+// ---------- Журнал ----------
+const ACTIONS = { grant: "Выдача", revoke: "Отзыв предмета", ban: "Бан", unban: "Разбан", reset_scores: "Сброс рекордов", reset_full: "Полный сброс", season_close: "Закрытие сезона",
+  refund: "Возврат Stars", payment_manual_grant: "Ручная выдача покупки", payment_error_resolve: "Ошибка платежа закрыта", broadcast: "Рассылка", broadcast_cancel: "Остановка рассылки",
+  event_create: "Запуск события", event_stop: "Остановка события", news_send: "Новость обновления" };
+async function viewLog() {
+  const l = await api("/api/admin/log"); drawTabs();
+  $("#view").innerHTML = `<div class="card"><h2>Действия администраторов</h2>${l.log.length ? `<div class="scroll"><table><tr><th>Когда</th><th>Админ</th><th>Действие</th><th>Цель</th><th>Детали</th></tr>${l.log.map((x) =>
+    `<tr><td>${dt(x.created_at)}</td><td>${esc(x.admin_name || x.admin_id)}</td><td>${esc(ACTIONS[x.action] || x.action)}</td><td>${esc(x.target)}</td>
+     <td class="small mute">${esc(Object.entries(x.details || {}).filter(([, v]) => v !== "" && v !== 0 && v != null).map(([k, v]) => `${k}: ${v}`).join(", "))}</td></tr>`).join("")}</table></div>` : '<p class="mute">Пусто</p>'}</div>`;
+}
+
+const MODE_NAMES = { classic: "Классика", nowalls: "Без стен", rocks: "Камни", maze: "Лабиринт", moving: "Живые стены" };
+const KINDS = { daily: "челлендж дня", tournament: "турнир", challenge: "вызов" };
+const FLAGS = { path: "идеальный путь", combo: "огромное комбо" };
+const flagPills = (g) => (g.flags ? g.flags.split(",").filter(Boolean).map((f) => ` <span class="pill bad" title="eff ${g.eff ?? "—"}">${esc(FLAGS[f] || f)}</span>`).join("") : "");
+
+// ---------- Удержание ----------
+const pct = (a, b) => (b ? Math.round((a / b) * 100) + "%" : "—");
+async function viewRetention() {
+  const r = await api("/api/admin/retention?days=" + (STATE.rdays || 21)); drawTabs();
+  const f = r.funnel, steps = [["Зарегистрировались", f.registered], ["Сыграли хотя бы раз", f.played], ["Сыграли 5+ раз", f.played5], ["Вернулись в другой день", f.returned], ["Платили", f.paid]];
+  const cell = (n, size, ready) => (ready ? `<td class="n">${pct(n, size)}<br><span class="small mute">${n}</span></td>` : '<td class="n mute">…</td>');
+  $("#view").innerHTML = `
+    <div class="card"><div class="row" style="justify-content:space-between"><h2>Воронка</h2>
+      <select id="rdays">${[7, 14, 21, 30].map((d) => `<option value="${d}" ${d === r.days ? "selected" : ""}>${d} дн.</option>`).join("")}</select></div>
+      <p class="small mute">Игроки, пришедшие за последние ${r.days} дн.</p>
+      ${steps.map(([name, n]) => `<div style="margin:9px 0"><div class="row" style="justify-content:space-between"><span>${name}</span><b>${fmt(n)} <span class="mute small">${pct(n, f.registered)}</span></b></div>
+        <div class="bar"><i style="width:${f.registered ? Math.max(2, (n / f.registered) * 100) : 0}%"></i></div></div>`).join("")}</div>
+    <div class="card"><h2>Когорты по дню прихода</h2>
+      <p class="small mute">Какая доля новичков заходила снова через 1, 3 и 7 дней. «…» — срок ещё не наступил.</p>
+      ${r.cohorts.length ? `<div class="scroll"><table><tr><th>День</th><th class="n">Новых</th><th class="n">D1</th><th class="n">D3</th><th class="n">D7</th></tr>${r.cohorts.map((c) =>
+        `<tr><td>${esc(c.day)}</td><td class="n">${c.size}</td>${cell(c.d1, c.size, c.d1_ready)}${cell(c.d3, c.size, c.d3_ready)}${cell(c.d7, c.size, c.d7_ready)}</tr>`).join("")}</table></div>` : '<p class="mute">Нет новых игроков за период</p>'}</div>`;
+  $("#rdays").onchange = (e) => { STATE.rdays = +e.target.value; show(); };
+}
+
+// ---------- Античит ----------
+async function viewCheat() {
+  const r = await api("/api/admin/suspicious"); drawTabs();
+  $("#view").innerHTML = `<div class="card"><h2>Подозрительные забеги</h2>
+    <p class="small mute">Сервер уже проверяет каждый забег по логу — подделать очки нельзя. Здесь — забеги, похожие на бота: путь к еде почти всегда кратчайший (eff &lt; ${r.threshold}; у людей обычно 1.3–2.5) или нереальное комбо. Автоматически никого не баним: открой реплей и реши сам.</p>
+    ${r.runs.length ? `<div class="scroll"><table><tr><th>Когда</th><th>Игрок</th><th class="n">Очки</th><th class="n">eff</th><th>Метки</th><th></th></tr>${r.runs.map((g) =>
+      `<tr><td>${dt(g.created_at)}</td><td>${who(g)}${g.banned ? ' <span class="pill bad">бан</span>' : ""}</td><td class="n">${fmt(g.score)}<br><span class="small mute">${esc(MODE_NAMES[g.mode] || g.mode)}</span></td><td class="n">${g.eff ?? "—"}</td><td>${flagPills(g)}</td>
+       <td><div class="row">${g.has_log ? `<a class="pill" href="/?areplay=${g.id}" target="_blank" rel="noopener">▶ реплей</a>` : ""}<button class="sm" data-open="${esc(g.telegram_id)}">Игрок</button></div></td></tr>`).join("")}</table></div>` : '<p class="mute">Пока ничего подозрительного 🎉</p>'}</div>`;
+  $("#view").onclick = (e) => { const b = e.target.closest("[data-open]"); if (b) { STATE.tab = "players"; STATE.q = b.dataset.open; STATE.open = b.dataset.open; show(); } };
+}
+
+// ---------- События ----------
+async function viewEvents() {
+  const r = await api("/api/admin/events"); drawTabs();
+  const a = r.auto, now = Date.now();
+  $("#view").innerHTML = `<div class="card"><h2>Сейчас</h2>
+      <div class="grid"><div class="kpi"><b>×${a.coinMult}</b><span>множитель монет</span></div><div class="kpi"><b>${esc(MODE_NAMES[a.featured] || a.featured)}</b><span>режим недели (×${a.featuredMult})</span></div>
+      <div class="kpi"><b>${a.tour ? "идёт" : "—"}</b><span>турнир выходных${a.tour ? " · " + esc(MODE_NAMES[a.tour.mode] || a.tour.mode) : a.next_tour ? " · с " + esc(a.next_tour) : ""}</span></div></div>
+      <p class="small mute">По выходным автоматически: двойные монеты и турнир. Выключить двойные монеты по выходным — переменная WEEKEND_X2=off.</p></div>
+    <div class="card"><h2>Новое событие</h2>
+      <div class="row"><input id="etitle" placeholder="Название, например «Счастливый час»" maxlength="60"><select id="emult"><option value="1.5">×1.5 монет</option><option value="2" selected>×2 монет</option><option value="3">×3 монет</option></select>
+        <select id="ehours"><option value="1">1 час</option><option value="3">3 часа</option><option value="12">12 часов</option><option value="24">сутки</option><option value="72">3 дня</option></select><button class="pri" id="ecreate">Запустить</button></div>
+      <p class="small mute">Начинается сразу. Игроки видят баннер в игре; награда за забеги умножается.</p></div>
+    <div class="card"><h2>История</h2>${r.events.length ? `<div class="scroll"><table><tr><th>Название</th><th class="n">×</th><th>Начало</th><th>Конец</th><th></th></tr>${r.events.map((e) =>
+      `<tr><td>${esc(e.title)}</td><td class="n">${e.coin_mult}</td><td>${dt(e.starts_at)}</td><td>${dt(e.ends_at)}</td><td>${new Date(e.ends_at).getTime() > now ? `<button class="sm dng" data-stop="${e.id}">Остановить</button>` : '<span class="pill">завершено</span>'}</td></tr>`).join("")}</table></div>` : '<p class="mute">Событий ещё не было</p>'}</div>`;
+  $("#ecreate").onclick = () => run(async () => { await api("/api/admin/events", { title: $("#etitle").value.trim(), coin_mult: +$("#emult").value, hours: +$("#ehours").value }); toast("Событие запущено"); show(); });
+  $("#view").onclick = async (e) => { const b = e.target.closest("[data-stop]"); if (b && (await ask("Остановить событие?"))) run(async () => { await api(`/api/admin/events/${b.dataset.stop}/stop`, {}); show(); }); };
+}
+
+const REJECT = { too_fast: "быстрее реального времени", bad_token: "чужой/старый токен", bad_log: "битый лог", bad_ticks: "неверная длина" };
+const VIEWS = { overview: viewOverview, retention: viewRetention, players: viewPlayers, cheat: viewCheat, season: viewSeason, events: viewEvents, payments: viewPayments, broadcast: viewBroadcast, log: viewLog };
+async function show() {
+  clearTimeout(STATE.poll); $("#view").onclick = null; drawTabs();
+  $("#view").innerHTML = '<p class="mute">Загрузка…</p>';
+  try { await VIEWS[STATE.tab](); } catch (e) { $("#view").innerHTML = `<div class="card bad">${esc(e.message)}</div>`; }
+}
+
+(async () => {
+  try {
+    const me = await api("/api/admin/me");
+    if (!me.admin) { $("#deny").hidden = false; return; }
+    CAT = await api("/api/admin/catalog");
+    $("#app").hidden = false; show();
+    api("/api/admin/stats?days=7").then((s) => drawTabs(s.today.open_errors)).catch(() => {});
+  } catch { $("#deny").hidden = false; }
+})();
+</script>
+</body>
+</html>

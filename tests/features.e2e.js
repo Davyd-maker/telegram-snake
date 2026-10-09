@@ -1,0 +1,144 @@
+// Сквозная проверка новых функций на живом сервере с ТЕСТОВОЙ базой (игроки 4001–4004, админ — первый из ADMIN_TELEGRAM_ID).
+// Запуск: API_URL=http://127.0.0.1:3000 BOT_TOKEN=<тот же, что у сервера> ADMIN_ID=<id админа> node tests/features.e2e.js
+const crypto = require("crypto");
+const E = require("../public/engine.js");
+const BASE = process.env.API_URL || "http://127.0.0.1:3000", TOKEN = process.env.BOT_TOKEN, ADMIN = Number(process.env.ADMIN_ID || 1001);
+const TG_LOG = process.env.TG_LOG || ""; // адрес журнала вызовов Telegram у тестовой заглушки (необязательно)
+let fails = 0;
+const ok = (c, m, x) => { if (!c) { fails++; console.log("  ✗", m, x !== undefined ? JSON.stringify(x).slice(0, 400) : ""); } else console.log("  ✓", m); };
+function initData(user, start) {
+  const p = new URLSearchParams({ auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify(user), ...(start ? { start_param: start } : {}) });
+  const dcs = [...p].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("\n");
+  const sk = crypto.createHmac("sha256", "WebAppData").update(TOKEN).digest();
+  p.set("hash", crypto.createHmac("sha256", sk).update(dcs).digest("hex"));
+  return p.toString();
+}
+const U = (id, name, start, lang = "ru") => ({ id, init: initData({ id, first_name: name, language_code: lang }, start) });
+async function call(u, m, path, body, extra = {}) {
+  const r = await fetch(BASE + path, { method: m, headers: { "Content-Type": "application/json", ...(u ? { "X-Telegram-Init-Data": u.init } : {}), ...extra }, body: body === undefined ? undefined : JSON.stringify(body) });
+  return { status: r.status, data: await r.json().catch(() => null) };
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function bot(g) {
+  const h = g.snake[0], f = g.food, N = E.N;
+  const safe = (d) => { let nx = h.x + d.x, ny = h.y + d.y; if (g.cfg.mode !== "nowalls" && (nx < 0 || ny < 0 || nx >= N || ny >= N)) return false; nx = (nx + N) % N; ny = (ny + N) % N; if (g.rockSet[ny * N + nx]) return false; const t = g.snake[g.snake.length - 1]; return !(g.occ[ny * N + nx] && !(t.x === nx && t.y === ny && g.pendingGrowth <= 0)); };
+  const s = E.DIRS.map(([x, y]) => ({ x, y })).filter((d) => !(d.x === -g.dir.x && d.y === -g.dir.y) && safe(d));
+  s.sort((a, b) => (Math.abs(h.x + a.x - f.x) + Math.abs(h.y + a.y - f.y)) - (Math.abs(h.x + b.x - f.x) + Math.abs(h.y + b.y - f.y)));
+  return s[0] || null;
+}
+async function play(u, body, maxTicks = 300, maxScore = 1e9) {
+  const r = await call(u, "POST", "/api/run", body); if (!r.data?.token) return { r };
+  const g = new E.Game(r.data.cfg);
+  while (!g.over && g.ticks < maxTicks && g.score < maxScore) { const d = bot(g); if (d && (d.x !== g.dir.x || d.y !== g.dir.y)) g.setdir(d.x, d.y); g.tick(); }
+  const res = g.result();
+  await sleep(Math.max(0, res.gameTime - 130 * g.log.length - 2000) + 200);
+  const s = await call(u, "POST", "/api/score", { token: r.data.token, log: E.encodeLog(g.log), ticks: res.ticks });
+  return { r, g, res, s };
+}
+const whSecret = crypto.createHash("sha256").update("wh:" + TOKEN).digest("hex").slice(0, 48);
+const webhook = (upd) => fetch(BASE + "/telegram/webhook", { method: "POST", headers: { "Content-Type": "application/json", "X-Telegram-Bot-Api-Secret-Token": whSecret }, body: JSON.stringify(upd) });
+const tgLog = async () => (TG_LOG ? (await fetch(TG_LOG)).json() : []);
+
+(async () => {
+  const admin = U(ADMIN, "Boss"), A = U(4001, "Anna"), B = U(4002, "Boris", "ref_4001"), Cc = U(4003, "Cid", null, "en"), D = U(4004, "Dina");
+  for (const x of [admin, A, B, Cc, D]) await call(x, "GET", "/api/me");
+
+  console.log("• язык и настройки");
+  let r = await call(Cc, "GET", "/api/me"); ok(r.data.player.lang === "en", "язык из Telegram (en)");
+  r = await call(D, "POST", "/api/settings", { notify: false, lang: "en" }); ok(r.data.player.notify === false && r.data.player.lang === "en", "настройки сохраняются");
+  await call(D, "POST", "/api/settings", { notify: true, lang: "ru" });
+
+  console.log("• события и задания");
+  r = await call(A, "GET", "/api/me");
+  ok(r.data.events && typeof r.data.events.coinMult === "number" && E.MODES[r.data.events.featured], "события в /api/me", r.data.events);
+  ok(r.data.player.missions.length === 6 && r.data.player.missions.filter((m) => m.weekly).length === 3, "3 дневных + 3 недельных задания");
+  const a1 = await play(A, { mode: "classic" }, 300);
+  ok(a1.s.status === 200 && a1.s.data.result.score === a1.res.score, `забег засчитан: ${a1.res.score}`);
+  const a2 = await play(A, { mode: "rocks" }, 250);
+  const ms = a2.s.data.player.missions;
+  ok(ms.some((m) => m.progress > 0), "прогресс заданий растёт", ms.map((m) => `${m.id}:${m.progress}/${m.target}`));
+  const ready = ms.find((m) => m.progress >= m.target && !m.claimed);
+  if (ready) { r = await call(A, "POST", "/api/mission", { id: ready.id }); ok(r.data.reward === ready.reward && r.data.pass_xp > 0, `задание «${ready.id}» забрано`, r.data); }
+
+  console.log("• события: ×2 от админа");
+  r = await call(admin, "POST", "/api/admin/events", { title: "Тест ×2", coin_mult: 2, hours: 1 }); ok(r.data.ok, "событие создано");
+  r = await call(A, "GET", "/api/me"); ok(r.data.events.coinMult >= 2, "множитель монет активен");
+  const a3 = await play(A, { mode: "classic", diff: "normal" }, 120);
+  ok(a3.s.data.result.bonuses.some((b) => b.kind === "event") && a3.s.data.result.reward >= E.reward(a3.res, a3.r.data.cfg, false) * 2 - 1, "награда удвоена", a3.s.data.result);
+  await call(admin, "POST", `/api/admin/events/${(await call(admin, "GET", "/api/admin/events")).data.events[0].id}/stop`, {});
+
+  console.log("• сезонный пропуск");
+  r = await call(A, "GET", "/api/pass"); const pass = r.data.pass;
+  ok(pass.xp > 0 && pass.tiers.length === 15, `опыт пропуска ${pass.xp}`);
+  if (pass.level > 0) { r = await call(A, "POST", "/api/pass/claim", { tier: 1, track: "free" }); ok(r.data.ok && r.data.coins > 0, "бесплатная ступень 1"); }
+  r = await call(A, "POST", "/api/pass/claim", { tier: 1, track: "prem" }); ok(r.status === 400, "премиум без покупки — нельзя");
+  r = await call(A, "POST", "/api/invoice", { product: "pass" }); ok(!!r.data.url, "счёт на пропуск");
+  const season = (await call(A, "GET", "/api/pass")).data.season.id;
+  const pay = (payload, amount, charge) => webhook({ message: { chat: { id: 4001 }, from: { id: 4001, language_code: "ru" }, successful_payment: { currency: "XTR", total_amount: amount, invoice_payload: payload, telegram_payment_charge_id: charge } } });
+  await pay(`product:pass:${season}:4001`, 99, "ch-pass-1"); await sleep(400);
+  r = await call(A, "GET", "/api/pass"); ok(r.data.pass.premium, "премиум включён после оплаты");
+  if (r.data.pass.level > 0) { r = await call(A, "POST", "/api/pass/claim", { tier: 1, track: "prem" }); ok(r.data.ok, "премиум-ступень 1"); }
+  r = await call(A, "POST", "/api/invoice", { product: "pass" }); ok(r.status === 400, "второй раз купить нельзя");
+
+  console.log("• набор новичка");
+  r = await call(D, "GET", "/api/me"); ok(!!r.data.player.starter_offer, "предложение новичку есть"); const coins0 = r.data.player.coins;
+  await webhook({ message: { chat: { id: 4004 }, from: { id: 4004 }, successful_payment: { currency: "XTR", total_amount: 49, invoice_payload: "product:starter:0:4004", telegram_payment_charge_id: "ch-starter-1" } } }); await sleep(400);
+  r = await call(D, "GET", "/api/me"); const pl = r.data.player;
+  ok(pl.coins === coins0 + 5000 && pl.owned_skins.includes("cyber") && pl.artifact_levels.magnet >= 2 && !pl.starter_offer, "набор выдан", { c: pl.coins, s: pl.owned_skins, l: pl.artifact_levels });
+  r = await call(admin, "POST", "/api/admin/payments/refund", { charge_id: "ch-starter-1" });
+  if (r.status === 502) console.log("  – возврат пропущен: нет связи с Telegram (тестовый токен)");
+  else { ok(r.data.ok, "возврат набора"); r = await call(D, "GET", "/api/me"); ok(!r.data.player.owned_skins.includes("cyber"), "после возврата скин забран"); }
+
+  console.log("• призраки и реплеи");
+  const ch = await call(A, "POST", "/api/challenge", { game_id: a1.s.data.result.game_id });
+  r = await call(B, "POST", "/api/run", { kind: "challenge", ref: ch.data.id });
+  ok(r.data.ghost && r.data.ghost.score === a1.res.score && r.data.ghost.log, "в вызове есть призрак соперника");
+  if (r.data.ghost) { const sim = E.simulate(r.data.cfg, E.parseLog(r.data.ghost.log), r.data.ghost.ticks); ok(sim.score === a1.res.score, "призрак проигрывается на том же поле"); }
+  const d1 = await play(B, { kind: "daily" }, 150);
+  r = await call(B, "POST", "/api/run", { kind: "daily" }); ok(r.data.ghost?.label === "Твой лучший" && r.data.ghost.score === d1.res.score, "в челлендже — призрак своего лучшего");
+  r = await call(B, "GET", "/api/me"); ok(r.data.player.best_score === 0, "челлендж дня не идёт в общий рейтинг");
+  const sh = await call(A, "POST", "/api/replay/share", { game_id: a1.s.data.result.game_id });
+  ok(/rp_[0-9a-f]{10}/.test(sh.data.link), "ссылка на реплей", sh.data);
+  r = await call(Cc, "GET", `/api/replay/${sh.data.id}`); ok(r.data.score === a1.res.score && r.data.log, "реплей по ссылке открывается у другого игрока");
+
+  console.log("• кланы");
+  await call(admin, "POST", "/api/admin/player/grant", { telegram_id: "4002", coins: 5000 });
+  r = await call(B, "POST", "/api/clan/create", { name: "Змеи", tag: "zm", emoji: "🐉" }); ok(r.data.ok && r.data.mine.tag === "ZM", "клан создан", r.data);
+  r = await call(Cc, "POST", "/api/clan/create", { name: "змеи", tag: "ZX" }); ok(r.status === 409 || r.status === 400, "имя занято / нет монет");
+  const clanId = (await call(B, "GET", "/api/clans")).data.mine.id;
+  r = await call(A, "POST", "/api/clan/join", { id: clanId }); ok(r.data.ok && r.data.mine.members.length === 2, "вступление");
+  r = await call(A, "GET", "/api/clans"); ok(r.data.clans[0].score > 0, `очки клана: ${r.data.clans[0]?.score}`);
+  r = await call(A, "POST", "/api/clan/kick", { telegram_id: "4002" }); ok(r.status === 403, "не владелец не может исключать");
+  r = await call(B, "POST", "/api/clan/kick", { telegram_id: "4001" }); ok(r.data.ok && r.data.mine.members.length === 1, "владелец исключил");
+  r = await call(B, "POST", "/api/clan/leave", {}); ok(r.data.ok, "владелец вышел");
+  r = await call(B, "GET", "/api/clans"); ok(!r.data.clans.some((c) => c.id === clanId), "пустой клан удалён");
+
+  console.log("• турнир");
+  r = await call(A, "GET", "/api/tournament"); ok(r.data.prizes.length === 4 && r.data.last, "турнир: призы и прошлый турнир");
+  const tr = await call(A, "POST", "/api/run", { kind: "tournament" });
+  ok(r.data.current ? tr.status === 200 : tr.status === 409, `турнир ${r.data.current ? "идёт" : "не идёт (будни)"} — старт ${tr.status}`);
+
+  console.log("• уведомления");
+  // Борис приглашён Анной → они друзья. Обнуляем Борису рекорд, даём маленький, потом большой — больше рекорда Анны.
+  await call(admin, "POST", "/api/admin/player/reset", { telegram_id: "4002", scope: "scores" });
+  await play(B, { mode: "classic" }, 80, 4);
+  const annaBest = (await call(A, "GET", "/api/me")).data.player.best_score;
+  const before = (await tgLog()).length;
+  let b2 = null;
+  for (let i = 0; i < 3; i++) { b2 = await play(B, { mode: "classic" }, 600); if (b2.res.score > annaBest) break; }
+  if (TG_LOG && b2.res.score > annaBest) {
+    await sleep(600);
+    const msgs = (await tgLog()).slice(before).filter((x) => x.method === "sendMessage" && String(x.body.chat_id) === "4001");
+    ok(msgs.some((m) => /побил/.test(m.body.text) && m.body.text.includes(String(b2.res.score))), `Анне пришло «Борис побил твой рекорд» (${b2.res.score} > ${annaBest})`, msgs.map((m) => m.body.text));
+  } else console.log("  – пропущено: рекорд Анны не побит или нет журнала Telegram");
+
+  console.log("• админка: удержание, античит, реплей");
+  r = await call(admin, "GET", "/api/admin/retention"); ok(r.data.cohorts.length >= 1 && r.data.funnel.registered >= 5 && r.data.funnel.paid >= 1, "когорты и воронка", r.data.funnel);
+  r = await call(admin, "GET", "/api/admin/suspicious"); ok(Array.isArray(r.data.runs), `подозрительных забегов: ${r.data.runs.length} (бот играет почти идеально — должен попадаться)`);
+  ok(r.data.runs.length > 0, "бот помечен античитом");
+  r = await call(admin, "GET", `/api/admin/game/${a1.s.data.result.game_id}/replay`); ok(r.data.log && r.data.score === a1.res.score, "реплей забега для админа");
+  r = await call(A, "GET", `/api/admin/game/${a1.s.data.result.game_id}/replay`); ok(r.status === 403, "обычному игроку — нельзя");
+
+  console.log(fails ? `\nПРОВАЛЕНО: ${fails}` : "\nВСЕ ПРОВЕРКИ ПРОШЛИ");
+  process.exit(fails ? 1 : 0);
+})().catch((e) => { console.error("CRASH", e); process.exit(2); });

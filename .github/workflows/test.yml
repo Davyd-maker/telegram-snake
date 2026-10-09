@@ -1,0 +1,37 @@
+# Автотесты при каждом push и pull request: быстрые тесты + сквозные на временной базе PostgreSQL.
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: snake_test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/snake_test
+      DB_SSL: "false"
+      BOT_TOKEN: "123456:CI-TEST-TOKEN"
+      ADMIN_TELEGRAM_ID: "1001"
+      PORT: "3000"
+      REMINDERS: "off"
+      BROADCAST_DELAY_MS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm install --no-audit --no-fund
+      - name: Unit tests
+        run: npm test
+      - name: Start server
+        run: |
+          node server.js > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3000/health && break; sleep 1; done
+      - name: API end-to-end tests
+        run: |
+          API_URL=http://127.0.0.1:3000 ADMIN_ID=1001 npm run test:api
+      - name: Server log
+        if: always()
+        run: cat server.log
