@@ -41,8 +41,11 @@
       }
       ctx.restore(); return;
     }
-    const x = H.x, y = H.y - r * 0.55, w = r * 1.2;
-    ctx.translate(x, y);
+    // шапки стоят вертикально, но при движении вбок сдвигаются к затылку и чуть наклоняются назад,
+    // чтобы не наезжать на верхний глаз (глаза при движении вбок — сверху и снизу головы)
+    const w = r * 1.2, side = f.x;
+    ctx.translate(H.x - side * r * 0.5, H.y - r * (0.55 - Math.abs(side) * 0.12)); ctx.rotate(-side * 0.32);
+    if (side < -0.3) ctx.scale(-1, 1); // ползёт влево — козырёк и украшения смотрят влево
     if (id === "crown") {
       const g = ctx.createLinearGradient(0, -w * 0.8, 0, 0); g.addColorStop(0, "#fff3a0"); g.addColorStop(1, "#e0a000");
       ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-w * 0.55, 0); ctx.lineTo(-w * 0.6, -w * 0.55); ctx.lineTo(-w * 0.3, -w * 0.3); ctx.lineTo(0, -w * 0.75); ctx.lineTo(w * 0.3, -w * 0.3); ctx.lineTo(w * 0.6, -w * 0.55); ctx.lineTo(w * 0.55, 0); ctx.closePath(); ctx.fill();
