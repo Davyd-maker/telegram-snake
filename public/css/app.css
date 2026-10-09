@@ -365,3 +365,21 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
 .pv-lv_garden{background:linear-gradient(90deg,#2e9e3a,#c8ffb0)}
 .pv-lv_dungeon{background:linear-gradient(90deg,#5b4a8a,#e6d5ff);box-shadow:0 0 10px rgba(167,139,250,.5)}
 .pv-lv_volcano{background:linear-gradient(90deg,#d13b0a,#ff8a3c,#ffe08a);box-shadow:0 0 14px rgba(255,106,26,.7);animation:flicker 1s ease-in-out infinite}
+
+/* ===== комбо и эффекты — строкой над полем, а не поверх него ===== */
+.hudbar{width:min(100%,calc(100vh - 172px),calc(100dvh - 172px));height:36px;margin:0 auto 6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
+#game.dpad-on .hudbar{width:min(100%,calc(100vh - 332px),calc(100dvh - 332px))}
+.board-shell{width:min(100%,calc(100vh - 172px),calc(100dvh - 172px))}
+#game.dpad-on .board-shell{width:min(100%,calc(100vh - 332px),calc(100dvh - 332px))}
+.hudbar .fx{position:static;flex:1;min-width:0;max-width:none;flex-wrap:nowrap;overflow:hidden;gap:5px}
+.hudbar .fxchip{flex:none;padding:4px 8px;font-size:12px;animation:chipin .25s ease both}
+@keyframes chipin{from{opacity:0;transform:translateY(-6px) scale(.9)}to{opacity:1;transform:none}}
+.hudbar .combo{position:static;transform:scale(.85);flex:none;text-align:right;font-size:17px;line-height:1;white-space:nowrap}
+.hudbar .combo.show{transform:scale(1)}
+.hudbar .combo i{width:100%;margin-top:4px}
+@media(max-width:360px){.hudbar .fxchip{padding:3px 6px;font-size:11px}.hudbar .combo{font-size:15px}}
+.fxchip i,.fxchip b,.fxchip em{font-style:normal}.fxchip .nm{font-weight:800}.fxchip .nm:empty,.fxchip .vl:empty{display:none}
+.hudbar .fx.compact .nm{display:none}
+/* строка эффектов и поле — одним блоком по центру экрана */
+.hudbar{margin-top:auto}
+.board-shell{margin:0 auto auto}

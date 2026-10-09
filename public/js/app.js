@@ -774,13 +774,27 @@
     const g = game;
     el.score.textContent = g.score;
     el.gc.textContent = fmtN((replay ? 0 : p.coins || 0) + g.runCoins);
-    const chips = E.TIMED.filter((k) => g.fx[k] > g.gameTime).map((k) => [E.PU[k].icon, Math.ceil((g.fx[k] - g.gameTime) / 1000), E.PU[k].color]);
-    if (g.shield) chips.push(["🛡️", "", E.PU.shield.color]);
-    if (g.cfg.artifact === "phantom" && g.charges > 0) chips.push(["👻", "×" + g.charges, "#b48cff"]);
-    if (g.isSafe()) chips.push(["✨", Math.ceil((g.safeUntil - g.gameTime) / 1000), "#9fffc8"]);
-    if (g.lv) chips.unshift(g.hole ? ["🕳️", t("в норку!"), "#ffd84c"] : ["🎯", `${g.score}/${g.lv.target}`, "#9fffc8"]);
+    // значки над полем: [ключ, иконка, название, значение, цвет]
+    const chips = E.TIMED.filter((k) => g.fx[k] > g.gameTime).map((k) => [k, E.PU[k].icon, t(E.PU[k].name), Math.ceil((g.fx[k] - g.gameTime) / 1000) + "с", E.PU[k].color]);
+    if (g.shield) chips.push(["shield", "🛡️", t("Щит"), "", E.PU.shield.color]);
+    if (g.cfg.artifact === "phantom" && g.charges > 0) chips.push(["phantom", "👻", t("Фантом"), "×" + g.charges, "#b48cff"]);
+    if (g.isSafe()) chips.push(["safe", "✨", t("Неуязвимость"), Math.ceil((g.safeUntil - g.gameTime) / 1000) + "с", "#9fffc8"]);
+    if (g.lv) chips.unshift(g.hole ? ["goal", "🕳️", t("в норку!"), "", "#ffd84c"] : ["goal", "🎯", "", `${g.score}/${g.lv.target}`, "#9fffc8"]);
     const sig = chips.map((c) => c.join()).join("|");
-    if (sig !== fxSig) { fxSig = sig; $("fx").innerHTML = chips.map(([i, t, c]) => `<span class="fxchip" style="border-color:${c};color:${c}">${i} ${t}</span>`).join(""); }
+    if (sig !== fxSig) {
+      fxSig = sig;
+      // обновляем по ключу: новый эффект появляется с анимацией, у старых меняются только цифры
+      const box = $("fx"), keep = new Set(chips.map((c) => c[0]));
+      box.classList.toggle("compact", chips.length > 2); // много эффектов — без названий, только значок и время
+      for (const elx of [...box.children]) if (!keep.has(elx.dataset.k)) elx.remove();
+      chips.forEach(([k, icon, name, val, color], i) => {
+        let elx = box.querySelector(`[data-k="${k}"]`);
+        if (!elx) { elx = document.createElement("span"); elx.className = "fxchip"; elx.dataset.k = k; elx.innerHTML = '<i class="ic"></i><b class="nm"></b><em class="vl"></em>'; }
+        if (box.children[i] !== elx) box.insertBefore(elx, box.children[i] || null);
+        elx.style.borderColor = color; elx.style.color = color;
+        elx.querySelector(".ic").textContent = icon; elx.querySelector(".nm").textContent = name; elx.querySelector(".vl").textContent = val;
+      });
+    }
     const showCombo = g.combo >= 2;
     $("combo").classList.toggle("show", showCombo);
     if (showCombo) {

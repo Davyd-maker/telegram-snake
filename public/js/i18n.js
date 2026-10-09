@@ -39,7 +39,7 @@
     "Пауза": "Paused", "ПАУЗА": "PAUSED", "Очки:": "Score:", "после продолжения — отсчёт 3-2-1": "3-2-1 countdown after resuming", "Продолжить": "Resume", "Настройки": "Settings",
     "Завершить и выйти в меню": "End run and go to menu",
     "Звук": "Sound", "Громкость": "Volume", "Вибрация": "Vibration", "Сообщения от бота": "Bot messages", "друг побил рекорд, вызовы, рейтинг": "friend beat your record, challenges, rankings",
-    "Язык": "Language", "ходов": "moves", "Награды": "Rewards", "сезон, уровни, турниры и пропуск": "season, levels, tournaments and pass", "За уровни": "For levels", "За турнир": "For tournament",
+    "Язык": "Language", "Неуязвимость": "Invulnerable", "ходов": "moves", "Награды": "Rewards", "сезон, уровни, турниры и пропуск": "season, levels, tournaments and pass", "За уровни": "For levels", "За турнир": "For tournament",
     "В пропуске": "In the pass", "🏆 Этот скин можно получить только как награду": "🏆 This skin is only available as a reward", "Уровни": "Levels", "30 уровней": "30 levels", "набери цель и заползи в норку": "reach the target and crawl into the hole",
     "Звёзды — за скорость прохождения": "Stars are for speed", "Глава": "Chapter", "награда за главу": "chapter reward", "Сад": "Garden", "Подземелье": "Dungeon", "Вулкан": "Volcano",
     "Лучшие по звёздам": "Top by stars", "ур.": "lvl", "Пока никто не прошёл ни одного уровня": "No one has completed a level yet", "Сначала пройди предыдущий уровень": "Complete the previous level first",
@@ -185,7 +185,7 @@
     [/^×([\d.]+) событие$/, "×$1 event"], [/^×([\d.]+) режим недели$/, "×$1 mode of the week"], [/^\+(\d+) XP пропуска$/, "+$1 pass XP"],
     [/^Реплей окончен · (.+): (\d+) очков$/, "Replay finished · $1: $2 points"], [/^итоговая награда ×([\d.]+)$/, "total reward ×$1"], [/^награда ×([\d.]+)$/, "reward ×$1"],
     [/^Твой лучший результат: (\d+)$/, "Your best: $1"], [/^место #(\d+)$/, "place #$1"], [/^попыток (\d+)$/, "attempts $1"], [/^Твоё место: #(\d+)$/, "Your place: #$1"],
-    [/^(\d+) октября$/, "October $1"], [/^Неделя (\d{4}-\d\d-\d\d)$/, "Week $1"], [/^до (\d+)$/, "until $1"]
+    [/^(\d+)с$/, "$1s"], [/^(\d+) октября$/, "October $1"], [/^Неделя (\d{4}-\d\d-\d\d)$/, "Week $1"], [/^до (\d+)$/, "until $1"]
   ];
 
   const CYR = /[А-Яа-яЁё]/;
