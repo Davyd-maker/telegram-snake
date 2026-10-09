@@ -341,3 +341,27 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
 /* «Что нового» */
 .newslist{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px;max-height:52vh;overflow-y:auto}
 .newslist li{padding:10px 12px;border-radius:14px;background:rgba(4,14,9,.7);border:1px solid rgba(120,255,190,.1);font-size:14px;line-height:1.35}
+
+/* ===== Уровни ===== */
+.nav button.levelsbtn{background:linear-gradient(135deg,rgba(96,165,250,.22),rgba(5,16,10,.9));border-color:rgba(96,165,250,.45)}
+.lvhead{display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px}
+.lvchapter{margin:16px 0 8px;padding:12px 14px;border-radius:16px;background:rgba(4,14,9,.7);border:1px solid var(--line)}
+.lvchapter h3{margin:0 0 2px;font-size:16px}.lvchapter small{display:block}
+.lvchapter.ch2{border-color:rgba(167,139,250,.35)}.lvchapter.ch3{border-color:rgba(255,120,60,.4)}
+.lvgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-top:10px}
+.lvnode{position:relative;aspect-ratio:1;border-radius:16px;background:#0b1912;border:1px solid rgba(120,255,190,.15);display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;font-size:18px;padding:0}
+.lvnode small{font-size:10px;letter-spacing:-1px;color:#ffd84c;margin-top:2px;min-height:12px}
+.lvnode.done{background:linear-gradient(145deg,#15402b,#0c2217);border-color:rgba(85,255,173,.45)}
+.lvnode.next{border-color:var(--accent);box-shadow:0 0 16px rgba(85,255,173,.45);animation:pulse2 1.6s infinite}
+.lvnode.lock{opacity:.4}
+.lvnode.boss{border-width:2px;border-color:rgba(255,190,60,.6)}
+.lvnode.boss:after{content:"👑";position:absolute;top:-8px;right:-4px;font-size:13px}
+.lvstars{font-size:34px;letter-spacing:4px;margin:4px 0}
+.lvstars i{font-style:normal;display:inline-block;filter:grayscale(1) brightness(.5);transition:filter .3s}
+.lvstars i.on{filter:none;animation:pop .45s ease both}
+.lvstars i.on:nth-child(2){animation-delay:.15s}.lvstars i.on:nth-child(3){animation-delay:.3s}
+.liinfo{display:grid;gap:6px;margin-top:10px;text-align:left}
+.liinfo div{padding:9px 12px;border-radius:12px;background:rgba(4,14,9,.7);border:1px solid rgba(120,255,190,.1);font-size:14px}
+.pv-lv_garden{background:linear-gradient(90deg,#2e9e3a,#c8ffb0)}
+.pv-lv_dungeon{background:linear-gradient(90deg,#5b4a8a,#e6d5ff);box-shadow:0 0 10px rgba(167,139,250,.5)}
+.pv-lv_volcano{background:linear-gradient(90deg,#d13b0a,#ff8a3c,#ffe08a);box-shadow:0 0 14px rgba(255,106,26,.7);animation:flicker 1s ease-in-out infinite}

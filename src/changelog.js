@@ -1,9 +1,28 @@
 // Новости обновлений. После выкладки новой версии бот один раз рассылает новость CURRENT всем, кто не отключил
 // сообщения (ANNOUNCE_UPDATES=off — не рассылать), а в игре при первом входе показывается окно «Что нового».
 // Новая версия: добавь запись в NEWS и поменяй CURRENT. Лимит Telegram — 4096 символов; лучше коротко.
-const CURRENT = "28";
+const CURRENT = "29";
 
 const NEWS = {
+  29: {
+    title: { ru: "Новый режим — «Уровни»!", en: "New mode — Levels!" },
+    ru: [
+      "🕳️ 30 уровней в трёх главах: Сад, Подземелье и Вулкан",
+      "🎯 Набери цель по очкам — откроется норка, заползай в неё и переходи дальше",
+      "🧱 Чем дальше, тем сложнее: стены, лабиринты, живые камни и ворота по таймеру",
+      "⭐ До трёх звёзд за быстрое прохождение и рейтинг по звёздам",
+      "🎁 Монеты за каждый уровень и эксклюзивный скин за каждую главу",
+      "🧲 Магнит переделан: теперь тянет еду прямо в рот"
+    ],
+    en: [
+      "🕳️ 30 levels in three chapters: Garden, Dungeon and Volcano",
+      "🎯 Reach the target score — a hole opens, crawl into it and move on",
+      "🧱 It gets harder: walls, mazes, living rocks and timed gates",
+      "⭐ Up to three stars for fast runs and a star leaderboard",
+      "🎁 Coins for every level and an exclusive skin for each chapter",
+      "🧲 Magnet reworked: it now pulls food right into your mouth"
+    ]
+  },
   28: {
     title: { ru: "Большое обновление Snake Arena!", en: "Big Snake Arena update!" },
     ru: [

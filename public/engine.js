@@ -22,7 +22,8 @@
     nowalls: { name: "Без стен",       emoji: "🌀", mult: 0.5,  rated: false, hint: "Стены проходимы · награда ×0.5" },
     rocks:   { name: "Камни",          emoji: "🪨", mult: 1.25, rated: false, hint: "Случайные камни на поле · награда ×1.25" },
     maze:    { name: "Лабиринт",       emoji: "🧩", mult: 1.25, rated: false, hint: "Фиксированные стены · награда ×1.25" },
-    moving:  { name: "Живые стены",    emoji: "⚡", mult: 1.5,  rated: false, hint: "Камни появляются и исчезают · награда ×1.5" }
+    moving:  { name: "Живые стены",    emoji: "⚡", mult: 1.5,  rated: false, hint: "Камни появляются и исчезают · награда ×1.5" },
+    level:   { name: "Уровни",         emoji: "🕳️", mult: 1,    rated: false, hidden: true, hint: "Набери цель и заползи в норку" }
   };
   // Сложность: speed — множитель длительности хода (меньше — быстрее)
   const DIFFS = {
@@ -76,13 +77,83 @@
     return out;
   })();
 
+
+  // ---------------- Режим «Уровни» ----------------
+  // 30 уровней в 3 главах. Раскладки нарисованы заранее (одинаковые у всех). Стартовый коридор (строки 11–13,
+  // столбцы 6–18) всегда свободен. Еда и норка появляются только в клетках, куда можно доползти.
+  const LEVELS = (() => {
+    const H = (y, x1, x2) => { const o = []; for (let x = x1; x <= x2; x++) o.push([x, y]); return o; };
+    const V = (x, y1, y2) => { const o = []; for (let y = y1; y <= y2; y++) o.push([x, y]); return o; };
+    const box = (x1, y1, x2, y2) => [...H(y1, x1, x2), ...H(y2, x1, x2), ...V(x1, y1 + 1, y2 - 1), ...V(x2, y1 + 1, y2 - 1)];
+    const blk = (x, y, w = 2, h = 2) => { const o = []; for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) o.push([x + i, y + j]); return o; };
+    const mir = (cells) => cells.flatMap(([x, y]) => [[x, y], [N - 1 - x, y], [x, N - 1 - y], [N - 1 - x, N - 1 - y]]);
+    const without = (cells, holes) => cells.filter(([x, y]) => !holes.some(([a, b]) => a === x && b === y));
+    const grid = (step, off) => { const o = []; for (let x = off; x < N; x += step) for (let y = off; y < N; y += step) o.push([x, y]); return o; };
+    const sideGaps = (x1, y1, x2, y2) => { const mx = Math.floor((x1 + x2) / 2), my = Math.floor((y1 + y2) / 2); return [[mx, y1], [mx + 1, y1], [mx, y2], [mx + 1, y2], [x1, my], [x1, my + 1], [x2, my], [x2, my + 1]]; };
+    const ring = (x1, y1, x2, y2) => without(box(x1, y1, x2, y2), sideGaps(x1, y1, x2, y2));
+    const gate = (cells, period, phase = 0) => ({ cells, period, phase });
+    const diag = () => { const o = []; for (let i = 2; i < N - 2; i += 3) o.push([i, i], [N - 1 - i, i]); return o; };
+    const H_ = () => mir([...V(3, 3, 8), ...V(7, 3, 8), ...H(5, 4, 6)]);
+    const rooms = () => [...without(V(11, 0, 23), [[11, 5], [11, 6], [11, 17], [11, 18]]), ...without(H(5, 0, 23), [[5, 5], [6, 5], [17, 5], [18, 5]]), ...without(H(18, 0, 23), [[5, 18], [6, 18], [17, 18], [18, 18]])];
+    const roomDoors = [[11, 5], [11, 6], [11, 17], [11, 18], [5, 5], [6, 5], [17, 5], [18, 5], [5, 18], [6, 18], [17, 18], [18, 18]];
+    const spiral = () => [...without(box(3, 3, 20, 20), [[3, 6], [3, 7]]), ...without(box(7, 7, 16, 16), [[16, 15], [16, 16]])];
+    const comb = () => [...[3, 7, 11, 15, 19].flatMap((x) => V(x, 0, 8)), ...[5, 9, 13, 17, 21].flatMap((x) => V(x, 15, 23))];
+    const MZ = MAZE.map(([x, y]) => [x, y]);
+    // t — цель по очкам, s — скорость (множитель длительности хода: меньше — быстрее), m — «живые» камни
+    const raw = [
+      // Глава 1 — «Сад»
+      { t: 10, s: 1.08, w: [] },
+      { t: 12, s: 1.07, w: mir(blk(4, 4)) },
+      { t: 14, s: 1.06, w: [...H(5, 6, 17), ...H(18, 6, 17)] },
+      { t: 16, s: 1.05, w: mir(V(6, 3, 8)) },
+      { t: 18, s: 1.04, w: ring(2, 2, 21, 21) },
+      { t: 20, s: 1.03, w: diag() },
+      { t: 22, s: 1.02, w: [...V(7, 2, 21), ...V(16, 2, 21)] },
+      { t: 24, s: 1.01, w: H_() },
+      { t: 26, s: 1.0, w: grid(4, 3) },
+      { t: 32, s: 1.0, w: [...ring(5, 5, 18, 18), ...mir(blk(1, 1))], boss: true },
+      // Глава 2 — «Подземелье»
+      { t: 28, s: 0.98, w: [...H(4, 0, 17), ...H(8, 6, 23), ...H(15, 0, 17), ...H(19, 6, 23)] },
+      { t: 30, s: 0.97, w: mir(blk(5, 5)), m: true },
+      { t: 32, s: 0.96, w: spiral() },
+      { t: 34, s: 0.95, w: rooms() },
+      { t: 36, s: 0.94, w: without(V(12, 0, 23), [[12, 4], [12, 5], [12, 18], [12, 19]]), g: [gate([[12, 4], [12, 5], [12, 18], [12, 19]], 30)] },
+      { t: 38, s: 0.93, w: grid(4, 3), m: true },
+      { t: 40, s: 0.92, w: [...H(4, 0, 15), ...H(8, 8, 23), ...H(15, 0, 15), ...H(19, 8, 23)] },
+      { t: 42, s: 0.91, w: [...MZ, ...mir(blk(1, 1))] },
+      { t: 44, s: 0.9, w: rooms(), g: [gate(roomDoors, 36)] },
+      { t: 55, s: 0.9, w: [...without(box(4, 4, 19, 19), sideGaps(4, 4, 19, 19)), ...mir(blk(1, 1))], g: [gate(sideGaps(4, 4, 19, 19), 32, 10)], m: true, boss: true },
+      // Глава 3 — «Вулкан»
+      { t: 45, s: 0.88, w: grid(3, 1) },
+      { t: 48, s: 0.87, w: [...ring(2, 2, 21, 21), ...ring(6, 6, 17, 17)], g: [gate(sideGaps(6, 6, 17, 17), 28)] },
+      { t: 50, s: 0.86, w: comb() },
+      { t: 52, s: 0.85, w: comb(), m: true },
+      { t: 55, s: 0.84, w: [...MZ, ...H(2, 3, 20), ...H(21, 3, 20)] },
+      { t: 58, s: 0.83, w: [], g: [gate(V(12, 0, 23), 24), gate(H(6, 0, 23), 24, 12), gate(H(17, 0, 23), 24, 6)] },
+      { t: 60, s: 0.82, w: spiral(), m: true },
+      { t: 62, s: 0.81, w: [...H(3, 0, 20), ...H(7, 3, 23), ...H(16, 0, 20), ...H(20, 3, 23)] },
+      { t: 65, s: 0.8, w: grid(3, 1), g: [gate(H(6, 0, 23).filter(([x]) => x % 3 !== 1), 26), gate(H(17, 0, 23).filter(([x]) => x % 3 !== 1), 26, 13)], m: true },
+      { t: 80, s: 0.78, w: [...ring(2, 2, 21, 21), ...comb().filter(([x, y]) => x > 2 && x < 21 && y > 2 && y < 21)], g: [gate(sideGaps(2, 2, 21, 21), 30, 8)], m: true, boss: true }
+    ];
+    const inStart = ([x, y]) => y >= 11 && y <= 13 && x >= 6 && x <= 18;
+    const uniq = (cells) => { const seen = new Set(), o = []; for (const [x, y] of cells) { const k = y * N + x; if (x < 0 || y < 0 || x >= N || y >= N || seen.has(k) || inStart([x, y])) continue; seen.add(k); o.push({ x, y }); } return o; };
+    return raw.map((l, i) => ({
+      n: i + 1, chapter: Math.floor(i / 10) + 1, target: l.t, speed: l.s, moving: !!l.m, boss: !!l.boss,
+      walls: uniq(l.w), gates: (l.g || []).map((g) => ({ cells: uniq(g.cells), period: g.period, phase: g.phase || 0 })),
+      par: l.t * 8 + 70 // ходов на 3 звезды (2 звезды — до ×1.6)
+    }));
+  })();
+  // Звёзды за пройденный уровень: быстрее — больше
+  const levelStars = (n, ticks) => { const L = LEVELS[n - 1]; if (!L) return 0; return ticks <= L.par ? 3 : ticks <= L.par * 1.6 ? 2 : 1; };
+
   const normCfg = (cfg) => ({
     seed: (Number(cfg && cfg.seed) >>> 0) || 1,
     mode: MODES[cfg && cfg.mode] ? cfg.mode : "classic",
     diff: DIFFS[cfg && cfg.diff] ? cfg.diff : "normal",
     artifact: ["magnet", "berserk", "phantom"].includes(cfg && cfg.artifact) ? cfg.artifact : "",
     artLevel: Math.max(1, Math.min(MAX_ART_LEVEL, (cfg && cfg.artLevel) | 0 || 1)),
-    rules: Math.max(1, Math.min(RULES, (cfg && cfg.rules) | 0 || 1))
+    rules: Math.max(1, Math.min(RULES, (cfg && cfg.rules) | 0 || 1)),
+    level: cfg && cfg.mode === "level" ? Math.max(1, Math.min(LEVELS.length, (cfg.level | 0) || 1)) : 0
   });
 
   class Game {
@@ -107,6 +178,9 @@
       this.over = false; this.reason = ""; this.win = false;
       this.rocks = []; this.pending = [];   // pending — камни «живых стен», которые вот-вот станут твёрдыми
       this.rockSet = new Uint8Array(N * N);
+      // режим уровней: постоянные стены, ворота, норка, клетки, куда нельзя доползти
+      this.lv = cfg.mode === "level" ? LEVELS[cfg.level - 1] : null;
+      this.baseRocks = []; this.gates = []; this.gateSet = new Uint8Array(N * N); this.blocked = new Uint8Array(N * N); this.hole = null;
       this.food = null;
       // статистика забега: для заданий и для античита (на правила не влияет)
       this.stats = { gold: 0, coin: 0, pu: 0, saves: 0, pathTicks: 0, pathDist: 0 };
@@ -117,12 +191,54 @@
 
     // ---- препятствия ----
     _setRocks(list) {
-      this.rocks = list; this.rockSet.fill(0);
-      for (const r of list) this.rockSet[r.y * N + r.x] = 1;
+      this.rocks = this.baseRocks.length ? [...this.baseRocks, ...list] : list; this.rockSet.fill(0);
+      for (const r of this.rocks) this.rockSet[r.y * N + r.x] = 1;
+    }
+    // Уровень: стены, ворота и карта достижимости (поиск в ширину от головы; ворота считаем открытыми)
+    _initLevel() {
+      const L = this.lv;
+      this.baseRocks = L.walls.map((c) => ({ ...c }));
+      this.gates = L.gates.flatMap((g) => g.cells.map((c) => ({ x: c.x, y: c.y, period: g.period, phase: g.phase, closed: false, warn: false })));
+      for (const g of this.gates) this.gateSet[g.y * N + g.x] = 1;
+      this._setRocks([]);
+      const seen = new Uint8Array(N * N), st = [this.snake[0]]; seen[st[0].y * N + st[0].x] = 1;
+      while (st.length) {
+        const c = st.pop();
+        for (const [dx, dy] of DIRS) {
+          const x = c.x + dx, y = c.y + dy, k = y * N + x;
+          if (x < 0 || y < 0 || x >= N || y >= N || seen[k] || this.rockSet[k]) continue;
+          seen[k] = 1; st.push({ x, y });
+        }
+      }
+      for (let i = 0; i < N * N; i++) this.blocked[i] = seen[i] ? 0 : 1;
+    }
+    // Ворота: закрыты половину периода; за 6 ходов до закрытия — предупреждение. Закрываются, только когда клетка свободна.
+    _updateGates(ev) {
+      let changed = false;
+      for (const g of this.gates) {
+        const ph = (this.ticks + g.phase) % (g.period * 2), want = ph >= g.period;
+        g.warn = !want && ph >= g.period - 6;
+        const k = g.y * N + g.x;
+        if (want && !g.closed && !this.occ[k] && !(this.food && this.food.x === g.x && this.food.y === g.y) && !(this.pu && this.pu.x === g.x && this.pu.y === g.y)) { g.closed = true; changed = true; }
+        else if (!want && g.closed) { g.closed = false; changed = true; }
+      }
+      if (changed) ev.push({ t: "gates" });
+    }
+    gateClosed(x, y) { if (!this.gateSet[y * N + x]) return false; const g = this.gates.find((q) => q.x === x && q.y === y); return !!(g && g.closed); }
+    // Норка: появляется, когда набрана цель, подальше от головы
+    _spawnHole(ev) {
+      const free = this.freeCells(), h = this.snake[0];
+      if (!free.length) return;
+      const far = free.filter((c) => Math.abs(c.x - h.x) + Math.abs(c.y - h.y) >= 6);
+      const pool = far.length ? far : free;
+      const c = pool[Math.floor(this.rng() * pool.length)];
+      this.hole = { x: c.x, y: c.y };
+      ev.push({ t: "hole", x: c.x, y: c.y });
     }
     _initObstacles() {
       const m = this.cfg.mode;
-      if (m === "maze") this._setRocks(MAZE.map(([x, y]) => ({ x, y })));
+      if (m === "level") this._initLevel();
+      else if (m === "maze") this._setRocks(MAZE.map(([x, y]) => ({ x, y })));
       else if (m === "rocks") {
         const r = mulberry32(this.cfg.seed ^ 0xA5A5A5A5), list = [], seen = new Set();
         while (list.length < 14) {
@@ -151,6 +267,7 @@
         for (let tries = 0; tries < 200 && list.length < 8; tries++) {
           const x = Math.floor(r() * N), y = Math.floor(r() * N), k = y * N + x;
           if (seen.has(k) || this.occ[k]) continue;
+          if (this.lv && (this.rockSet[k] || this.gateSet[k] || this.blocked[k] || (this.hole && this.hole.x === x && this.hole.y === y))) continue;
           if (Math.abs(x - head.x) + Math.abs(y - head.y) < 5) continue;
           if (this.food && this.food.x === x && this.food.y === y) continue;
           seen.add(k); list.push({ x, y, solidAt: t + WARN });
@@ -160,7 +277,7 @@
     }
 
     // ---- скорость ----
-    stepMs() { return this.speedMs * (this.fx.slow > this.gameTime ? 1.6 : 1) * DIFFS[this.cfg.diff].speed; }
+    stepMs() { return this.speedMs * (this.fx.slow > this.gameTime ? 1.6 : 1) * DIFFS[this.cfg.diff].speed * (this.lv ? this.lv.speed : 1); }
     updateSpeed() {
       const len = this.snake.length + this.pendingGrowth;
       this.speedMs = Math.round(SPEED_MIN + (SPEED_START - SPEED_MIN) * Math.exp(-Math.max(0, len - START_LEN) / 40));
@@ -193,6 +310,10 @@
       if (this.food) busy[this.food.y * N + this.food.x] = 1;
       if (this.pu) busy[this.pu.y * N + this.pu.x] = 1;
       for (const c of this.pending) busy[c.y * N + c.x] = 1;
+      if (this.lv) {
+        for (let i = 0; i < N * N; i++) if (this.gateSet[i] || this.blocked[i]) busy[i] = 1;
+        if (this.hole) busy[this.hole.y * N + this.hole.x] = 1;
+      }
       const free = [];
       for (let i = 0; i < N * N; i++) if (!busy[i]) free.push({ x: i % N, y: (i / N) | 0 });
       return free;
@@ -251,7 +372,8 @@
       return c > 0;
     }
     _free(x, y) {
-      return x >= 0 && x < N && y >= 0 && y < N && !this.occ[y * N + x] && !this.rockSet[y * N + x] && !(this.pu && this.pu.x === x && this.pu.y === y);
+      return x >= 0 && x < N && y >= 0 && y < N && !this.occ[y * N + x] && !this.rockSet[y * N + x] && !(this.pu && this.pu.x === x && this.pu.y === y)
+        && !(this.lv && (this.gateSet[y * N + x] || (this.hole && this.hole.x === x && this.hole.y === y)));
     }
 
     // ---- один ход ----
@@ -264,7 +386,7 @@
       let hx = this.snake[0].x + this.dir.x, hy = this.snake[0].y + this.dir.y;
       if (cfg.mode === "nowalls" || ghost) { hx = (hx + N) % N; hy = (hy + N) % N; }
       const oob = hx < 0 || hx >= N || hy < 0 || hy >= N;
-      const hit = oob || (!ghost && (this._bodyHit(hx, hy) || this.rockSet[hy * N + hx] === 1));
+      const hit = oob || (!ghost && (this._bodyHit(hx, hy) || this.rockSet[hy * N + hx] === 1 || (this.lv && this.gateClosed(hx, hy))));
       if (hit) {
         let saved = "";
         if (this.isSafe()) saved = "safe";
@@ -278,6 +400,12 @@
       this.gameTime += interval; this.ticks++;
       for (const k of TIMED) if (this.fx[k] && this.fx[k] <= this.gameTime) { this.fx[k] = 0; ev.push({ t: "fxend", k }); }
       this.snake.unshift({ x: hx, y: hy }); this.occ[hy * N + hx]++;
+      // норка: заполз — уровень пройден
+      if (this.hole && hx === this.hole.x && hy === this.hole.y) {
+        const q = this.snake.pop(); this.occ[q.y * N + q.x]--;
+        this.over = true; this.win = true; this.reason = "hole";
+        ev.push({ t: "over", reason: "hole", win: true }); return ev;
+      }
       const mult = this.fx.x2 > this.gameTime ? 2 : 1;
 
       const f = this.food, ate = hx === f.x && hy === f.y;
@@ -301,6 +429,7 @@
         }
         ev.push({ t: "ate", x: f.x, y: f.y, type: f.type, pts, cm, coins, mult, combo: this.combo });
         this.updateSpeed();
+        if (this.lv && !this.hole && this.score >= this.lv.target) this._spawnHole(ev);
         if (!this.placeFood()) { this.over = true; this.win = true; this.reason = "win"; ev.push({ t: "over", reason: "win", win: true }); return ev; }
       }
 
@@ -333,7 +462,8 @@
       else { const q = this.snake.pop(); this.occ[q.y * N + q.x]--; }
 
       if (!this.pu && this.apples >= 2 && this.gameTime >= this.nextPuAt) { this.spawnPu(); ev.push({ t: "pu_spawn" }); }
-      if (cfg.mode === "moving") this._updateMoving(ev);
+      if (cfg.mode === "moving" || (this.lv && this.lv.moving)) this._updateMoving(ev);
+      if (this.lv && this.gates.length) this._updateGates(ev);
 
       if (this.comboTimer > 0) this.comboTimer--;
       else if (this.combo > 0) this.combo = 0;
@@ -341,7 +471,9 @@
     }
 
     result() {
-      return { score: this.score, apples: this.apples, runCoins: this.runCoins, bestRun: this.bestRun, ticks: this.ticks, gameTime: this.gameTime, over: this.over, reason: this.reason, win: this.win, stats: { ...this.stats } };
+      const done = this.reason === "hole";
+      return { score: this.score, apples: this.apples, runCoins: this.runCoins, bestRun: this.bestRun, ticks: this.ticks, gameTime: this.gameTime, over: this.over, reason: this.reason, win: this.win, stats: { ...this.stats },
+        level: this.lv ? this.lv.n : 0, completed: done, stars: done ? levelStars(this.lv.n, this.ticks) : 0 };
     }
   }
 
@@ -406,6 +538,6 @@
     };
   }
 
-  return { N, START_LEN, SAFE_MS, DIRS, RULES, BONUS_MAGNET_RANGE, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
+  return { N, START_LEN, SAFE_MS, DIRS, RULES, BONUS_MAGNET_RANGE, LEVELS, levelStars, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
     artifactStats, mulberry32, normCfg, Game, reward, isRated, parseLog, encodeLog, simulate, player };
 });

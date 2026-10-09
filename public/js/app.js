@@ -217,6 +217,7 @@
     if (id === "profile") loadFriends();
     if (id === "shop") { renderShop(); renderArtifacts(); }
     if (id === "pass") renderPass();
+    if (id === "levels") renderLevels();
     if (id === "tournament") renderTournament();
     if (id === "clans") renderClans();
     try { window.scrollTo(0, 0); } catch (e) {}
@@ -239,7 +240,7 @@
   let ratingTab = "all", ratingMode = "nowalls";
   async function renderRating() {
     $("ratingTabs").innerHTML = tabsHtml([["all", "Все"], ["friends", "Друзья"], ["modes", "Режимы"]], ratingTab);
-    const modes = Object.entries(E.MODES).filter(([, m]) => !m.rated);
+    const modes = Object.entries(E.MODES).filter(([, m]) => !m.rated && !m.hidden);
     $("modeTabs").hidden = ratingTab !== "modes";
     $("modeTabs").innerHTML = modes.map(([id, m]) => `<button data-rmode="${id}" class="${id === ratingMode ? "on" : ""}">${m.emoji} ${m.name}</button>`).join("");
     const table = $("table"); table.innerHTML = '<div class="lbempty">Загрузка…</div>';
@@ -360,12 +361,15 @@
   const skinCat = () => p.skins || SA.DEFAULT_SKINS;
   const fieldCat = () => p.fields || SA.DEFAULT_FIELDS;
   const skinPalette = (id) => skinCat().find((z) => z.id === id && z.weekly)?.palette || null;
+  const REWARD_CUR = ["season", "levels", "tournament", "pass"];
+  const REWARD_LABEL = { season: "🏆 Награда сезона", levels: "🕳️ За уровни", tournament: "🏁 За турнир", pass: "🎟️ В пропуске" };
   function renderShop() {
     const owned = p.owned_skins || ["classic"], cat = skinCat();
     const card = (sk) => {
       const isOwned = owned.includes(sk.id), on = p.skin === sk.id, stars = sk.currency === "stars";
-      const sub = isOwned ? "✅ Открыт" : sk.currency === "season" ? esc(sk.desc || "Эксклюзив сезона") : stars ? esc(sk.desc || "") : sk.price ? "🪙 " + fmtN(sk.price) : "Бесплатно";
-      const label = on ? "✅ Выбрано" : isOwned ? "Выбрать" : sk.currency === "season" ? "🏆 Награда сезона" : stars ? `Купить · <span class="stp">⭐ ${sk.price}</span>` : sk.price ? "Купить" : "Выбрать";
+      const reward = REWARD_CUR.includes(sk.currency);
+      const sub = isOwned ? "✅ Открыт" : reward ? esc(sk.desc || "Эксклюзив сезона") : stars ? esc(sk.desc || "") : sk.price ? "🪙 " + fmtN(sk.price) : "Бесплатно";
+      const label = on ? "✅ Выбрано" : isOwned ? "Выбрать" : reward ? REWARD_LABEL[sk.currency] : stars ? `Купить · <span class="stp">⭐ ${sk.price}</span>` : sk.price ? "Купить" : "Выбрать";
       return `<div class="skin${sk.epic ? " epic" : ""}${on ? " sel" : ""}">${sk.epic ? '<span class="badge">EPIC</span>' : ""}<button class="pvbtn" data-pskin="${sk.id}" aria-label="Посмотреть на поле"><div class="pv ${sk.weekly ? "pv-weekly" : "pv-" + sk.id}"${sk.weekly && sk.palette ? ` style="--c0:${esc(sk.palette[0])};--c1:${esc(sk.palette[1])}"` : ""}></div><span>👁 на поле</span></button><b>${sk.emoji} ${esc(sk.name)}</b><small>${sub}</small><button data-skin="${sk.id}" class="${stars && !isOwned ? "star" : ""}">${label}</button></div>`;
     };
     const fowned = p.owned_fields || ["classic"];
@@ -377,7 +381,7 @@
     };
     const fcat = fieldCat();
     $("shopGrid").innerHTML =
-      `<h3 class="sect span2">🏆 Награды сезона<small>скин недели и эксклюзивы за топ рейтинга</small></h3>` + cat.filter((x) => x.currency === "season").sort((a, b) => owned.includes(b.id) - owned.includes(a.id) || b.weekly - a.weekly).map(card).join("") +
+      `<h3 class="sect span2">🏆 Награды<small>сезон, уровни, турниры и пропуск</small></h3>` + cat.filter((x) => REWARD_CUR.includes(x.currency)).sort((a, b) => owned.includes(b.id) - owned.includes(a.id) || b.weekly - a.weekly).map(card).join("") +
       `<h3 class="sect span2">⭐ Эпические скины<small>за Telegram Stars</small></h3>` + cat.filter((x) => x.epic && x.currency === "stars").map(card).join("") +
       `<h3 class="sect span2">🪙 Обычные скины<small>за монеты</small></h3>` + cat.filter((x) => x.currency === "coins").map(card).join("") +
       `<h3 class="sect span2">🗺 Игровые поля<small>за Telegram Stars</small></h3>` + fcat.filter((x) => x.currency === "stars").map(fcard).join("") +
@@ -387,7 +391,7 @@
     const sk = skinCat().find((x) => x.id === id); if (!sk || p.skin === id) return;
     const has = (p.owned_skins || ["classic"]).includes(id);
     if (!has && sk.currency === "stars") return buyStars(sk);
-    if (!has && sk.currency === "season") return toast("🏆 Этот скин можно получить только за сезонную награду");
+    if (!has && REWARD_CUR.includes(sk.currency)) return toast(sk.desc || "🏆 Этот скин можно получить только как награду");
     if (!has && (p.coins || 0) < sk.price) return toast("Не хватает монет");
     if (!has && !(await confirmBox(`Купить скин «${sk.name}» за ${fmtN(sk.price)} 🪙?`, "Купить"))) return;
     const d = await api("/api/profile", { method: "POST", body: JSON.stringify({ skin: id }) });
@@ -675,6 +679,41 @@
     requestAnimationFrame(frame);
   })();
 
+  // ---------- Режим «Уровни» ----------
+  let levelsData = null;
+  const starsHtml = (n, max = 3) => Array.from({ length: max }, (_, i) => `<i class="${i < n ? "on" : ""}">⭐</i>`).join("");
+  async function renderLevels() {
+    const box = $("levelBox"); if (!levelsData) box.innerHTML = '<div class="lbempty">Загрузка…</div>';
+    const d = await api("/api/levels");
+    if (!d?.levels) { box.innerHTML = '<div class="lbempty">Не удалось загрузить. Проверь соединение.</div>'; return; }
+    levelsData = d;
+    const next = d.levels.find((l) => l.unlocked && !l.done);
+    let html = `<div class="lvhead"><b>⭐ ${d.total_stars} / ${d.max_stars}</b><small class="muted">${t("Звёзды — за скорость прохождения")}</small></div>`;
+    for (const ch of d.chapters) {
+      const lv = d.levels.filter((l) => l.chapter === ch.n), stars = lv.reduce((a, l) => a + l.stars, 0);
+      html += `<div class="lvchapter ch${ch.n}"><h3>${ch.emoji} ${t("Глава")} ${ch.n}: ${esc(t(ch.name))}</h3><small class="muted">⭐ ${stars}/${lv.length * 3} · ${t("награда за главу")}: ${esc(ch.skin_emoji || "")} ${esc(t(ch.skin_name || ""))}</small>
+        <div class="lvgrid">${lv.map((l) => `<button class="lvnode${l.done ? " done" : ""}${next && next.n === l.n ? " next" : ""}${l.unlocked ? "" : " lock"}${l.boss ? " boss" : ""}" data-level="${l.n}">${l.unlocked ? l.n : "🔒"}<small>${l.done ? "⭐".repeat(l.stars) : ""}</small></button>`).join("")}</div></div>`;
+    }
+    html += `<h3 class="sect">🏆 ${t("Лучшие по звёздам")}</h3><div class="lb" style="margin-top:8px">${d.leaderboard.length ? d.leaderboard.map((x, i) => lbRow(x, i, `${x.score} ⭐ · ${t("ур.")} ${x.max_level}`)).join("") : `<div class="lbempty">${t("Пока никто не прошёл ни одного уровня")}</div>`}</div>`;
+    box.innerHTML = html;
+  }
+  function openLevel(n) {
+    const l = levelsData?.levels.find((x) => x.n === n); if (!l) return;
+    if (!l.unlocked) return toast("Сначала пройди предыдущий уровень");
+    const feats = [l.walls ? `🧱 ${t("Стены и коридоры")}` : `🟩 ${t("Открытое поле")}`];
+    if (l.moving) feats.push(`⚡ ${t("Живые камни: появляются и исчезают")}`);
+    if (l.gates) feats.push(`🚪 ${t("Ворота закрываются по таймеру — мигают перед закрытием")}`);
+    $("liEmoji").textContent = l.boss ? "👑" : "🕳️";
+    $("liTitle").textContent = `${t("Уровень")} ${n}${l.boss ? " · " + t("финал главы") : ""}`;
+    $("liBody").innerHTML = `<div class="lvstars">${starsHtml(l.stars)}</div><div class="liinfo">
+      <div>🎯 ${t("Цель")}: <b>${l.target}</b> ${t("очков, затем заползи в норку")} 🕳️</div>
+      ${feats.map((f) => `<div>${f}</div>`).join("")}
+      <div>⭐⭐⭐ — ${t("быстрее {n} ходов", { n: l.par })} · ⭐⭐ — ${t("быстрее {n}", { n: Math.round(l.par * 1.6) })}</div>
+      <div>🪙 ${l.done ? t("За новую звезду") + ": +" + l.star_reward : t("За прохождение") + ": +" + l.first_reward + " · " + t("за звезду") + " +" + l.star_reward}</div></div>`;
+    $("liPlay").onclick = () => { $("levelInfo").classList.remove("show"); returnTo = "levels"; startRun({ kind: "level", ref: n }); };
+    $("levelInfo").classList.add("show");
+  }
+
   // ======================= ИГРА =======================
   const renderer = SA.createRenderer(el.cv, { N: E.N });
   let game = null, run = null, lastKind = { kind: "free" };
@@ -682,6 +721,7 @@
   let prevSnake = [], lastTick = 0, foodBorn = 0, fxSig = "";
   let replay = null; // { rp, name, score, skin, palette, speed }
   let pullAnim = null; // анимация еды, которую тянет магнит
+  let holeAnim = null; // змейка заползает в норку: { t0 }
   let ghost = null;  // призрак: { rp, prev, label, skin, palette, dead, hd } — соперник или свой лучший забег на том же поле
   function makeGhost(gd, cfg) {
     if (!gd?.log && gd?.log !== "") return null;
@@ -701,11 +741,15 @@
   const curPalette = () => (replay ? replay.palette : skinPalette(p.skin));
   function view() {
     const g = game;
+    // заползание в норку: змейка исчезает с головы, сегмент за сегментом
+    let snake = g.snake, prev = prevSnake;
+    if (holeAnim) { const k = Math.min(snake.length, Math.floor((performance.now() - holeAnim.t0) / 45)); snake = snake.slice(k); prev = snake; }
     return {
-      snake: g.snake, prevSnake, dir: g.dir, food: g.food, foodBorn, pu: g.pu, PU: E.PU, PU_LIFE: E.PU_LIFE, gameTime: g.gameTime,
+      snake, prevSnake: prev, dir: g.dir, food: g.food, foodBorn, pu: g.pu, PU: E.PU, PU_LIFE: E.PU_LIFE, gameTime: g.gameTime,
       rocks: g.rocks, pending: g.pending, stepMs: g.stepMs() / (replay ? replay.speed : 1), lastTick, paused: paused || !!countdown,
       ghost: g.ghostOn(), safe: g.isSafe() && !g.over, shield: g.shield, skin: curSkin(), palette: curPalette(), countdown, countdownAt,
       combo: g.combo >= 2 ? Math.min(g.combo, 8) : 0,
+      gates: g.gates || [], hole: g.hole, holeAnim,
       foodFrom: pullAnim && pullAnim.food === g.food ? pullAnim : null,
       magnetR: g.fx.magnet > g.gameTime ? E.BONUS_MAGNET_RANGE : 0, magnetArt: g.cfg.artifact === "magnet" && g.cfg.rules >= 2,
       ghosts: ghost ? [{ snake: ghost.rp.game.snake, prevSnake: ghost.prev, dir: ghost.rp.game.dir, skin: ghost.skin, palette: ghost.palette, label: ghost.label, dead: ghost.dead, hd: ghost.hd }] : []
@@ -734,6 +778,7 @@
     if (g.shield) chips.push(["🛡️", "", E.PU.shield.color]);
     if (g.cfg.artifact === "phantom" && g.charges > 0) chips.push(["👻", "×" + g.charges, "#b48cff"]);
     if (g.isSafe()) chips.push(["✨", Math.ceil((g.safeUntil - g.gameTime) / 1000), "#9fffc8"]);
+    if (g.lv) chips.unshift(g.hole ? ["🕳️", t("в норку!"), "#ffd84c"] : ["🎯", `${g.score}/${g.lv.target}`, "#9fffc8"]);
     const sig = chips.map((c) => c.join()).join("|");
     if (sig !== fxSig) { fxSig = sig; $("fx").innerHTML = chips.map(([i, t, c]) => `<span class="fxchip" style="border-color:${c};color:${c}">${i} ${t}</span>`).join(""); }
     const showCombo = g.combo >= 2;
@@ -760,6 +805,10 @@
     } else if (e.t === "bomb") {
       for (const c of e.cells) renderer.burst(c.x, c.y, "bomb", 6);
       sfx.boom(); haptic("heavy"); renderer.shake(9, 350); renderer.flash("255,140,60");
+    } else if (e.t === "hole") { // цель набрана — открылась норка
+      renderer.ring(e.x, e.y, "#ffd84c"); renderer.ring(e.x, e.y, "#ffffff"); sfx.claim(); haptic("success");
+      renderer.floater(e.x + 0.5, e.y, "🕳️ " + t("Норка открыта!"));
+      toast("🕳️ Норка открыта — заползай!");
     } else if (e.t === "pull") { // магнит: еда плавно едет к голове
       pullAnim = { food: g.food, x: e.fx, y: e.fy, t: performance.now(), dur: interval };
       renderer.magnetSpark(e.fx, e.fy, e.x, e.y);
@@ -794,7 +843,7 @@
   }
 
   function beginLoop() {
-    dying = false; running = true; paused = false; countdown = 0; fxSig = "";
+    dying = false; holeAnim = null; running = true; paused = false; countdown = 0; fxSig = "";
     prevSnake = game.snake.map((q) => ({ x: q.x, y: q.y })); lastTick = performance.now(); foodBorn = performance.now();
     renderer.reset(); $("fx").innerHTML = ""; $("combo").classList.remove("show");
     el.pauseBtn.textContent = "Ⅱ";
@@ -810,7 +859,7 @@
     SA.audio.unlock();
     el.over.classList.remove("show"); $("pauseMenu").classList.remove("show");
     el.game.classList.add("active"); $("startSplash").style.display = "none"; el.game.classList.remove("replay");
-    $("gameTitle").textContent = t(kindOpt.kind === "daily" ? "📅 Челлендж дня" : kindOpt.kind === "challenge" ? "⚔️ Вызов" : kindOpt.kind === "tournament" ? "🏁 Турнир" : "🐍 Snake Arena");
+    $("gameTitle").textContent = kindOpt.kind === "level" ? `🕳️ ${t("Уровень")} ${kindOpt.ref}` : t(kindOpt.kind === "daily" ? "📅 Челлендж дня" : kindOpt.kind === "challenge" ? "⚔️ Вызов" : kindOpt.kind === "tournament" ? "🏁 Турнир" : "🐍 Snake Arena");
     const art = (p.artifacts || []).find((a) => a.id === sel.artifact);
     const d = await api("/api/run", { method: "POST", body: JSON.stringify({ mode: sel.mode, diff: sel.diff, artifact: sel.artifact, kind: kindOpt.kind, ref: kindOpt.ref }) });
     starting = false;
@@ -818,18 +867,19 @@
     if (d?.token) { cfg = d.cfg; token = d.token; }
     else if (d?._status === 403 && d.banned) { el.game.classList.remove("active"); show("home"); return toast("Аккаунт заблокирован"); }
     else if (d?._status === 404 && kindOpt.kind === "challenge") { challengeId = ""; renderChallengeBox(); el.game.classList.remove("active"); show("home"); return toast("Вызов уже недоступен"); }
+    else if (d?._status === 403 && kindOpt.kind === "level") { el.game.classList.remove("active"); show("levels"); return toast("Сначала пройди предыдущий уровень"); }
     else if (d?._status === 409 && kindOpt.kind === "tournament") { el.game.classList.remove("active"); show("tournament"); return toast("Турнир сейчас не идёт"); }
     else {
       cfg = { seed: (Math.random() * 2 ** 31) >>> 0, mode: sel.mode, diff: sel.diff, artifact: sel.artifact, artLevel: art?.level || 1, rules: E.RULES };
       toast("Нет связи с сервером — этот забег не будет засчитан", 3000);
     }
     run = { token, cfg, kind: d?.kind || kindOpt.kind, ref: kindOpt.ref };
-    lastKind = run.kind === "challenge" ? { kind: "free" } : { kind: run.kind };
+    lastKind = run.kind === "challenge" ? { kind: "free" } : { kind: run.kind, ref: kindOpt.ref };
     if (run.kind === "challenge") { challengeId = ""; $("challengeBox").hidden = true; }
     game = new E.Game(cfg);
     ghost = makeGhost(d?.ghost, cfg);
     const m = E.MODES[game.cfg.mode], df = E.DIFFS[game.cfg.diff];
-    $("gameSub").textContent = `${m.emoji} ${t(m.name)} · ${t(df.name)}` + (ghost ? ` · 👻 ${ghost.label}` : "");
+    $("gameSub").textContent = (game.lv ? `🎯 ${t("цель")} ${game.lv.target} · ${t("потом в норку")} 🕳️` : `${m.emoji} ${t(m.name)} · ${t(df.name)}`) + (ghost ? ` · 👻 ${ghost.label}` : "");
     beginLoop();
     if (!p.tutorial_done && run.kind === "free" && !LS.get("snakeTutorial", "")) showTutorial();
   }
@@ -885,19 +935,28 @@
       return;
     }
     sfx.over(); haptic(res.win ? "success" : "error");
+    const isLevel = run.kind === "level", viaHole = res.reason === "hole";
     if (!res.win) renderer.die(g.snake);
-    // даём досмотреть, как змейка рассыпается, и только потом показываем итоги
-    if (!res.win) { dying = true; cancelAnimationFrame(raf); raf = requestAnimationFrame(renderLoop); setTimeout(() => { if (game === g) { dying = false; cancelAnimationFrame(raf); } }, 750); }
-    $("overEmoji").textContent = res.win ? "🏆" : "💥";
-    $("overTitle").textContent = res.win ? "Поле заполнено!" : "Игра окончена";
+    // даём досмотреть, как змейка рассыпается (или заползает в норку), и только потом показываем итоги
+    const animMs = viaHole ? Math.min(1100, 120 + g.snake.length * 45) : res.win ? 0 : 750;
+    if (viaHole) { holeAnim = { t0: performance.now(), len: g.snake.length + 1 }; renderer.ring(g.hole.x, g.hole.y, "#ffd84c"); }
+    if (animMs) { dying = true; cancelAnimationFrame(raf); raf = requestAnimationFrame(renderLoop); setTimeout(() => { if (game === g) { dying = false; cancelAnimationFrame(raf); } }, animMs); }
+    $("overEmoji").textContent = viaHole ? "🕳️" : res.win ? "🏆" : "💥";
+    $("overTitle").textContent = isLevel ? (viaHole ? `${t("Уровень")} ${run.ref} ${t("пройден!")}` : `${t("Уровень")} ${run.ref} ${t("не пройден")}`) : res.win ? "Поле заполнено!" : "Игра окончена";
+    $("levelStars").hidden = !isLevel; $("levelStars").innerHTML = isLevel ? starsHtml(res.stars || 0) : "";
+    $("nextLevelBtn").hidden = !(isLevel && viaHole && Number(run.ref) < E.LEVELS.length);
+    $("levelsMapBtn").hidden = !isLevel;
+    $("againBtn").textContent = isLevel ? (viaHole ? "🔄 " + t("Пройти быстрее") : "🔄 " + t("Ещё раз")) : "🔄 " + t("Играть ещё");
     $("final").textContent = res.score; $("oapples").textContent = res.apples; $("reward").textContent = lastResult.reward;
     $("recBadge").hidden = !localRecord;
     const m = E.MODES[cfg.mode], df = E.DIFFS[cfg.diff];
-    $("overMode").textContent = `${m.emoji} ${m.name} · ${df.name}` + (run.kind === "daily" ? " · 📅 челлендж дня" : "") + (lastResult.rated ? "" : " · вне общего рейтинга");
+    $("overMode").textContent = run.kind === "level"
+      ? `🎯 ${t("цель")} ${g.lv.target} · ⏱ ${res.ticks} ${t("ходов")} · ⭐⭐⭐ ≤ ${g.lv.par}`
+      : `${m.emoji} ${m.name} · ${df.name}` + (run.kind === "daily" ? " · 📅 челлендж дня" : "") + (lastResult.rated ? "" : " · вне общего рейтинга");
     $("overInfo").textContent = run.token ? "Проверяем забег…" : "Забег не засчитан: нет связи с сервером";
     $("overInfo").className = "overinfo" + (run.token ? "" : " warn");
     $("duelBtn").hidden = true; $("shareResBtn").hidden = res.score <= 0; $("replayShareBtn").hidden = true; $("overExtra").innerHTML = "";
-    setTimeout(() => el.over.classList.add("show"), res.win ? 0 : 750);
+    setTimeout(() => el.over.classList.add("show"), animMs);
     send.then((d) => {
       if (!d) return;
       if (d.result) {
@@ -907,13 +966,20 @@
         if (d.daily) extra.push(`📅 Твоё место сегодня: #${d.daily.rank}` + (d.daily.bonus ? ` · бонус +${d.daily.bonus} 🪙` : ""));
         if (d.challenge_result) extra.push(d.challenge_result.win ? `🏆 Вызов выигран: ${d.challenge_result.score} > ${d.challenge_result.creator_score}` : `⚔️ Вызов проигран: ${d.challenge_result.score} против ${d.challenge_result.creator_score}`);
         if (d.tournament) extra.push(`🏁 Место в турнире: #${d.tournament.rank}`);
+        if (d.level && !d.level.failed) {
+          if (d.level.first) extra.push(`🎉 ${t("Уровень пройден впервые")}`);
+          else if (d.level.stars > d.level.prev_stars) extra.push(`⭐ ${t("Новый рекорд звёзд")}`);
+          if (d.level.chapter_skin) { const sk = skinCat().find((x) => x.id === d.level.chapter_skin); extra.push(`🎁 ${t("Глава пройдена! Скин")} ${sk ? sk.emoji + " " + t(sk.name) : ""}`); }
+          levelsData = null;
+        }
         $("overInfo").textContent = extra.join(" · ") || "✅ Забег засчитан";
         $("overInfo").className = "overinfo ok";
         const chips = [];
         for (const b of d.result.bonuses || []) chips.push(b.kind === "event" ? `🎉 ×${b.mult} событие` : `⭐ ×${b.mult} режим недели`);
+        if (d.level?.bonus) chips.push(`🕳️ +${d.level.bonus} 🪙 ${t("за уровень")}`);
         if (d.result.xp) chips.push(`🎟️ +${d.result.xp} XP пропуска`);
         $("overExtra").innerHTML = chips.map((c) => `<span class="ochip">${esc(c)}</span>`).join("");
-        $("duelBtn").hidden = !d.result.game_id; $("replayShareBtn").hidden = !d.result.game_id;
+        $("duelBtn").hidden = !d.result.game_id || run.kind === "level"; $("replayShareBtn").hidden = !d.result.game_id;
         if ($("season").classList.contains("active")) renderSeason();
       } else if (d.reason || d.error) {
         $("overInfo").textContent = d.reload ? "Игра обновилась — перезапусти её" : d.expired ? "Сессия устарела — перезапусти игру" : d._status === 409 ? "Этот забег уже засчитан" : "⚠️ Забег не прошёл проверку и не засчитан";
@@ -980,7 +1046,7 @@
 
   // ---------- экран старта ----------
   function renderSplash() {
-    $("modeGrid").innerHTML = Object.entries(E.MODES).map(([id, m]) => `<button data-mode="${id}" class="${id === sel.mode ? "on" : ""}">${m.emoji} ${m.name}</button>`).join("");
+    $("modeGrid").innerHTML = Object.entries(E.MODES).filter(([, m]) => !m.hidden).map(([id, m]) => `<button data-mode="${id}" class="${id === sel.mode ? "on" : ""}">${m.emoji} ${m.name}</button>`).join("");
     $("diffTabs").innerHTML = Object.entries(E.DIFFS).map(([id, d]) => `<button data-diff="${id}" class="${id === sel.diff ? "on" : ""}">${d.name}<small>×${d.mult}</small></button>`).join("");
     const m = E.MODES[sel.mode], d = E.DIFFS[sel.diff], mult = Math.round(m.mult * d.mult * 100) / 100;
     const rated = E.isRated({ mode: sel.mode, diff: sel.diff });
@@ -1011,6 +1077,7 @@
     if (t.dataset.rmode) { ratingMode = t.dataset.rmode; return renderRating(); }
     if (t.dataset.tab && t.parentElement.id === "ratingTabs") { ratingTab = t.dataset.tab; return renderRating(); }
     if (t.dataset.tab && t.parentElement.id === "seasonTabs") { seasonTab = t.dataset.tab; return renderSeason(); }
+    if (t.dataset.level) return openLevel(Number(t.dataset.level));
     if (t.dataset.ptier) { t.disabled = true; return claimPass(Number(t.dataset.ptier), t.dataset.ptrack); }
     if (t.dataset.cjoin) return (async () => { const r = await api("/api/clan/join", { method: "POST", body: JSON.stringify({ id: Number(t.dataset.cjoin) }) }); if (r?.ok) { sfx.claim(); toast("🛡️ Ты в клане!"); } else toast(r?.error || "Не удалось вступить"); renderClans(); })();
     if (t.dataset.ckick) return (async () => { if (await confirmBox(SA.i18n.t("Исключить игрока из клана?"), SA.i18n.t("Исключить"))) { await api("/api/clan/kick", { method: "POST", body: JSON.stringify({ telegram_id: t.dataset.ckick }) }); renderClans(); } })();
@@ -1021,6 +1088,9 @@
   $("splashClose").addEventListener("click", closeGame);
   $("dailyPlay").addEventListener("click", () => { returnTo = "daily"; startRun({ kind: "daily" }); });
   $("againBtn").addEventListener("click", () => startRun(lastKind));
+  $("nextLevelBtn").addEventListener("click", () => { const n = Number(run?.ref || lastKind.ref) + 1; lastKind = { kind: "level", ref: n }; startRun(lastKind); });
+  $("levelsMapBtn").addEventListener("click", () => { returnTo = "levels"; closeGame(); });
+  $("liClose").addEventListener("click", () => $("levelInfo").classList.remove("show"));
   $("menuBtn").addEventListener("click", closeGame);
   $("shareResBtn").addEventListener("click", shareResult);
   $("duelBtn").addEventListener("click", () => lastResult?.game_id && createChallenge(lastResult.game_id));

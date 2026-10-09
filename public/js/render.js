@@ -142,6 +142,44 @@
       for (const r of v.pending || []) rockAt(r.x, r.y, blink, true);
     }
 
+    // ---- уровни: ворота и норка ----
+    function drawGates(now) {
+      for (const g of v.gates || []) {
+        const px = g.x * cell, py = g.y * cell;
+        ctx.save();
+        if (g.closed) { // закрытые ворота — металлические прутья
+          ctx.fillStyle = "#2a3238"; ctx.fillRect(px + cell * 0.06, py + cell * 0.06, cell * 0.88, cell * 0.88);
+          ctx.strokeStyle = "#9fb3bd"; ctx.lineWidth = cell * 0.1;
+          for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(px + (cell * i) / 4, py + cell * 0.1); ctx.lineTo(px + (cell * i) / 4, py + cell * 0.9); ctx.stroke(); }
+          ctx.strokeStyle = "rgba(255,255,255,.25)"; ctx.lineWidth = cell * 0.04; ctx.strokeRect(px + cell * 0.08, py + cell * 0.08, cell * 0.84, cell * 0.84);
+        } else { // открытые — пунктир; перед закрытием мигают оранжевым
+          const warn = g.warn && Math.floor(now / 150) % 2 === 0;
+          ctx.strokeStyle = warn ? "rgba(255,150,60,.95)" : "rgba(159,179,189,.35)"; ctx.lineWidth = cell * (warn ? 0.09 : 0.05);
+          ctx.setLineDash([cell * 0.16, cell * 0.12]); ctx.strokeRect(px + cell * 0.12, py + cell * 0.12, cell * 0.76, cell * 0.76);
+        }
+        ctx.restore();
+      }
+    }
+    function drawHole(now) {
+      const h = v.hole; if (!h) return;
+      const cx = (h.x + 0.5) * cell, cy = (h.y + 0.5) * cell, t = now / 1000;
+      ctx.save();
+      // свечение-приглашение
+      const r = cell * (1.1 + 0.15 * Math.sin(t * 4));
+      const gl = ctx.createRadialGradient(cx, cy, cell * 0.2, cx, cy, r);
+      gl.addColorStop(0, "rgba(255,216,76,.45)"); gl.addColorStop(1, "rgba(255,216,76,0)");
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      // сама норка — тёмная яма с земляным краем
+      ctx.fillStyle = "#5a3a1c"; ctx.beginPath(); ctx.ellipse(cx, cy, cell * 0.46, cell * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+      const pit = ctx.createRadialGradient(cx, cy + cell * 0.04, 1, cx, cy, cell * 0.36);
+      pit.addColorStop(0, "#000"); pit.addColorStop(0.7, "#0b0603"); pit.addColorStop(1, "#2b1a0b");
+      ctx.fillStyle = pit; ctx.beginPath(); ctx.ellipse(cx, cy + cell * 0.03, cell * 0.36, cell * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+      // вращающийся вихрь
+      ctx.strokeStyle = "rgba(255,216,76,.55)"; ctx.lineWidth = cell * 0.04;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(cx, cy, cell * (0.12 + i * 0.08), t * 3 + i * 2, t * 3 + i * 2 + Math.PI * 0.9); ctx.stroke(); }
+      ctx.restore();
+    }
+
     function stepAlpha(now) { return v.paused ? 1 : Math.min(1, Math.max(0, (now - v.lastTick) / v.stepMs)); }
 
     // Позиции сегментов между прошлым и текущим ходом — движение плавное, а не рывками
@@ -429,7 +467,7 @@
       ctx.save();
       if (now < shakeUntil) { const k = (shakeUntil - now) / 400 * shakePow; ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k); }
       if (bgc) ctx.drawImage(bgc, 0, 0, side, side); else { ctx.fillStyle = "#04100a"; ctx.fillRect(0, 0, side, side); }
-      drawFieldFx(now); drawLight(now); drawRocks(now); drawMagnet(now); drawFood(now); drawPowerUp(now); drawRings(now); drawSnake(now); drawParticles(); drawFloaters(); drawComboGlow(now);
+      drawFieldFx(now); drawLight(now); drawRocks(now); drawGates(now); drawHole(now); drawMagnet(now); drawFood(now); drawPowerUp(now); drawRings(now); drawSnake(now); drawParticles(); drawFloaters(); drawComboGlow(now);
       ctx.restore();
       if (now < flashUntil) { ctx.save(); ctx.globalAlpha = ((flashUntil - now) / 350) * 0.45; ctx.fillStyle = `rgb(${flashColor})`; ctx.fillRect(0, 0, side, side); ctx.restore(); }
       if (v.countdown) { // обратный отсчёт после паузы

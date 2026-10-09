@@ -43,9 +43,9 @@ module.exports = (app) => {
   // free — случайное поле; daily — общее поле дня; tournament — поле турнира выходных; challenge — поле вызова друга.
   app.post("/api/run", player(async (req, res, { p, uid }) => {
     const b = req.body || {};
-    const kind = ["daily", "challenge", "tournament"].includes(b.kind) ? b.kind : "free";
+    const kind = ["daily", "challenge", "tournament", "level"].includes(b.kind) ? b.kind : "free";
     let cfg = {
-      mode: Engine.MODES[b.mode] ? b.mode : "classic",
+      mode: Engine.MODES[b.mode] && b.mode !== "level" ? b.mode : "classic",
       diff: Engine.DIFFS[b.diff] ? b.diff : "normal",
       artifact: "", artLevel: 1, seed: R.randomSeed()
     };
@@ -64,6 +64,19 @@ module.exports = (app) => {
       cfg = { mode: t.mode, diff: t.diff, artifact: "", artLevel: 1, seed: t.seed };
       const mine = await q(`SELECT game_id FROM tournament_scores WHERE tour=$1 AND telegram_id=$2`, [ref, uid]);
       ghost = await ghostFromGame(mine.rows[0]?.game_id, "Твой лучший");
+    } else if (kind === "level") {
+      // уровень открыт, если это первый или пройден предыдущий
+      const n = Math.floor(Number(b.ref)) || 0;
+      if (n < 1 || n > Engine.LEVELS.length) return res.status(400).json({ error: "Bad level" });
+      if (n > 1) {
+        const prev = await q(`SELECT 1 FROM level_progress WHERE telegram_id=$1 AND level=$2`, [uid, n - 1]);
+        if (!prev.rowCount) return res.status(403).json({ error: "Level locked" });
+      }
+      ref = String(n);
+      cfg = { mode: "level", level: n, diff: "normal", artifact: cfg.artifact, artLevel: cfg.artLevel, seed: R.randomSeed() };
+      const mine = await q(`SELECT game_id FROM level_progress WHERE telegram_id=$1 AND level=$2`, [uid, n]);
+      ghost = await ghostFromGame(mine.rows[0]?.game_id, "Твой лучший");
+      if (ghost && ghost.cfg) cfg.seed = Number(ghost.cfg.seed) || cfg.seed; // с призраком — на том же поле
     } else if (kind === "challenge") {
       const r = await q(`SELECT * FROM challenges WHERE id=$1 AND expires_at>NOW()`, [String(b.ref || "")]);
       const c = r.rows[0];
@@ -73,7 +86,7 @@ module.exports = (app) => {
       if (c.seed) ghost = await ghostFromGame(c.game_id); // соперник едет рядом призраком — только на том же поле
     }
     cfg.rules = Engine.RULES; // новые забеги — по последней версии правил
-    const token = R.makeRunToken(uid, { seed: cfg.seed, mode: cfg.mode, diff: cfg.diff, art: cfg.artifact, lvl: cfg.artLevel, rl: cfg.rules, kind, ref });
+    const token = R.makeRunToken(uid, { seed: cfg.seed, mode: cfg.mode, diff: cfg.diff, art: cfg.artifact, lvl: cfg.artLevel, rl: cfg.rules, lv: cfg.level || 0, kind, ref });
     res.json({ token, cfg, kind, ghost });
   }, { limit: [40, 60000] }));
 
@@ -127,6 +140,28 @@ module.exports = (app) => {
       tournament = { best: tr.rows[0].best, rank: rk.rows[0].rank, improved: tr.rows[0].best === score };
     }
 
+    // уровень: пройден, если змейка заползла в норку
+    let level = null;
+    if (kind === "level" && sim.completed) {
+      const n = Number(t.ref) || cfg.level;
+      const prev = (await q(`SELECT stars, best_ticks FROM level_progress WHERE telegram_id=$1 AND level=$2`, [uid, n])).rows[0];
+      const stars = sim.stars, prevStars = prev ? prev.stars : 0;
+      let bonus = prev ? 0 : C.levelFirstReward(n);
+      if (stars > prevStars) bonus += (stars - prevStars) * C.levelStarReward(n);
+      let chapterSkin = null;
+      if (!prev && n % 10 === 0) chapterSkin = C.CHAPTERS[n / 10 - 1]?.skin || null; // финал главы — скин
+      await q(`INSERT INTO level_progress(telegram_id, level, stars, best_ticks, best_score) VALUES($1,$2,$3,$4,$5)
+               ON CONFLICT(telegram_id, level) DO UPDATE SET stars=GREATEST(level_progress.stars, EXCLUDED.stars),
+                 best_ticks=LEAST(COALESCE(level_progress.best_ticks, EXCLUDED.best_ticks), EXCLUDED.best_ticks), best_score=GREATEST(level_progress.best_score, EXCLUDED.best_score)`,
+        [uid, n, stars, sim.ticks, score]);
+      if (chapterSkin) await q(`UPDATE players SET owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$1]::TEXT[])) WHERE telegram_id=$2`, [chapterSkin, uid]);
+      coins += bonus;
+      level = { level: n, stars, prev_stars: prevStars, first: !prev, bonus, chapter_skin: chapterSkin, next: n < Engine.LEVELS.length ? n + 1 : null,
+                improved: !prev || sim.ticks < (prev.best_ticks || 1e9) };
+    } else if (kind === "level") {
+      level = { level: Number(t.ref) || cfg.level, stars: 0, failed: true };
+    }
+
     // задания (дневные и недельные)
     const st = M.addRun(M.state(p), M.runStats(sim, cfg, kind));
     const gainedXp = Math.max(5, Math.floor(score / 2) + apples * 3);
@@ -151,6 +186,7 @@ module.exports = (app) => {
       gameId = gl?.rows[0]?.id || null;
       if (gameId && daily?.improved) q(`UPDATE daily_scores SET game_id=$1 WHERE day=$2 AND telegram_id=$3`, [gameId, t.ref, uid]).catch(() => {});
       if (gameId && tournament?.improved) q(`UPDATE tournament_scores SET game_id=$1 WHERE tour=$2 AND telegram_id=$3`, [gameId, t.ref, uid]).catch(() => {});
+      if (gameId && level?.improved && !level.failed) q(`UPDATE level_progress SET game_id=$1 WHERE level=$2 AND telegram_id=$3`, [gameId, level.level, uid]).catch(() => {});
     }
     if (rated && score > 0) {
       // кто был 10-м в сезоне до этого забега (чтобы сообщить ему, если он вылетел из топ-10)
@@ -185,7 +221,7 @@ module.exports = (app) => {
     }
 
     res.json({
-      player: P.responsePlayer(await P.getPlayer(u)), bot_username: config.botUsername, challenge_result, daily, tournament,
+      player: P.responsePlayer(await P.getPlayer(u)), bot_username: config.botUsername, challenge_result, daily, tournament, level,
       result: { score, apples, reward: coins, is_record: isRecord, combo: sim.bestRun, rated, mode, diff: cfg.diff, game_id: gameId, xp: gainedXp, bonuses }
     });
   }, { limit: [20, 60000] }));
@@ -204,6 +240,25 @@ module.exports = (app) => {
     res.json({
       day, bonus: config.DAILY_CHALLENGE_BONUS, me,
       leaderboard: top.rows.map((x) => ({ name: nameOf(x), score: x.score, skin: C.skinDef(x.skin) ? x.skin : "classic", palette: C.skinPalette(x.skin), is_me: x.telegram_id === uid }))
+    });
+  }, { allowBanned: true }));
+
+  // ---- Режим «Уровни»: карта прогресса и рейтинг кампании ----
+  app.get("/api/levels", player(async (req, res, { uid }) => {
+    const mine = await q(`SELECT level, stars, best_ticks FROM level_progress WHERE telegram_id=$1`, [uid]);
+    const byN = Object.fromEntries(mine.rows.map((r) => [r.level, r]));
+    const levels = Engine.LEVELS.map((L) => ({
+      n: L.n, chapter: L.chapter, target: L.target, boss: L.boss, moving: L.moving, gates: L.gates.length > 0, walls: L.walls.length,
+      stars: byN[L.n]?.stars || 0, done: !!byN[L.n], unlocked: L.n === 1 || !!byN[L.n - 1], par: L.par,
+      first_reward: C.levelFirstReward(L.n), star_reward: C.levelStarReward(L.n)
+    }));
+    const top = await q(`SELECT lp.telegram_id, pl.first_name, pl.username, pl.skin, SUM(lp.stars)::int AS stars, MAX(lp.level)::int AS max_level
+                         FROM level_progress lp JOIN players pl ON pl.telegram_id=lp.telegram_id WHERE NOT pl.banned
+                         GROUP BY lp.telegram_id, pl.first_name, pl.username, pl.skin ORDER BY stars DESC, max_level DESC, lp.telegram_id LIMIT 20`);
+    res.json({
+      levels, chapters: C.CHAPTERS.map((c) => ({ ...c, skin_name: C.SKIN_BY_ID[c.skin]?.name, skin_emoji: C.SKIN_BY_ID[c.skin]?.emoji })),
+      total_stars: mine.rows.reduce((a, r) => a + r.stars, 0), max_stars: Engine.LEVELS.length * 3,
+      leaderboard: top.rows.map((x) => ({ name: nameOf(x), score: x.stars, max_level: x.max_level, skin: C.skinDef(x.skin) ? x.skin : "classic", palette: C.skinPalette(x.skin), is_me: x.telegram_id === uid }))
     });
   }, { allowBanned: true }));
 
@@ -262,7 +317,7 @@ module.exports = (app) => {
     let score = 0, seed = null, mode = "classic", diff = "normal", art = "", artLevel = 1, gameId = null;
     if (req.body?.game_id) {
       const g = await q(`SELECT id, score, mode, diff, seed, cfg FROM game_log WHERE id=$1 AND telegram_id=$2 AND verified AND seed IS NOT NULL`, [Number(req.body.game_id) || 0, uid]);
-      if (!g.rowCount || !g.rows[0].score) return res.status(400).json({ error: "Bad game" });
+      if (!g.rowCount || !g.rows[0].score || g.rows[0].mode === "level") return res.status(400).json({ error: "Bad game" }); // уровни — без вызовов
       ({ score, mode, diff } = g.rows[0]); seed = g.rows[0].seed; art = g.rows[0].cfg?.artifact || ""; artLevel = g.rows[0].cfg?.artLevel || 1; gameId = g.rows[0].id;
     } else { // старый способ: вызов по рекорду, поле у соперника случайное
       score = Math.max(0, Math.min(3000, Math.floor(Number(req.body?.score) || 0), Number(p.best_score) || 0));

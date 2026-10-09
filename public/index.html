@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Snake Arena</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/css/app.css?v=30">
+<link rel="stylesheet" href="/css/app.css?v=31">
 </head>
 <body>
 <div class="app">
@@ -33,6 +33,7 @@
       </div>
     </div>
     <div class="nav">
+      <button data-screen="levels" class="wide levelsbtn"><i>🕳️</i><span>Уровни</span><small>30 уровней · набери цель и заползи в норку</small></button>
       <button data-screen="daily" class="wide"><i>📅</i><span>Челлендж дня</span><small>Одно поле для всех · бонус за первый забег</small></button>
       <button data-screen="tournament"><i>🏁</i><span>Турнир</span><small>По выходным · кубки</small></button>
       <button data-screen="pass"><i>🎟️</i><span>Пропуск</span><small>Награды сезона</small></button>
@@ -54,6 +55,7 @@
     <div id="dailyTable" class="lb" style="margin-top:8px"></div>
   </div></section>
 
+  <section id="levels" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🕳️ Уровни</h2><div id="levelBox"></div></div></section>
   <section id="tournament" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🏁 Турнир выходных</h2><div id="tourBox"></div></div></section>
   <section id="pass" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🎟️ Сезонный пропуск</h2><div id="passBox"></div></div></section>
   <section id="clans" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🛡️ Кланы</h2><div id="clanBox"></div></div></section>
@@ -142,6 +144,7 @@
     <div class="over-emoji" id="overEmoji">💥</div><h2 id="overTitle">Игра окончена</h2>
     <small class="hint" id="overMode"></small>
     <div id="recBadge" class="recbadge" hidden>🏆 Новый рекорд!</div>
+    <div id="levelStars" class="lvstars" hidden></div>
     <div class="ostats">
       <div><b id="final">0</b><small>Очки</small></div>
       <div><b id="oapples">0</b><small>Съедено</small></div>
@@ -150,7 +153,9 @@
     <div id="overInfo" class="overinfo"></div>
     <div id="overExtra" class="oextra"></div>
     <div class="actions">
+      <button id="nextLevelBtn" class="primary" hidden>▶ Следующий уровень</button>
       <button id="againBtn" class="primary">🔄 Играть ещё</button>
+      <button id="levelsMapBtn" hidden>🗺 Карта уровней</button>
       <div class="actions2"><button id="shareResBtn">📸 Поделиться</button><button id="duelBtn" hidden>⚔️ Вызвать на это поле</button><button id="replayShareBtn" hidden>🔗 Реплей забега</button></div>
       <button id="menuBtn">🏠 В меню</button>
     </div>
@@ -184,6 +189,14 @@
     <div class="actions"><button id="pvBuy" class="primary">Купить</button></div>
   </div>
 </div>
+<div id="levelInfo" class="overlay">
+  <div class="modal">
+    <button id="liClose" class="xbtn" aria-label="Закрыть">✕</button>
+    <div class="over-emoji" id="liEmoji">🕳️</div><h2 id="liTitle">Уровень</h2>
+    <div id="liBody"></div>
+    <div class="actions"><button id="liPlay" class="primary">▶ Играть</button></div>
+  </div>
+</div>
 <div id="news" class="overlay">
   <div class="modal left">
     <div class="over-emoji" style="text-align:center">🆕</div><h2 id="newsTitle" style="text-align:center">Что нового</h2>
@@ -202,12 +215,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="/engine.js?v=30"></script>
-<script src="/js/catalog.js?v=30"></script>
-<script src="/js/i18n.js?v=30"></script>
-<script src="/js/settings.js?v=30"></script>
-<script src="/js/render.js?v=30"></script>
-<script src="/js/card.js?v=30"></script>
-<script src="/js/app.js?v=30"></script>
+<script src="/engine.js?v=31"></script>
+<script src="/js/catalog.js?v=31"></script>
+<script src="/js/i18n.js?v=31"></script>
+<script src="/js/settings.js?v=31"></script>
+<script src="/js/render.js?v=31"></script>
+<script src="/js/card.js?v=31"></script>
+<script src="/js/app.js?v=31"></script>
 </body>
 </html>

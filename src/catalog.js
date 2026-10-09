@@ -29,7 +29,10 @@ const SKIN_CATALOG = [
   { id: "season_master",   name: "Неоновый мастер", emoji: "⚡", price: null, currency: "season", epic: true, seasonRank: 10, desc: "Эксклюзив за топ-10 сезона" },
   { id: "pass_phoenix",    name: "Феникс",          emoji: "🪶", price: null, currency: "pass",       epic: true, desc: "Награда премиум-пропуска сезона" },
   { id: "tour_gold",       name: "Золотой кубок",   emoji: "🏆", price: null, currency: "tournament", epic: true, desc: "Победителю турнира выходных" },
-  { id: "tour_silver",     name: "Серебряный кубок", emoji: "🥈", price: null, currency: "tournament", epic: true, desc: "За топ-3 турнира выходных" }
+  { id: "tour_silver",     name: "Серебряный кубок", emoji: "🥈", price: null, currency: "tournament", epic: true, desc: "За топ-3 турнира выходных" },
+  { id: "lv_garden",       name: "Садовник",        emoji: "🌿", price: null, currency: "levels",     epic: true, desc: "За прохождение главы «Сад»" },
+  { id: "lv_dungeon",      name: "Страж подземелья", emoji: "🗝️", price: null, currency: "levels",    epic: true, desc: "За прохождение главы «Подземелье»" },
+  { id: "lv_volcano",      name: "Повелитель лавы", emoji: "🌋", price: null, currency: "levels",     epic: true, desc: "За прохождение главы «Вулкан»" }
 ];
 const SKIN_BY_ID = Object.fromEntries(SKIN_CATALOG.map((s) => [s.id, s]));
 
@@ -167,7 +170,17 @@ const TOUR_PRIZES = [
 // ---- Кланы
 const CLAN = { createCost: 3000, maxMembers: 30, topCount: 20, rewards: [1500, 1000, 600], emojis: ["🐍", "🐉", "🦂", "🦊", "🐺", "🦅", "🔥", "⚡", "💎", "🌙", "☠️", "👑"] };
 
+// ---- Режим «Уровни»: главы и награды
+const CHAPTERS = [
+  { n: 1, name: "Сад",        emoji: "🌿", skin: "lv_garden" },
+  { n: 2, name: "Подземелье", emoji: "🗝️", skin: "lv_dungeon" },
+  { n: 3, name: "Вулкан",     emoji: "🌋", skin: "lv_volcano" }
+];
+const levelFirstReward = (n) => 100 + n * 20;           // монет за первое прохождение уровня
+const levelStarReward = (n) => 40 + Math.ceil(n / 10) * 30; // монет за каждую новую звезду
+
 module.exports = {
+  CHAPTERS, levelFirstReward, levelStarReward,
   MISSION_POOL, WEEKLY_POOL, MISSION_BY_ID, PRODUCTS, STARTER, PASS_TIERS, PASS_TIER_XP, TOUR_PRIZES, CLAN,
   ARTIFACT_UPGRADE_COST, MISSIONS, SKIN_CATALOG, SKIN_BY_ID, ARTIFACT_CATALOG, ARTIFACT_BY_ID, FIELD_CATALOG, FIELD_BY_ID, ACHIEVEMENTS,
   currentSeasonBounds, weeklySkinFor, weeklySkinById, skinDef, skinPalette, catalogFor

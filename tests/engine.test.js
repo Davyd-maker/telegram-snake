@@ -161,3 +161,36 @@ test("старые забеги (правила v1) переигрываются
   assert.equal(E.normCfg({}).rules, 1);
   assert.equal(E.normCfg({ rules: 2 }).rules, 2);
 });
+
+// ---- режим «Уровни» ----
+const { playLevel } = require("./levelbot");
+test("уровни: 30 штук, старт свободен, места для еды хватает", () => {
+  assert.equal(E.LEVELS.length, 30);
+  for (const L of E.LEVELS) {
+    const g = new E.Game({ mode: "level", level: L.n, seed: 1, rules: E.RULES });
+    for (let x = 6; x <= 18; x++) assert.equal(g.rockSet[12 * E.N + x] | g.gateSet[12 * E.N + x], 0, `уровень ${L.n}: стартовый коридор`);
+    const reachable = g.blocked.reduce((a, b) => a + (b ? 0 : 1), 0);
+    assert.ok(reachable >= 250, `уровень ${L.n}: доступно ${reachable} клеток`);
+    assert.ok(L.target > 0 && L.par > L.target);
+  }
+});
+test("уровни: каждый проходим (бот с поиском пути) и переигровка по логу совпадает", () => {
+  for (const L of E.LEVELS) {
+    let done = null;
+    for (const seed of [11, 22, 33, 44, 55]) { const g = playLevel(L.n, seed); if (g.result().completed) { done = g; break; } }
+    assert.ok(done, `уровень ${L.n} не пройден ботом ни на одном поле`);
+    const r = done.result();
+    const sim = E.simulate(done.cfg, E.parseLog(E.encodeLog(done.log)), r.ticks + 1);
+    assert.equal(sim.completed, true, `уровень ${L.n}: переигровка`);
+    assert.equal(sim.score, r.score); assert.equal(sim.stars, r.stars);
+  }
+});
+test("уровни: норка появляется только после цели, звёзды за скорость", () => {
+  const g = playLevel(1, 11);
+  assert.ok(g.result().completed && g.score >= E.LEVELS[0].target);
+  assert.equal(E.levelStars(1, 1), 3);
+  assert.equal(E.levelStars(1, E.LEVELS[0].par + 1), 2);
+  assert.equal(E.levelStars(1, Math.ceil(E.LEVELS[0].par * 1.6) + 1), 1);
+  const fresh = new E.Game({ mode: "level", level: 1, seed: 11, rules: E.RULES });
+  assert.equal(fresh.hole, null);
+});

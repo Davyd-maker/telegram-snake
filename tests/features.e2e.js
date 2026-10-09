@@ -132,6 +132,37 @@ const tgLog = async () => (TG_LOG ? (await fetch(TG_LOG)).json() : []);
     ok(msgs.some((m) => /побил/.test(m.body.text) && m.body.text.includes(String(b2.res.score))), `Анне пришло «Борис побил твой рекорд» (${b2.res.score} > ${annaBest})`, msgs.map((m) => m.body.text));
   } else console.log("  – пропущено: рекорд Анны не побит или нет журнала Telegram");
 
+  console.log("• режим «Уровни»");
+  const LB = require("./levelbot");
+  async function playLevelApi(u, n) {
+    const r = await call(u, "POST", "/api/run", { kind: "level", ref: n });
+    if (!r.data?.token) return { r };
+    const g = new E.Game(r.data.cfg);
+    while (!g.over && g.ticks < 6000) { LB.step(g); g.tick(); }
+    const res = g.result();
+    await sleep(Math.max(0, res.gameTime - 130 * g.log.length - 2000) + 200);
+    const s = await call(u, "POST", "/api/score", { token: r.data.token, log: E.encodeLog(g.log), ticks: res.ticks });
+    return { r, g, res, s };
+  }
+  r = await call(Cc, "GET", "/api/levels");
+  ok(r.data.levels.length === 30 && r.data.levels[0].unlocked && !r.data.levels[1].unlocked, "карта уровней: открыт только 1-й");
+  r = await call(Cc, "POST", "/api/run", { kind: "level", ref: 2 }); ok(r.status === 403, "2-й уровень закрыт до прохождения 1-го");
+  const coinsBefore = (await call(Cc, "GET", "/api/me")).data.player.coins;
+  let l1 = null; for (let i = 0; i < 3; i++) { l1 = await playLevelApi(Cc, 1); if (l1.res.completed) break; }
+  ok(l1.s.status === 200 && l1.s.data.level?.first && l1.s.data.level.stars === l1.res.stars, `1-й уровень пройден: ${l1.res.stars}★ за ${l1.res.ticks} ходов`, l1.s.data.level);
+  ok(l1.s.data.player.coins >= coinsBefore + l1.s.data.level.bonus && l1.s.data.level.bonus >= 120, `награда за уровень +${l1.s.data.level?.bonus}`);
+  ok(l1.s.data.result.rated === false, "уровни не идут в общий рейтинг");
+  r = await call(Cc, "GET", "/api/levels"); ok(r.data.levels[1].unlocked && r.data.levels[0].done && r.data.total_stars === l1.res.stars, "2-й уровень открылся, звёзды сохранены");
+  ok(r.data.leaderboard.some((x) => x.is_me), "рейтинг по звёздам");
+  r = await call(Cc, "POST", "/api/run", { kind: "level", ref: 1 }); ok(r.data.ghost && r.data.ghost.label === "Твой лучший" && r.data.cfg.seed === Number(r.data.ghost.cfg.seed), "повтор уровня — с призраком своего лучшего на том же поле");
+  const l1b = await playLevelApi(Cc, 1); ok(l1b.s.data.level && !l1b.s.data.level.first, "повторное прохождение — без награды за первое");
+  // проваленный уровень
+  const rr = await call(Cc, "POST", "/api/run", { kind: "level", ref: 2 }); const gg = new E.Game(rr.data.cfg); gg.safeUntil = 0; gg.setdir(0, -1); while (!gg.over) gg.tick();
+  await sleep(Math.max(0, gg.gameTime - 2000) + 200);
+  r = await call(Cc, "POST", "/api/score", { token: rr.data.token, log: E.encodeLog(gg.log), ticks: gg.ticks }); ok(r.data.level?.failed, "смерть на уровне — уровень не засчитан", r.data.level);
+  // подделка: прислать «прохождение» другого уровня тем же логом нельзя — сервер переигрывает по своему токену
+  r = await call(Cc, "GET", "/api/levels"); ok(!r.data.levels[1].done, "2-й уровень не отмечен пройденным");
+
   console.log("• админка: удержание, античит, реплей");
   r = await call(admin, "GET", "/api/admin/retention"); ok(r.data.cohorts.length >= 1 && r.data.funnel.registered >= 5 && r.data.funnel.paid >= 1, "когорты и воронка", r.data.funnel);
   r = await call(admin, "GET", "/api/admin/suspicious"); ok(Array.isArray(r.data.runs), `подозрительных забегов: ${r.data.runs.length} (бот играет почти идеально — должен попадаться)`);

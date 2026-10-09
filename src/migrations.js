@@ -68,6 +68,15 @@ const MIGRATIONS = [
       await q(`CREATE INDEX IF NOT EXISTS clan_members_clan_idx ON clan_members (clan_id)`);
       await q(`CREATE TABLE IF NOT EXISTS clan_rewards (season_id INTEGER PRIMARY KEY, done_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     }
+  },
+  {
+    id: 7, name: "режим «Уровни»: прогресс игроков",
+    up: async (q) => {
+      await q(`CREATE TABLE IF NOT EXISTS level_progress (
+        telegram_id TEXT NOT NULL, level INTEGER NOT NULL, stars INTEGER NOT NULL DEFAULT 0, best_ticks INTEGER, best_score INTEGER NOT NULL DEFAULT 0, game_id BIGINT,
+        completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(telegram_id, level))`);
+      await q(`CREATE INDEX IF NOT EXISTS level_progress_player_idx ON level_progress (telegram_id)`);
+    }
   }
 ];
 

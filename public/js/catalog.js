@@ -55,6 +55,8 @@
     sakura: ["#ffd1e8", "#ff5fa8"], ocean: ["#b8f3ff", "#0a7ad9"], toxic: ["#e8ff7a", "#4fc400"], sunset: ["#ffd27a", "#ff4f7b"], aurora: ["#b8ffe8", "#00a878"],
     samurai: ["#ffd0d0", "#b3122f"], void: ["#d8b5ff", "#4314a3"], prism: ["#ffffff", "#3bdcff"]
   };
+  // скины за главы уровней
+  Object.assign(SA.SKIN_COLORS, { lv_garden: ["#c8ffb0", "#2e9e3a"], lv_dungeon: ["#e6d5ff", "#5b4a8a"], lv_volcano: ["#ffe08a", "#d13b0a"] });
 
   const hsl = (h, l = 60) => `hsl(${((h % 360) + 360) % 360},95%,${l}%)`;
   const mix = (a, b, t) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
@@ -73,13 +75,14 @@
     prism: { color: (t, now) => hsl(now / 5 - t * 240), glow: (now) => hsl(now / 5, 65) },
     season_champion: { color: (t) => mix([255, 245, 160], [255, 150, 20], t), glow: () => "#ffd34d" },
     season_elite: { color: (t) => mix([220, 240, 255], [100, 70, 255], t), glow: () => "#8c6cff" },
-    season_master: { color: (t) => mix([160, 255, 255], [0, 190, 255], t), glow: () => "#32e8ff" }
+    season_master: { color: (t) => mix([160, 255, 255], [0, 190, 255], t), glow: () => "#32e8ff" },
+    lv_volcano: { color: (t, now) => mix([255, 224, 138], [209, 59, 10], Math.min(1, t + 0.15 * Math.sin(now / 200 + t * 8))), glow: () => "#ff6a1a" }
   };
 
   // Голова змейки в рейтинге (CSS-градиент)
   SA.HEAD_COLORS = {
     ...SA.SKIN_COLORS, rainbow: ["#ffe14d", "#ff3b3b"], galaxy: ["#b078ff", "#1c0b66"], inferno: ["#fff3a0", "#ff4a00"], diamond: ["#ffffff", "#5fe3ff"],
-    prism: ["#ffffff", "#3bdcff"], season_champion: ["#fff5a0", "#ff9614"], season_elite: ["#dcf0ff", "#6446ff"], season_master: ["#a0ffff", "#00beff"]
+    prism: ["#ffffff", "#3bdcff"], lv_volcano: ["#ffe08a", "#d13b0a"], season_champion: ["#fff5a0", "#ff9614"], season_elite: ["#dcf0ff", "#6446ff"], season_master: ["#a0ffff", "#00beff"]
   };
 
   SA.esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
