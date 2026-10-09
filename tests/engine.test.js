@@ -5,7 +5,7 @@ const E = require("../public/engine.js");
 
 // Жадный бот: идёт к еде и не врезается на ход вперёд
 function bot(g) {
-  const h = g.snake[0], f = g.food, N = E.N;
+  const h = g.snake[0], f = g.hole || g.food || h, N = E.N;
   const opts = E.DIRS.map(([x, y]) => ({ x, y })).filter((d) => !(d.x === -g.dir.x && d.y === -g.dir.y));
   const safe = (d) => {
     let nx = h.x + d.x, ny = h.y + d.y;
@@ -22,6 +22,7 @@ function bot(g) {
 function play(cfg, maxTicks = 600, extra) {
   const g = new E.Game(cfg);
   while (!g.over && g.ticks < maxTicks) {
+    if (g.choosing) { g.choose(g.ticks % 3); continue; } // «Подземелье»: выбор улучшения
     const d = bot(g);
     if (d && (d.x !== g.dir.x || d.y !== g.dir.y)) g.setdir(d.x, d.y);
     if (extra) extra(g);
@@ -115,7 +116,7 @@ test("лабиринт и камни не перекрывают стартов�
 
 test("испорченный лог отклоняется", () => {
   assert.equal(E.parseLog("16,8"), null);        // время идёт назад
-  assert.equal(E.parseLog("13"), null);          // неизвестная операция
+  assert.deepEqual(E.parseLog("13"), [13]);      // 5..7 — выбор улучшения в «Подземелье» (v4)
   assert.equal(E.parseLog("1.5"), null);
   assert.equal(E.parseLog("-8"), null);
   assert.deepEqual(E.parseLog(""), []);
@@ -236,4 +237,54 @@ test("v3: на 10-м уровне есть вор, на 20-м поле сужа�
   const before = g20.rocks.length; g20.safeUntil = 1e9;
   for (let i = 0; i < 150 && !g20.over; i++) { g20.fx.ghost = 0; g20.tick(); }
   assert.ok(g20.shrinkStep === 1 && g20.baseRocks.length > E.LEVELS[19].walls.length, "первое сужение случилось " + before);
+});
+
+// ---------------- правила v4 ----------------
+const LB = require("./levelbot.js");
+function botRun(cfg, maxTicks, pick = (g) => g.ticks % 3) {
+  const g = new E.Game(cfg);
+  while (!g.over && g.ticks < maxTicks) { if (g.choosing) { g.choose(pick(g)); continue; } LB.step(g); g.tick(); }
+  return g;
+}
+test("v4 подземелье: этажи, выбор улучшений, переигровка по логу совпадает", () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const g = botRun({ mode: "dungeon", seed, rules: E.RULES }, 4000);
+    assert.ok(g.floor >= 2, "бот проходит хотя бы первый этаж");
+    assert.ok(g.log.some((e) => (e & 7) >= E.OP_CHOOSE), "выбор записан в лог");
+    const sim = E.simulate(g.cfg, E.parseLog(E.encodeLog(g.log)), g.ticks);
+    assert.equal(sim.score, g.score); assert.equal(sim.floor, g.floor); assert.deepEqual(sim.upgrades, g.up.taken);
+  }
+});
+test("v4 подземелье: без выбора забег на нём и заканчивается", () => {
+  const g = botRun({ mode: "dungeon", seed: 3, rules: E.RULES }, 4000);
+  const log = E.parseLog(E.encodeLog(g.log)), firstChoice = log.findIndex((e) => (e & 7) >= E.OP_CHOOSE);
+  const sim = E.simulate(g.cfg, log.slice(0, firstChoice), g.ticks);
+  assert.equal(sim.floor, 1);
+});
+test("v4 подземелье: «Огранка» даёт больше очков, «Броня» спасает", () => {
+  const g = new E.Game({ mode: "dungeon", seed: 5, rules: E.RULES });
+  g.choosing = { floor: 1, options: ["points", "armor", "slow"] };
+  g.choose(0); assert.equal(g.up.points, 0.3); assert.equal(g.floor, 2);
+  g.choosing = { floor: 2, options: ["points", "armor", "slow"] };
+  const ch = g.charges; g.choose(1); assert.equal(g.charges, ch + 1);
+});
+test("v4 головоломка: одно поле и одни фрукты у всех, проходима", () => {
+  const a = new E.Game({ mode: "puzzle", seed: 777, rules: E.RULES }), b = new E.Game({ mode: "puzzle", seed: 777, rules: E.RULES });
+  assert.deepEqual(a.lv.foods, b.lv.foods); assert.deepEqual(a.food, b.food);
+  for (let seed = 1; seed <= 40; seed++) {
+    const g = botRun({ mode: "puzzle", seed, rules: E.RULES }, 3000), r = g.result();
+    assert.ok(r.completed, "головоломка " + seed + " проходима");
+    assert.equal(r.apples, E.PUZZLE_FRUITS);
+    assert.ok(!g.log.length || E.simulate(g.cfg, g.log, g.ticks).completed);
+  }
+});
+test("v4 уровни игроков: стены чистятся, старт свободен, проверка места", () => {
+  const n = E.normCustom({ w: [0, 0, 1, 300, 576, -3, "5"], t: 999 });
+  assert.deepEqual(n, { w: [0, 1, 5], t: 80 });
+  const box = []; for (let x = 5; x <= 19; x++) box.push(10 * 24 + x, 14 * 24 + x); for (let y = 11; y <= 13; y++) box.push(y * 24 + 5, y * 24 + 19);
+  const full = E.customCheck({ w: box, t: 10 }); // старт заперт в коробке — места мало
+  assert.equal(full.ok, false);
+  const g = botRun({ mode: "custom", seed: 4, rules: E.RULES, custom: { w: [30, 31, 32, 33], t: 8 } }, 3000);
+  assert.ok(g.result().completed);
+  assert.equal(E.normCfg({ mode: "custom", rules: 3 }).mode, "classic", "режимы v4 — только с правилами v4");
 });

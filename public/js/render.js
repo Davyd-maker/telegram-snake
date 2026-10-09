@@ -74,6 +74,11 @@
     } else if (id === "headphones") {
       ctx.strokeStyle = "#2a2a35"; ctx.lineWidth = r * 0.14; ctx.beginPath(); ctx.arc(0, w * 0.15, w * 0.62, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
       for (const sd of [-1, 1]) { ctx.fillStyle = "#ff4f6b"; ctx.beginPath(); ctx.ellipse(sd * w * 0.62, w * 0.1, w * 0.16, w * 0.24, 0, 0, Math.PI * 2); ctx.fill(); }
+    } else if (id === "witch") { // шляпа ведьмы: широкие поля и загнутый конус
+      ctx.fillStyle = "#2b1840"; ctx.beginPath(); ctx.ellipse(0, -w * 0.02, w * 0.72, w * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-w * 0.38, -w * 0.08); ctx.quadraticCurveTo(-w * 0.1, -w * 0.7, w * 0.3, -w * 1.1); ctx.quadraticCurveTo(w * 0.12, -w * 0.62, w * 0.38, -w * 0.08); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#ff8a1a"; ctx.fillRect(-w * 0.36, -w * 0.24, w * 0.72, w * 0.12);
+      ctx.fillStyle = "#ffd84c"; ctx.fillRect(-w * 0.06, -w * 0.25, w * 0.12, w * 0.14);
     } else if (id === "flower") {
       ctx.translate(w * 0.35, -w * 0.15); ctx.rotate(now / 1500);
       ctx.fillStyle = "#fff"; for (let k = 0; k < 5; k++) { ctx.rotate((Math.PI * 2) / 5); ctx.beginPath(); ctx.ellipse(0, -w * 0.2, w * 0.12, w * 0.2, 0, 0, Math.PI * 2); ctx.fill(); }
@@ -135,10 +140,23 @@
       lx.fillStyle = lg; lx.fillRect(0, 0, L, L);
       rockSprite = makeRock(Math.ceil(cell * dpr));
       fieldFx = [];
-      if (S.fx === "stars" || S.fx === "snow" || S.fx === "rain" || S.fx === "leaves" || S.fx === "night") {
-        let seed = { stars: 7, snow: 13, rain: 21, leaves: 33, night: 41 }[S.fx]; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-        const cnt = { stars: 46, snow: 34, rain: 60, leaves: 16, night: 30 }[S.fx];
+      if (S.fx === "stars" || S.fx === "snow" || S.fx === "rain" || S.fx === "leaves" || S.fx === "night" || S.fx === "spooky") {
+        let seed = { stars: 7, snow: 13, rain: 21, leaves: 33, night: 41, spooky: 57 }[S.fx]; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        const cnt = { stars: 46, snow: 34, rain: 60, leaves: 16, night: 30, spooky: 9 }[S.fx];
         for (let i = 0; i < cnt; i++) fieldFx.push({ x: rnd(), y: rnd(), r: 0.6 + rnd() * 1.1, ph: rnd() * 6.28, sp: 0.03 + rnd() * 0.05, c: Math.floor(rnd() * 3) });
+      }
+      // «Ночь Хэллоуина»: луна и силуэты надгробий — в кэш фона
+      if (S.fx === "spooky") {
+        const mx = side * 0.8, my = side * 0.17, mr = cell * 2.1;
+        const mg = b.createRadialGradient(mx, my, mr * 0.2, mx, my, mr * 2.6); mg.addColorStop(0, "rgba(255,230,160,.35)"); mg.addColorStop(1, "rgba(255,230,160,0)");
+        b.fillStyle = mg; b.beginPath(); b.arc(mx, my, mr * 2.6, 0, Math.PI * 2); b.fill();
+        b.fillStyle = "rgba(255,236,170,.55)"; b.beginPath(); b.arc(mx, my, mr, 0, Math.PI * 2); b.fill();
+        b.fillStyle = S.bg; b.beginPath(); b.arc(mx + mr * 0.45, my - mr * 0.2, mr * 0.9, 0, Math.PI * 2); b.fill();
+        b.fillStyle = "rgba(10,4,20,.55)";
+        for (const [gx, gw] of [[0.08, 1.1], [0.28, 0.9], [0.62, 1.2], [0.9, 0.8]]) {
+          const x = side * gx, y = side - cell * 0.1, w = cell * gw;
+          b.beginPath(); b.moveTo(x - w / 2, y); b.lineTo(x - w / 2, y - w * 0.9); b.arc(x, y - w * 0.9, w / 2, Math.PI, 0); b.lineTo(x + w / 2, y); b.fill();
+        }
       }
       // лужи на «Дожде» и мох на «Осени» — в кэш фона
       if (S.fx === "rain" || S.fx === "leaves") {
@@ -197,6 +215,18 @@
           const x = (q.x + Math.sin(t * q.sp * 9 + q.ph) * 0.03) * side, y = (q.y + Math.cos(t * q.sp * 7 + q.ph) * 0.03) * side;
           ctx.globalAlpha = Math.max(0, Math.sin(t * 2 + q.ph)) * 0.9; ctx.fillStyle = "#e9ff8a";
           ctx.beginPath(); ctx.arc(x, y, cell * 0.06, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (S.fx === "spooky") { // туман и летучие мыши
+        for (let i = 0; i < 3; i++) {
+          const x = ((t * (0.02 + i * 0.01) + i * 0.37) % 1.4 - 0.2) * side, y = side * (0.55 + i * 0.15);
+          const g = ctx.createRadialGradient(x, y, 1, x, y, cell * 6); g.addColorStop(0, "rgba(190,170,255,.10)"); g.addColorStop(1, "rgba(190,170,255,0)");
+          ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, cell * 7, cell * 2.6, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = "rgba(20,8,30,.85)";
+        for (const q of fieldFx) {
+          const x = ((q.x + t * q.sp * 1.3) % 1.2 - 0.1) * side, y = (q.y * 0.6 + 0.05 + Math.sin(t * 1.7 + q.ph) * 0.03) * side, f = Math.sin(t * 14 + q.ph), w = cell * 0.45 * q.r;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x - w * 0.5, y - w * 0.6 * f, x - w, y - w * 0.15 * f); ctx.quadraticCurveTo(x - w * 0.5, y + w * 0.1, x, y + w * 0.15);
+          ctx.quadraticCurveTo(x + w * 0.5, y + w * 0.1, x + w, y - w * 0.15 * f); ctx.quadraticCurveTo(x + w * 0.5, y - w * 0.6 * f, x, y); ctx.fill();
         }
       } else if (S.fx === "neon") {
         const y = ((t * 0.12) % 1.2 - 0.1) * side, h2 = cell * 3, g = ctx.createLinearGradient(0, y - h2, 0, y + h2);
@@ -386,6 +416,23 @@
       const stem = (x0, y0, x1, y1) => { ctx.strokeStyle = "#6b4a22"; ctx.lineWidth = cell * 0.045; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo((x0 + x1) / 2 + r * 0.2, Math.min(y0, y1) - r * 0.2, x1, y1); ctx.stroke(); };
       const leaf = (x, y, a, s = 1) => { ctx.fillStyle = "#5fe08a"; ctx.beginPath(); ctx.ellipse(x, y, r * 0.34 * s, r * 0.15 * s, a, 0, Math.PI * 2); ctx.fill(); };
       ctx.shadowColor = "rgba(255,80,120,.8)"; ctx.shadowBlur = 12;
+      if (kind === 6) { // тыква (Хэллоуин)
+        ctx.shadowColor = "rgba(255,140,30,.9)";
+        for (const [ox, rw] of [[-0.42, 0.55], [0.42, 0.55], [0, 0.62]]) { const g = ctx.createRadialGradient(ox * r - r * 0.2, -r * 0.3, 1, ox * r, r * 0.05, r * 1.0); g.addColorStop(0, "#ffd08a"); g.addColorStop(0.45, "#ff8a1a"); g.addColorStop(1, "#a83e00"); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(ox * r, r * 0.08, r * rw, r * 0.82, 0, 0, Math.PI * 2); ctx.fill(); }
+        ctx.shadowBlur = 0; ctx.fillStyle = "#3b6b1f"; ctx.fillRect(-r * 0.09, -r * 0.95, r * 0.18, r * 0.3);
+        ctx.fillStyle = "#2a0d00"; // рожица
+        for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sd * r * 0.42, -r * 0.12); ctx.lineTo(sd * r * 0.18, -r * 0.12); ctx.lineTo(sd * r * 0.3, -r * 0.34); ctx.fill(); }
+        ctx.beginPath(); ctx.moveTo(-r * 0.45, r * 0.22); ctx.quadraticCurveTo(0, r * 0.62, r * 0.45, r * 0.22); ctx.lineTo(r * 0.2, r * 0.3); ctx.lineTo(0, r * 0.2); ctx.lineTo(-r * 0.2, r * 0.3); ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 0; return;
+      }
+      if (kind === 7) { // конфета в фантике
+        ctx.save(); ctx.rotate(-0.4 + Math.sin(t * 3) * 0.08);
+        ctx.fillStyle = "#c13cff"; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sd * r * 0.5, 0); ctx.lineTo(sd * r * 1.05, -r * 0.42); ctx.lineTo(sd * r * 1.05, r * 0.42); ctx.closePath(); ctx.fill(); }
+        const g = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 1, 0, 0, r * 0.6); g.addColorStop(0, "#ffe0ff"); g.addColorStop(1, "#ff3db8");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.62, r * 0.48, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineWidth = r * 0.1; ctx.beginPath(); ctx.moveTo(-r * 0.3, -r * 0.3); ctx.lineTo(r * 0.1, r * 0.35); ctx.moveTo(r * 0.05, -r * 0.4); ctx.lineTo(r * 0.38, r * 0.15); ctx.stroke();
+        ctx.restore(); ctx.shadowBlur = 0; return;
+      }
       if (kind === 1) { // вишня
         stem(-r * 0.45, r * 0.15, r * 0.1, -r * 0.95); stem(r * 0.45, r * 0.25, r * 0.1, -r * 0.95); leaf(r * 0.35, -r * 0.95, -0.4);
         ball(-r * 0.45, r * 0.3, r * 0.52, "#ffd6dc", "#ff2d55", "#7a0018"); ball(r * 0.45, r * 0.4, r * 0.52, "#ffd6dc", "#ff2d55", "#7a0018");
@@ -491,10 +538,40 @@
         ctx.fillText((gh.dead ? "💀 " : "👻 ") + (gh.label || ""), Math.max(cell * 2, Math.min(side - cell * 2, (h.x + 0.5) * cell)), Math.max(cell * 0.6, h.y * cell - cell * 0.15));
         ctx.restore();
       }
+      // соперник в дуэли — полноценная змейка с подписью
+      for (const o of v.others || []) {
+        if (!o.snake || !o.snake.length) continue;
+        o.hd = o.hd || { x: -1, y: 0 };
+        drawLayered(now, { ...o, bulges: false, shield: false, face: true, trail: false }, o.dead ? 0.3 : 1);
+        if (o.label) {
+          const h = o.snake[0];
+          ctx.save(); ctx.font = `800 ${cell * 0.5}px system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+          ctx.fillStyle = o.color || "#ff9a9a"; ctx.shadowColor = "#000"; ctx.shadowBlur = 4;
+          ctx.fillText(o.label, Math.max(cell * 2, Math.min(side - cell * 2, (h.x + 0.5) * cell)), Math.max(cell * 0.7, h.y * cell - cell * 0.3));
+          ctx.restore();
+        }
+      }
       if (!v.snake.length) return;
       // мигание в «безопасные» секунды после старта/паузы, полупрозрачность у бонуса «призрак»
       const alpha = v.ghost ? 0.55 : v.safe ? 0.5 + 0.35 * Math.abs(Math.sin(now / 110)) : 1;
       drawLayered(now, mainSnake(), alpha);
+      drawPet(now);
+    }
+    // Питомец: летит за хвостом змейки, плавно догоняя его; покачивается
+    let petPos = null;
+    function drawPet(now) {
+      if (!v.pet || !v.pet.emoji || !v.snake.length) { petPos = null; return; }
+      const pts = snakePoints(now, mainSnake()), tail = pts[pts.length - 1], prev = pts[Math.max(0, pts.length - 2)];
+      let dx = tail.x - prev.x, dy = tail.y - prev.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+      const tx = (tail.x + dx * 0.9 + 0.5) * cell, ty = (tail.y + dy * 0.9 + 0.5) * cell - cell * 0.35;
+      if (!petPos || Math.hypot(petPos.x - tx, petPos.y - ty) > cell * 6) petPos = { x: tx, y: ty };
+      petPos.x += (tx - petPos.x) * 0.12; petPos.y += (ty - petPos.y) * 0.12;
+      const bob = Math.sin(now / 220) * cell * 0.12, sz = cell * (0.8 + Math.min(0.35, (v.pet.level || 1) * 0.02));
+      ctx.save(); ctx.globalAlpha = 0.35; ctx.fillStyle = "#000"; ctx.beginPath(); ctx.ellipse(petPos.x, petPos.y + sz * 0.55, sz * 0.32, sz * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.font = `${sz}px system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(255,240,180,.6)"; ctx.shadowBlur = cell * 0.4;
+      if (dx > 0.3) { ctx.translate(petPos.x, petPos.y + bob); ctx.scale(-1, 1); ctx.fillText(v.pet.emoji, 0, 0); } else ctx.fillText(v.pet.emoji, petPos.x, petPos.y + bob);
+      ctx.restore();
     }
 
     function drawSnakeBody(now, sn) {
@@ -641,7 +718,7 @@
     // ---- след за хвостом (свой у скинов) ----
     const TRAILS = {
       fire: "ember", inferno: "ember", samurai: "ember", lv_volcano: "ember", sakura: "petal", ocean: "bubble", ice: "flake", toxic: "drip",
-      cyber: "pixel", prism: "pixel", gold: "spark", diamond: "spark", galaxy: "star", void: "star", aurora: "star", rainbow: "spark", sunset: "petal"
+      cyber: "pixel", prism: "pixel", gold: "spark", diamond: "spark", galaxy: "star", void: "star", aurora: "star", rainbow: "spark", sunset: "petal", hw_pumpkin: "ember", hw_skeleton: "spark", hw_ghost: "star"
     };
     function emitTrail(skin, tail, baseW, now, cols) {
       const type = TRAILS[skin] || (String(skin).startsWith("weekly_") || String(skin).startsWith("season_") ? "spark" : "");

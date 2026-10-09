@@ -16,7 +16,8 @@ function refLink(id) {
 function startLink(param) {
   const { botUsername: bot, APP_SHORT_NAME, REF_MODE, PUBLIC_URL } = config;
   const [kind, id] = param.split("_");
-  if (!bot) return PUBLIC_URL ? `${PUBLIC_URL}/?${kind === "ch" ? "challenge" : "replay"}=${id}` : "";
+  const q = { ch: "challenge", rp: "replay", lv: "level", du: "duel" }[kind] || "replay";
+  if (!bot) return PUBLIC_URL ? `${PUBLIC_URL}/?${q}=${id}` : "";
   if (APP_SHORT_NAME) return `https://t.me/${bot}/${APP_SHORT_NAME}?startapp=${param}`;
   if (REF_MODE === "startapp") return `https://t.me/${bot}?startapp=${param}`;
   return `https://t.me/${bot}?start=${param}`;
@@ -34,8 +35,21 @@ const achStats = (p) => ({
   games: Number(p.games_played || 0), total_apples: Number(p.total_apples || 0), best_score: Number(p.best_score || 0),
   best_combo: Number(p.best_combo || 0), referrals: Number(p.referrals || 0),
   levels: Number(p.levels_done || 0), level_stars: Number(p.level_stars || 0), streak: Number(p.daily_streak || 0),
-  skins: (p.owned_skins || []).length, accs: (p.owned_accessories || []).length, fields: (p.owned_fields || []).length
+  skins: (p.owned_skins || []).length, accs: (p.owned_accessories || []).length, fields: (p.owned_fields || []).length,
+  best_floor: Number(p.best_floor || 0), puzzles: Number(p.puzzles_solved || 0), duel_wins: Number(p.duel_wins || 0)
 });
+
+// ---------- питомец ----------
+const prevDay = (ymd) => { const d = new Date(ymd + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+function petInfo(p) {
+  const def = C.PET_BY_ID[p.pet]; if (!def) return null;
+  const xp = Number(p.pet_xp || 0), level = C.petLevel(xp), stage = C.petStage(level);
+  const today = p.today || "", fed = p.pet_fed_day || "";
+  const fedToday = fed === today, fedRecently = fedToday || (today && fed === prevDay(today));
+  const cur = (level - 1) * (level - 1) * 40, next = level >= C.PET_MAX_LEVEL ? null : level * level * 40;
+  return { id: def.id, name: def.name, emoji: def.stages[stage], stage, level, xp, next_xp: next, progress: next ? Math.round(((xp - cur) / (next - cur)) * 100) : 100,
+    fed_today: fedToday, hungry: !fedRecently, bonus: C.petBonus(level, fedRecently) };
+}
 function achievementList(p) {
   const a = p.achievements || {}, st = achStats(p);
   return C.ACHIEVEMENTS.map(({ need, ...x }) => ({ ...x, claimed: !!a[x.id], ready: !!need(st), progress: x.stat ? Math.min(st[x.stat] || 0, x.target) : null }));
@@ -176,6 +190,9 @@ function responsePlayer(p) {
     owned_accessories: Array.isArray(p.owned_accessories) ? p.owned_accessories : [],
     accessory: C.ACC_BY_ID[p.accessory] && (p.owned_accessories || []).includes(p.accessory) ? p.accessory : "",
     levels_done: Number(p.levels_done || 0), level_stars: Number(p.level_stars || 0),
+    best_floor: Number(p.best_floor || 0), puzzles_solved: Number(p.puzzles_solved || 0), duel_wins: Number(p.duel_wins || 0), duel_games: Number(p.duel_games || 0),
+    pet: petInfo(p), pets: C.PETS, candies: Number(p.candies || 0), holiday: require("./seasonal").current(p.today || undefined),
+    wheel_ready: !!p.today && p.wheel_day !== p.today, wheel: C.WHEEL.map((x) => ({ kind: x.kind, n: x.n })), gift: C.GIFT,
     stars_enabled: !!config.BOT_TOKEN,
     missions: missionList(p),
     ref_reward: config.REF_REWARD,
@@ -193,6 +210,6 @@ function responsePlayer(p) {
 }
 
 module.exports = {
-  refLink, challengeLink, startLink, levelInfo, achStats, achievementList, missionList, dailyInfo,
+  refLink, challengeLink, startLink, levelInfo, achStats, achievementList, missionList, dailyInfo, petInfo,
   applyReferral, getPlayer, responsePlayer
 };

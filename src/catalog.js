@@ -32,7 +32,11 @@ const SKIN_CATALOG = [
   { id: "tour_silver",     name: "Серебряный кубок", emoji: "🥈", price: null, currency: "tournament", epic: true, desc: "За топ-3 турнира выходных" },
   { id: "lv_garden",       name: "Садовник",        emoji: "🌿", price: null, currency: "levels",     epic: true, desc: "За прохождение главы «Сад»" },
   { id: "lv_dungeon",      name: "Страж подземелья", emoji: "🗝️", price: null, currency: "levels",    epic: true, desc: "За прохождение главы «Подземелье»" },
-  { id: "lv_volcano",      name: "Повелитель лавы", emoji: "🌋", price: null, currency: "levels",     epic: true, desc: "За прохождение главы «Вулкан»" }
+  { id: "lv_volcano",      name: "Повелитель лавы", emoji: "🌋", price: null, currency: "levels",     epic: true, desc: "За прохождение главы «Вулкан»" },
+  // Хэллоуин — за конфеты 🍬 (только во время праздника)
+  { id: "hw_pumpkin",  name: "Тыква",  emoji: "🎃", price: 150, currency: "candy", holiday: "halloween", desc: "Хэллоуин: оранжевая, с тёмными прожилками" },
+  { id: "hw_skeleton", name: "Скелет", emoji: "💀", price: 300, currency: "candy", holiday: "halloween", epic: true, desc: "Хэллоуин: светящиеся кости" },
+  { id: "hw_ghost",    name: "Привидение", emoji: "👻", price: 450, currency: "candy", holiday: "halloween", epic: true, desc: "Хэллоуин: полупрозрачное и мерцающее" }
 ];
 const SKIN_BY_ID = Object.fromEntries(SKIN_CATALOG.map((s) => [s.id, s]));
 
@@ -60,7 +64,8 @@ const FIELD_CATALOG = [
   { id: "crystal_field", name: "Кристалл",  emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" },
   { id: "rain_field",    name: "Дождь",     emoji: "🌧️", price: 30000, currency: "coins", desc: "Косой дождь и круги на лужах" },
   { id: "autumn_field",  name: "Осень",     emoji: "🍂", price: 90,  currency: "stars", epic: true, desc: "Кружатся жёлтые листья" },
-  { id: "night_field",   name: "Ночь",      emoji: "🌙", price: 120, currency: "stars", epic: true, desc: "Темнота и светлячки — видно только вокруг головы" }
+  { id: "night_field",   name: "Ночь",      emoji: "🌙", price: 120, currency: "stars", epic: true, desc: "Темнота и светлячки — видно только вокруг головы" },
+  { id: "halloween_field", name: "Ночь Хэллоуина", emoji: "🦇", price: 400, currency: "candy", holiday: "halloween", epic: true, desc: "Туман, луна и летучие мыши" }
 ];
 const FIELD_BY_ID = Object.fromEntries(FIELD_CATALOG.map((f) => [f.id, f]));
 
@@ -90,9 +95,35 @@ const ACHIEVEMENTS = [
   ACH("acc3", "🎩", "Собери 3 аксессуара", "accs", 3, 1000, "collect"),
   ACH("fields3", "🗺️", "Собери 3 поля", "fields", 3, 1500, "collect"),
   ACH("friends1", "🤝", "Пригласи друга", "referrals", 1, 500, "friends"),
+  ACH("floor5", "🗝️", "Доберись до 5-го этажа подземелья", "best_floor", 5, 1000, "levels"),
+  ACH("floor15", "🏯", "Доберись до 15-го этажа подземелья", "best_floor", 15, 4000, "levels"),
+  ACH("puzzle7", "🧩", "Реши 7 головоломок дня", "puzzles", 7, 2000, "levels"),
+  ACH("duel5", "⚔️", "Выиграй 5 дуэлей", "duel_wins", 5, 2000, "friends"),
   { id: "friends5",  icon: "👥", title: "5 друзей",     need: (p) => p.referrals >= 5,     stat: "referrals", target: 5, reward: 1500, group: "friends" },
   ACH("friends20", "🎉", "20 друзей", "referrals", 20, 6000, "friends")
 ];
+
+// Питомцы: ползут за змейкой, растут от забегов и кормления; накормленный питомец даёт бонус к монетам.
+const PETS = [
+  { id: "chick",  name: "Цыплёнок",  stages: ["🐣", "🐥", "🐔"] },
+  { id: "cat",    name: "Котёнок",   stages: ["🐱", "😺", "🦁"] },
+  { id: "dragon", name: "Дракончик", stages: ["🥚", "🦎", "🐉"] },
+  { id: "bug",    name: "Гусеница",  stages: ["🥚", "🐛", "🦋"] }
+];
+const PET_BY_ID = Object.fromEntries(PETS.map((x) => [x.id, x]));
+const PET_MAX_LEVEL = 20, PET_FEED_XP = 25;
+const petLevel = (xp) => Math.min(PET_MAX_LEVEL, Math.floor(Math.sqrt(Math.max(0, xp) / 40)) + 1);
+const petStage = (lv) => (lv >= 12 ? 2 : lv >= 5 ? 1 : 0);
+// бонус к монетам: +0.5% за уровень (до +10%), если питомца кормили сегодня или вчера
+const petBonus = (lv, fedRecently) => (fedRecently ? Math.min(0.1, lv * 0.005) : 0);
+
+// Колесо удачи: раз в день. w — вес (шанс), порядок — как секторы на колесе
+const WHEEL = [
+  { kind: "coins", n: 100, w: 26 }, { kind: "coins", n: 250, w: 22 }, { kind: "petxp", n: 60, w: 12 }, { kind: "coins", n: 500, w: 14 },
+  { kind: "candy", n: 25, w: 8 }, { kind: "coins", n: 1000, w: 6 }, { kind: "chest", n: 0, w: 3 }, { kind: "coins", n: 150, w: 9 }
+];
+// Подарки друзьям (монеты): лимиты в сутки
+const GIFT = { min: 50, max: 1000, sendPerDay: 1000, receivePerDay: 2000 };
 
 // Аксессуары: надеваются поверх любого скина. Один надет одновременно.
 const ACCESSORY_CATALOG = [
@@ -107,7 +138,8 @@ const ACCESSORY_CATALOG = [
   { id: "tophat",     name: "Цилиндр",      emoji: "🎩", price: 60,    currency: "stars", epic: true },
   { id: "horns",      name: "Рожки",        emoji: "😈", price: 75,    currency: "stars", epic: true },
   { id: "halo",       name: "Нимб",         emoji: "😇", price: 90,    currency: "stars", epic: true },
-  { id: "crown",      name: "Корона",       emoji: "👑", price: 150,   currency: "stars", epic: true }
+  { id: "crown",      name: "Корона",       emoji: "👑", price: 150,   currency: "stars", epic: true },
+  { id: "witch",      name: "Шляпа ведьмы", emoji: "🧙", price: 120,   currency: "candy", holiday: "halloween" }
 ];
 const ACC_BY_ID = Object.fromEntries(ACCESSORY_CATALOG.map((a) => [a.id, a]));
 
@@ -222,6 +254,7 @@ const levelFirstReward = (n) => 100 + n * 20;           // монет за пе�
 const levelStarReward = (n) => 40 + Math.ceil(n / 10) * 30; // монет за каждую новую звезду
 
 module.exports = {
+  PETS, PET_BY_ID, PET_MAX_LEVEL, PET_FEED_XP, petLevel, petStage, petBonus, WHEEL, GIFT,
   CHAPTERS, levelFirstReward, levelStarReward,
   MISSION_POOL, WEEKLY_POOL, MISSION_BY_ID, PRODUCTS, STARTER, PASS_TIERS, PASS_TIER_XP, TOUR_PRIZES, CLAN,
   ARTIFACT_UPGRADE_COST, MISSIONS, SKIN_CATALOG, SKIN_BY_ID, ARTIFACT_CATALOG, ARTIFACT_BY_ID, FIELD_CATALOG, FIELD_BY_ID, ACHIEVEMENTS, ACCESSORY_CATALOG, ACC_BY_ID,

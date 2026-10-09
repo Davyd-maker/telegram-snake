@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Snake Arena</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/css/app.css?v=36">
+<link rel="stylesheet" href="/css/app.css?v=37">
 </head>
 <body>
 <div class="app">
@@ -32,9 +32,15 @@
         <div class="stat"><b id="refs">0</b><small>👥 Друзей</small></div>
       </div>
     </div>
+    <div id="homeExtras" class="homeextras"></div>
     <div class="nav">
+      <button data-screen="duel" class="wide duelbtn"><i>⚔️</i><span>Дуэль</span><small>Живой бой с другом или случайным соперником</small></button>
       <button data-screen="levels" class="wide levelsbtn"><i>🕳️</i><span>Уровни</span><small>30 уровней · набери цель и заползи в норку</small></button>
       <button data-screen="daily" class="wide"><i>📅</i><span>Челлендж дня</span><small>Одно поле для всех · бонус за первый забег</small></button>
+      <button data-screen="dungeon" class="dungeonbtn"><i>🗝️</i><span>Подземелье</span><small>Этажи и улучшения</small></button>
+      <button data-screen="puzzle" class="puzzlebtn"><i>🧩</i><span>Головоломка</span><small>Новая каждый день</small></button>
+      <button data-screen="workshop"><i>🛠️</i><span>Мастерская</span><small>Уровни игроков</small></button>
+      <button data-screen="pet"><i id="petNavIco">🐾</i><span>Питомец</span><small id="petNavSub">Ползёт за змейкой</small></button>
       <button data-screen="tournament"><i>🏁</i><span>Турнир</span><small>По выходным · кубки</small></button>
       <button data-screen="pass"><i>🎟️</i><span>Пропуск</span><small>Награды сезона</small></button>
       <button data-screen="rating"><i>🏆</i><span>Рейтинг</span><small>Все, друзья, режимы</small></button>
@@ -55,6 +61,20 @@
     <div id="dailyTable" class="lb" style="margin-top:8px"></div>
   </div></section>
 
+  <section id="dungeon" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🗝️ Подземелье</h2><div id="dungeonBox"></div></div></section>
+  <section id="puzzle" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🧩 Головоломка дня</h2><div id="puzzleBox"></div></div></section>
+  <section id="workshop" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🛠️ Мастерская уровней</h2><div id="workshopBox"></div></div></section>
+  <section id="editor" class="screen"><button class="back" data-screen="workshop">← Назад</button><div class="card"><h2>✏️ Новый уровень</h2>
+    <small class="muted">Рисуй стены пальцем. Старт змейки (в центре) всегда свободен. Нужно оставить достаточно места для еды.</small>
+    <div class="edtools"><button data-edtool="wall" class="on">🧱 Стена</button><button data-edtool="erase">🧽 Ластик</button><button data-edtool="sym">🪞 Зеркало</button><button data-edtool="clear">🗑️</button></div>
+    <div class="edwrap"><canvas id="edCanvas" width="480" height="480" aria-label="Редактор уровня"></canvas></div>
+    <div id="edInfo" class="edinfo"></div>
+    <label class="setrow col"><span>🎯 Цель по очкам: <b id="edTargetVal">20</b></span><input type="range" id="edTarget" min="5" max="80" step="1" value="20"></label>
+    <input id="edName" maxlength="24" placeholder="Название уровня (3–24 символа)">
+    <button id="edSave" class="primary" style="width:100%;margin-top:10px">💾 Сохранить и сыграть</button>
+  </div></section>
+  <section id="pet" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🐾 Питомец</h2><div id="petBox"></div></div></section>
+  <section id="duel" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>⚔️ Дуэль</h2><div id="duelBox"></div></div></section>
   <section id="levels" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🕳️ Уровни</h2><div id="levelBox"></div></div></section>
   <section id="tournament" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🏁 Турнир выходных</h2><div id="tourBox"></div></div></section>
   <section id="pass" class="screen"><button class="back" data-screen="home">← Назад</button><div class="card"><h2>🎟️ Сезонный пропуск</h2><div id="passBox"></div></div></section>
@@ -114,6 +134,8 @@
     <div id="invitedBy" class="invby" hidden></div>
     <h3 class="sect">🤝 Мои друзья <small id="friendsSum" class="muted"></small></h3>
     <div id="friends"></div>
+    <h3 class="sect">🎁 Подарки друзьям <small id="giftSum" class="muted"></small></h3>
+    <div id="giftFriends"><div class="lbempty">Загрузка…</div></div>
   </div></section>
 </div>
 
@@ -149,6 +171,41 @@
   </div>
 </section>
 
+<section id="duelGame" class="screen">
+  <div class="gamewrap">
+    <div class="duelbar">
+      <div class="dside me"><b id="dMeName">Ты</b><span id="dMeScore">4</span></div>
+      <div class="dmid"><span id="dTimer">1:30</span><small id="dStatus"></small></div>
+      <div class="dside opp"><b id="dOppName">Соперник</b><span id="dOppScore">4</span></div>
+    </div>
+    <div class="board-shell"><canvas id="dcv" width="720" height="720" aria-label="Поле дуэли"></canvas><div class="board-vignette"></div></div>
+    <div class="dpad" id="ddpad"><button class="u" data-d="0" aria-label="Вверх">▲</button><button class="l" data-d="3" aria-label="Влево">◀</button><button class="d" data-d="2" aria-label="Вниз">▼</button><button class="r" data-d="1" aria-label="Вправо">▶</button></div>
+    <div class="gbot"><span class="ctlhint">📱 Свайп · ⌨️ Стрелки/WASD</span><div class="btns"><button id="dPadBtn" class="pad-toggle">🎮 Кнопки</button><button id="dLeave" class="pad-toggle">✕ Выйти</button></div></div>
+  </div>
+</section>
+<div id="duelOver" class="overlay">
+  <div class="modal">
+    <div class="over-emoji" id="doEmoji">🏆</div><h2 id="doTitle">Победа!</h2>
+    <small class="hint" id="doSub"></small>
+    <div class="ostats"><div><b id="doMe">0</b><small>Ты</small></div><div><b id="doOpp">0</b><small id="doOppName">Соперник</small></div><div><b id="doReward">0</b><small>🪙 Награда</small></div></div>
+    <div class="actions"><button id="doRematch" class="primary">🔄 Реванш</button><button id="doMenu">⚔️ К дуэлям</button></div>
+  </div>
+</div>
+<div id="upgrade" class="overlay top-layer">
+  <div class="modal"><div class="over-emoji">🗝️</div><h2 id="upgradeTitle">Этаж пройден!</h2><small class="hint" id="upgradeSub"></small>
+    <div id="upgradeList" class="upglist"></div></div>
+</div>
+<div id="wheel" class="overlay top-layer">
+  <div class="modal"><button id="wheelClose" class="xbtn" aria-label="Закрыть">✕</button><h2>🎡 Колесо удачи</h2><small class="hint">Один бесплатный поворот в день</small>
+    <div class="wheelwrap"><canvas id="wheelCv" width="300" height="300" aria-label="Колесо удачи"></canvas><i class="wheelptr">▼</i></div>
+    <div id="wheelRes" class="wheelres"></div>
+    <div class="actions"><button id="wheelSpin" class="primary">🎡 Крутить!</button></div></div>
+</div>
+<div id="gift" class="overlay top-layer">
+  <div class="modal"><button id="giftClose" class="xbtn" aria-label="Закрыть">✕</button><div class="over-emoji">🎁</div><h2 id="giftTitle">Подарок</h2><small class="hint" id="giftSub"></small>
+    <div class="giftamts" id="giftAmts"></div>
+    <h3 class="sect">🎨 Или подари скин</h3><div id="giftSkins" class="giftskins"></div></div>
+</div>
 <div id="over" class="overlay">
   <div class="modal">
     <div class="over-emoji" id="overEmoji">💥</div><h2 id="overTitle">Игра окончена</h2>
@@ -166,7 +223,7 @@
       <button id="nextLevelBtn" class="primary" hidden>▶ Следующий уровень</button>
       <button id="againBtn" class="primary">🔄 Играть ещё</button>
       <button id="levelsMapBtn" hidden>🗺 Карта уровней</button>
-      <div class="actions2"><button id="shareResBtn">📸 Поделиться</button><button id="duelBtn" hidden>⚔️ Вызвать на это поле</button><button id="replayShareBtn" hidden>🔗 Реплей забега</button></div>
+      <div class="actions2"><button id="puzzleShareBtn" hidden>📤 Поделиться результатом</button><button id="likeBtn" hidden>🤍 Нравится</button><button id="shareResBtn">📸 Поделиться</button><button id="duelBtn" hidden>⚔️ Вызвать на это поле</button><button id="replayShareBtn" hidden>🔗 Реплей забега</button></div>
       <button id="menuBtn">🏠 В меню</button>
     </div>
   </div>
@@ -236,12 +293,14 @@
 </div>
 <div id="toast"></div>
 
-<script src="/engine.js?v=36"></script>
-<script src="/js/catalog.js?v=36"></script>
-<script src="/js/i18n.js?v=36"></script>
-<script src="/js/settings.js?v=36"></script>
-<script src="/js/render.js?v=36"></script>
-<script src="/js/card.js?v=36"></script>
-<script src="/js/app.js?v=36"></script>
+<script src="/engine.js?v=37"></script>
+<script src="/js/catalog.js?v=37"></script>
+<script src="/js/i18n.js?v=37"></script>
+<script src="/js/settings.js?v=37"></script>
+<script src="/js/render.js?v=37"></script>
+<script src="/js/card.js?v=37"></script>
+<script src="/js/app.js?v=37"></script>
+<script src="/js/extra.js?v=37"></script>
+<script src="/js/duel.js?v=37"></script>
 </body>
 </html>

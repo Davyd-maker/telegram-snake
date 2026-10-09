@@ -65,6 +65,9 @@ async function handleUpdate(upd) {
     let appUrl = config.PUBLIC_URL;
     if (ch && config.PUBLIC_URL) { appUrl = `${config.PUBLIC_URL}/?challenge=${ch[1]}`; text = t(lang, "start_challenge"); }
     if (rp && config.PUBLIC_URL) { appUrl = `${config.PUBLIC_URL}/?replay=${rp[1]}`; text = t(lang, "start_replay"); }
+    const lv = /^lv_([0-9a-f]{8})$/.exec(param), du = /^du_([0-9a-f]{8})$/.exec(param);
+    if (lv && config.PUBLIC_URL) { appUrl = `${config.PUBLIC_URL}/?level=${lv[1]}`; text = t(lang, "start_level"); }
+    if (du && config.PUBLIC_URL) { appUrl = `${config.PUBLIC_URL}/?duel=${du[1]}`; text = t(lang, "start_duel"); }
     if (pl?.ref_applied) text = t(lang, "invited_bonus", { name: pl.invited_by || "", bonus: config.REF_BONUS }) + "\n\n" + text;
     await tgApi("sendMessage", {
       chat_id: m.chat.id, text,

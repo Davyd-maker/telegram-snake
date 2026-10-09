@@ -22,7 +22,16 @@ const T = {
     tour_win: "🏁 Турнир выходных завершён! Ты на месте #{rank} с результатом {score}. Награда ждёт в игре.",
     clan_win: "🛡️ Твой клан {clan} занял #{rank} место за неделю! Каждому участнику +{coins} 🪙.",
     notify_off: "🔕 Уведомления выключены. Включить снова: /notify_on (или в настройках игры).",
-    notify_on: "🔔 Уведомления включены."
+    notify_on: "🔔 Уведомления включены.",
+    chase_btn: "⚔️ Отыграться на его поле",
+    start_level: "🛠️ Тебе прислали уровень, нарисованный игроком Snake Arena. Жми «Играть» — сможешь пройти?",
+    start_duel: "⚔️ Тебя зовут на дуэль в реальном времени! Жми «Играть» — бой начнётся сразу.",
+    gift_coins: "🎁 {name} подарил тебе {coins} 🪙! Загляни в Snake Arena и скажи спасибо 🐍",
+    gift_skin: "🎁 {name} подарил тебе скин {emoji} «{skin}»! Он уже ждёт в игре.",
+    custom_played: "🛠️ Твой уровень «{level}» прошёл {name}! Тебе +10 🪙",
+    duel_invite: "⚔️ {name} зовёт тебя на дуэль в реальном времени! Жми кнопку — бой начнётся, когда вы оба будете в игре.",
+    duel_btn: "⚔️ Принять дуэль",
+    pet_hungry: "🍖 {pet} проголодался! Покорми питомца в Snake Arena, чтобы бонус к монетам не пропал."
   },
   en: {
     start: "🐍 Snake Arena — eat apples, keep your streak, beat records!",
@@ -46,7 +55,16 @@ const T = {
     tour_win: "🏁 The weekend tournament is over! You placed #{rank} with {score}. Your prize is waiting in the game.",
     clan_win: "🛡️ Your clan {clan} placed #{rank} this week! Every member gets +{coins} 🪙.",
     notify_off: "🔕 Notifications are off. Turn them back on: /notify_on (or in game settings).",
-    notify_on: "🔔 Notifications are on."
+    notify_on: "🔔 Notifications are on.",
+    chase_btn: "⚔️ Take revenge on their field",
+    start_level: "🛠️ Someone sent you a player-made Snake Arena level. Tap Play — can you beat it?",
+    start_duel: "⚔️ You're invited to a real-time duel! Tap Play — the fight starts right away.",
+    gift_coins: "🎁 {name} sent you {coins} 🪙! Drop by Snake Arena and say thanks 🐍",
+    gift_skin: "🎁 {name} gave you the {emoji} “{skin}” skin! It's waiting in the game.",
+    custom_played: "🛠️ {name} beat your level “{level}”! You get +10 🪙",
+    duel_invite: "⚔️ {name} invites you to a real-time duel! Tap the button — the fight starts when you're both in the game.",
+    duel_btn: "⚔️ Accept duel",
+    pet_hungry: "🍖 {pet} is hungry! Feed your pet in Snake Arena to keep the coin bonus."
   }
 };
 

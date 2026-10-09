@@ -27,6 +27,9 @@ function parseRunToken(token, uid) {
 // Общий seed для всех в один день (ежедневный челлендж). day — "YYYY-MM-DD" по DAILY_TZ
 const dailySeed = (day) => (crypto.createHash("sha256").update("daily:" + day).digest().readUInt32BE(0) >>> 0) || 1;
 const randomSeed = () => crypto.randomInt(1, 2 ** 31);
+const puzzleSeed = (day) => (crypto.createHash("sha256").update("puzzle:" + day).digest().readUInt32BE(0) >>> 0) || 1;
+// номер головоломки: 1 — 1 октября 2026
+const puzzleNumber = (day) => Math.max(1, Math.round((Date.parse(day + "T12:00:00Z") - Date.parse("2026-10-01T12:00:00Z")) / 864e5) + 1);
 const dayNow = () => new Intl.DateTimeFormat("sv-SE", { timeZone: config.DAILY_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
 // Переигрывает забег. Возвращает { ok, reason, cfg, sim }.
@@ -38,7 +41,7 @@ function verifyRun(token, uid, logSrc, ticksIn) {
   const ticks = Math.floor(Number(ticksIn));
   if (!Number.isFinite(ticks) || ticks < 0 || ticks > MAX_TICKS) return { ok: false, reason: "bad_ticks", t };
   // rl — версия правил игры (старые токены без неё — правила v1)
-  const cfg = Engine.normCfg({ seed: t.seed, mode: t.mode, diff: t.diff, artifact: t.art, artLevel: t.lvl, rules: t.rl || 1, level: t.lv || 0 });
+  const cfg = Engine.normCfg({ seed: t.seed, mode: t.mode, diff: t.diff, artifact: t.art, artLevel: t.lvl, rules: t.rl || 1, level: t.lv || 0, custom: t.cu });
   const sim = Engine.simulate(cfg, log, ticks);
   // игра не может идти быстрее реального времени: каждый поворот может «сэкономить» до ~половины хода
   const allowed = t.age + 130 * sim.turns + 2500;
@@ -46,4 +49,4 @@ function verifyRun(token, uid, logSrc, ticksIn) {
   return { ok: true, t, cfg, sim, log };
 }
 
-module.exports = { makeRunToken, parseRunToken, verifyRun, dailySeed, randomSeed, dayNow, MAX_TICKS, MAX_LOG };
+module.exports = { makeRunToken, parseRunToken, verifyRun, dailySeed, puzzleSeed, puzzleNumber, randomSeed, dayNow, MAX_TICKS, MAX_LOG };

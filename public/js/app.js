@@ -37,6 +37,12 @@
     const c = new URLSearchParams(location.search).get("challenge") || ((/^ch_([0-9a-f]{10})$/.exec(rawStart) || [])[1]) || "";
     return /^[0-9a-f]{10}$/.test(c) ? c : "";
   })();
+  // ссылки на уровень игрока (lv_ID) и дуэль (du_ID)
+  const qs0 = new URLSearchParams(location.search);
+  SA.startLinks = {
+    level: (/^[0-9a-f]{8}$/.test(qs0.get("level") || "") ? qs0.get("level") : (/^lv_([0-9a-f]{8})$/.exec(rawStart) || [])[1]) || "",
+    duel: (/^[0-9a-f]{8}$/.test(qs0.get("duel") || "") ? qs0.get("duel") : (/^du_([0-9a-f]{8})$/.exec(rawStart) || [])[1]) || ""
+  };
   const headers = () => {
     const h = { "Content-Type": "application/json" };
     if (tg?.initData) h["X-Telegram-Init-Data"] = tg.initData;
@@ -81,6 +87,7 @@
     dot("missions", p.daily?.can_claim || (p.missions || []).some((m) => m.progress >= m.target && !m.claimed));
     dot("achievements", (p.achievements_list || []).some((a) => !a.claimed && a.ready));
     if (p.banned) { $("bannedBox").hidden = false; $("playBtn").disabled = true; }
+    if (SA.onUi) SA.onUi(p);
   }
 
   function renderDaily() {
@@ -245,6 +252,7 @@
     if (id === "levels") renderLevels();
     if (id === "tournament") renderTournament();
     if (id === "clans") renderClans();
+    if (SA.onShow) SA.onShow(id);
     try { window.scrollTo(0, 0); } catch (e) {}
   }
 
@@ -429,39 +437,47 @@
     const card = (sk) => {
       const isOwned = owned.includes(sk.id), on = p.skin === sk.id, stars = sk.currency === "stars";
       const reward = REWARD_CUR.includes(sk.currency);
-      const sub = isOwned ? "✅ Открыт" : reward ? esc(sk.desc || "Эксклюзив сезона") : stars ? esc(sk.desc || "") : sk.price ? "🪙 " + fmtN(sk.price) : "Бесплатно";
-      const label = on ? "✅ Выбрано" : isOwned ? "Выбрать" : reward ? REWARD_LABEL[sk.currency] : stars ? `Купить · <span class="stp">⭐ ${sk.price}</span>` : sk.price ? "Купить" : "Выбрать";
+      const candy = sk.currency === "candy";
+      const sub = isOwned ? "✅ Открыт" : reward ? esc(sk.desc || "Эксклюзив сезона") : stars ? esc(sk.desc || "") : candy ? "🍬 " + fmtN(sk.price) : sk.price ? "🪙 " + fmtN(sk.price) : "Бесплатно";
+      const label = on ? "✅ Выбрано" : isOwned ? "Выбрать" : reward ? REWARD_LABEL[sk.currency] : stars ? `Купить · <span class="stp">⭐ ${sk.price}</span>` : candy ? `Купить · 🍬 ${fmtN(sk.price)}` : sk.price ? "Купить" : "Выбрать";
       return `<div class="skin${sk.epic ? " epic" : ""}${on ? " sel" : ""}">${sk.epic ? '<span class="badge">EPIC</span>' : ""}<button class="pvbtn" data-pskin="${sk.id}" aria-label="Посмотреть на поле"><div class="pv ${sk.weekly ? "pv-weekly" : "pv-" + sk.id}"${sk.weekly && sk.palette ? ` style="--c0:${esc(sk.palette[0])};--c1:${esc(sk.palette[1])}"` : ""}></div><span>👁 на поле</span></button><b>${sk.emoji} ${esc(sk.name)}</b><small>${sub}</small><button data-skin="${sk.id}" class="${stars && !isOwned ? "star" : ""}">${label}</button></div>`;
     };
     const fowned = p.owned_fields || ["classic"];
     const fcard = (f) => {
       const isOwned = fowned.includes(f.id), on = fieldId() === f.id, stars = f.currency === "stars";
-      const sub = isOwned ? "✅ Открыто" : stars ? esc(f.desc || "") : f.price ? "🪙 " + fmtN(f.price) : "Бесплатно";
-      const label = on ? "✅ Включено" : isOwned ? "Включить" : stars ? `Купить · <span class="stp">⭐ ${f.price}</span>` : f.price ? `Купить · 🪙 ${fmtN(f.price)}` : "Включить";
+      const candy = f.currency === "candy";
+      const sub = isOwned ? "✅ Открыто" : stars ? esc(f.desc || "") : candy ? "🍬 " + fmtN(f.price) : f.price ? "🪙 " + fmtN(f.price) : "Бесплатно";
+      const label = on ? "✅ Включено" : isOwned ? "Включить" : stars ? `Купить · <span class="stp">⭐ ${f.price}</span>` : candy ? `Купить · 🍬 ${fmtN(f.price)}` : f.price ? `Купить · 🪙 ${fmtN(f.price)}` : "Включить";
       return `<div class="skin${f.epic ? " epic" : ""}${on ? " sel" : ""}">${f.epic ? '<span class="badge">EPIC</span>' : ""}<button class="pvbtn" data-pfield="${f.id}" aria-label="Посмотреть поле"><div class="fv fv-${f.id}"></div><span>👁 посмотреть</span></button><b>${f.emoji} ${esc(f.name)}</b><small>${sub}</small><button data-field="${f.id}" class="${stars && !isOwned ? "star" : ""}">${label}</button></div>`;
     };
     const fcat = fieldCat();
     const aowned = p.owned_accessories || [];
     const acard = (a) => {
       const isOwned = aowned.includes(a.id), on = p.accessory === a.id, stars = a.currency === "stars";
-      const sub = isOwned ? "✅ Есть" : stars ? "⭐ " + a.price : "🪙 " + fmtN(a.price);
+      const sub = isOwned ? "✅ Есть" : stars ? "⭐ " + a.price : a.currency === "candy" ? "🍬 " + fmtN(a.price) : "🪙 " + fmtN(a.price);
       const label = on ? "Снять" : isOwned ? "Надеть" : stars ? `Купить · <span class="stp">⭐ ${a.price}</span>` : "Купить";
       return `<div class="skin acc${a.epic ? " epic" : ""}${on ? " sel" : ""}">${a.epic ? '<span class="badge">EPIC</span>' : ""}<button class="pvbtn" data-pacc="${a.id}" aria-label="Примерить"><div class="accv">${a.emoji}</div><span>👁 примерить</span></button><b>${esc(a.name)}</b><small>${sub}</small><button data-acc="${a.id}" class="${stars && !isOwned ? "star" : ""}">${label}</button></div>`;
     };
     const acat = p.accessories || [];
-    $("shopGrid").innerHTML =
-      (acat.length ? `<h3 class="sect span2">🎩 Аксессуары<small>носятся с любым скином · 🎁 сундук на 7-й день серии</small></h3>` + acat.map(acard).join("") : "") +
+    // праздничные предметы — за конфеты, видны только во время праздника (или если уже куплены)
+    const hol = p.holiday, holItems = (list, owned2) => list.filter((x) => x.currency === "candy" && (hol || owned2.includes(x.id)));
+    const hs = holItems(cat, owned), hf = holItems(fcat, fowned), ha = holItems(acat, aowned);
+    const holHtml = hs.length + hf.length + ha.length ? `<h3 class="sect span2 holsect">🎃 ${t("Хэллоуин")}<small>${hol ? t("за конфеты") + " · 🍬 " + fmtN(p.candies || 0) + " · " + t("конфеты — за фрукты во время праздника") : t("праздник закончился")}</small></h3>`
+      + hs.map(card).join("") + ha.map(acard).join("") + hf.map(fcard).join("") : "";
+    $("shopGrid").innerHTML = holHtml +
+      (acat.length ? `<h3 class="sect span2">🎩 Аксессуары<small>носятся с любым скином · 🎁 сундук на 7-й день серии</small></h3>` + acat.filter((x) => x.currency !== "candy").map(acard).join("") : "") +
       `<h3 class="sect span2">🏆 Награды<small>сезон, уровни, турниры и пропуск</small></h3>` + cat.filter((x) => REWARD_CUR.includes(x.currency)).sort((a, b) => owned.includes(b.id) - owned.includes(a.id) || b.weekly - a.weekly).map(card).join("") +
       `<h3 class="sect span2">⭐ Эпические скины<small>за Telegram Stars</small></h3>` + cat.filter((x) => x.epic && x.currency === "stars").map(card).join("") +
       `<h3 class="sect span2">🪙 Обычные скины<small>за монеты</small></h3>` + cat.filter((x) => x.currency === "coins").map(card).join("") +
       `<h3 class="sect span2">🗺 Игровые поля<small>за Telegram Stars</small></h3>` + fcat.filter((x) => x.currency === "stars").map(fcard).join("") +
-      `<h3 class="sect span2">⬛ Простые поля<small>за монеты</small></h3>` + fcat.filter((x) => x.currency !== "stars").map(fcard).join("");
+      `<h3 class="sect span2">⬛ Простые поля<small>за монеты</small></h3>` + fcat.filter((x) => x.currency === "coins").map(fcard).join("");
   }
   async function buy(id) {
     const sk = skinCat().find((x) => x.id === id); if (!sk || p.skin === id) return;
     const has = (p.owned_skins || ["classic"]).includes(id);
     if (!has && sk.currency === "stars") return buyStars(sk);
     if (!has && REWARD_CUR.includes(sk.currency)) return toast(sk.desc || "🏆 Этот скин можно получить только как награду");
+    if (!has && sk.currency === "candy") return buyCandy(sk, { skin: id }, "/api/profile");
     if (!has && (p.coins || 0) < sk.price) return toast("Не хватает монет");
     if (!has && !(await confirmBox(`Купить скин «${sk.name}» за ${fmtN(sk.price)} 🪙?`, "Купить"))) return;
     const d = await api("/api/profile", { method: "POST", body: JSON.stringify({ skin: id }) });
@@ -477,11 +493,21 @@
       return;
     }
     if (!has && a.currency === "stars") return buyStars(a, "acc");
+    if (!has && a.currency === "candy") return buyCandy(a, { accessory: id }, "/api/accessory");
     if (!has && (p.coins || 0) < a.price) return toast("Не хватает монет");
     if (!has && !(await confirmBox(`Купить «${a.name}» за ${fmtN(a.price)} 🪙?`, "Купить"))) return;
     const d = await api("/api/accessory", { method: "POST", body: JSON.stringify({ accessory: id }) });
     if (d?.player) { p = { ...p, ...d.player }; ui(); renderShop(); closePreview(); toast(has ? `${a.emoji} ${t("Надето!")}` : `${a.emoji} ${t("Куплено и надето!")} 🎉`); if (!has) sfx.claim(); }
     else toast("Не получилось, попробуй ещё раз");
+  }
+  // Праздничные предметы — за конфеты
+  async function buyCandy(item, body, url) {
+    if (!p.holiday) return toast("Праздник закончился");
+    if ((p.candies || 0) < item.price) return toast(t("Не хватает конфет — собирай фрукты в праздник 🍬"));
+    if (!(await confirmBox(`${t("Купить")} «${t(item.name)}» ${t("за")} ${fmtN(item.price)} 🍬?`, "Купить"))) return;
+    const d = await api(url, { method: "POST", body: JSON.stringify(body) });
+    if (d?.player) { p = { ...p, ...d.player }; ui(); renderShop(); closePreview(); sfx.claim(); toast(`${item.emoji} ${t("Куплено!")} 🎉`); }
+    else toast(d?.error === "Not enough candies" ? "Не хватает конфет" : "Не получилось, попробуй ещё раз");
   }
   // Покупки за Telegram Stars: сервер создаёт счёт, предмет выдаёт вебхук бота после оплаты
   async function buyStars(item, kind = "skin") {
@@ -506,6 +532,7 @@
     const f = fieldCat().find((x) => x.id === id); if (!f || fieldId() === id) return;
     const has = (p.owned_fields || ["classic"]).includes(id);
     if (!has && f.currency === "stars") return buyStars(f, "field");
+    if (!has && f.currency === "candy") return buyCandy(f, { field: id }, "/api/field");
     if (!has && (p.coins || 0) < f.price) return toast("Не хватает монет");
     if (!has && !(await confirmBox(`Купить поле «${f.name}» за ${fmtN(f.price)} 🪙?`, "Купить"))) return;
     const d = await api("/api/field", { method: "POST", body: JSON.stringify({ field: id }) });
@@ -527,7 +554,7 @@
     const btn = $("pvBuy");
     btn.className = !has && item.currency === "stars" ? "primary star" : "primary";
     btn.innerHTML = on ? (kind === "acc" ? "Снять" : "✅ Уже выбрано") : has ? (kind === "skin" ? "Выбрать" : kind === "acc" ? "Надеть" : "Включить")
-      : item.currency === "stars" ? `Купить · <span class="stp">⭐ ${item.price}</span>` : item.currency === "season" ? "🏆 Только за сезон" : `Купить · 🪙 ${fmtN(item.price)}`;
+      : item.currency === "stars" ? `Купить · <span class="stp">⭐ ${item.price}</span>` : item.currency === "season" ? "🏆 Только за сезон" : item.currency === "candy" ? `Купить · 🍬 ${fmtN(item.price)}` : `Купить · 🪙 ${fmtN(item.price)}`;
     btn.disabled = (on && kind !== "acc") || item.currency === "season" && !has;
     btn.onclick = () => (kind === "skin" ? buy(id) : kind === "acc" ? buyAcc(id) : buyField(id));
     $("preview").classList.add("show");
@@ -834,7 +861,8 @@
   }
 
   // какой фрукт сейчас на поле (только внешний вид): 0 — яблоко, 1–5 — вишня, клубника, виноград, арбуз, банан
-  const fruitOf = (g, n) => ((n * 7 + (g.cfg.seed % 13)) % 9) % 6;
+  // в праздник (Хэллоуин) вместо фруктов — тыквы и конфеты
+  const fruitOf = (g, n) => (p.holiday?.id === "halloween" ? (n % 3 === 2 ? 7 : 6) : ((n * 7 + (g.cfg.seed % 13)) % 9) % 6);
   // опасность прямо по курсу (для испуганной мордочки): стена, камень, тело или закрытые ворота в 1–2 клетках
   function dangerAhead(g) {
     if (g.isSafe() || g.ghostOn()) return false;
@@ -857,7 +885,8 @@
     if (holeAnim) { const k = Math.min(snake.length, Math.floor((performance.now() - holeAnim.t0) / 45)); snake = snake.slice(k); prev = snake; }
     return {
       snake, prevSnake: prev, dir: g.dir, food: g.food && g.food.type === "apple" ? { ...g.food, fruit: fruitOf(g, g.apples) } : g.food, foodBorn,
-      acc: replay ? replay.acc : p.accessory || "", danger: !g.over && dangerAhead(g), pu: g.pu, PU: E.PU, PU_LIFE: E.PU_LIFE, gameTime: g.gameTime,
+      acc: replay ? replay.acc : p.accessory || "", danger: !g.over && dangerAhead(g),
+      pet: !replay && p.pet ? { emoji: p.pet.emoji, level: p.pet.level } : null, pu: g.pu, PU: E.PU, PU_LIFE: E.PU_LIFE, gameTime: g.gameTime,
       rocks: g.rocks, pending: g.pending, stepMs: g.stepMs() / (replay ? replay.speed : 1), lastTick, paused: paused || !!countdown,
       ghost: g.ghostOn(), safe: g.isSafe() && !g.over, shield: g.shield, skin: curSkin(), palette: curPalette(), countdown, countdownAt,
       combo: g.combo >= 2 ? Math.min(g.combo, 8) : 0,
@@ -874,7 +903,7 @@
 
   function schedule() {
     clearTimeout(timer);
-    if (!running || paused || countdown) return;
+    if (!running || paused || countdown || (game && game.choosing && !replay)) return;
     timer = setTimeout(() => { doTick(); schedule(); }, game.stepMs() / (replay ? replay.speed : 1));
   }
   let rivalPrev = null;
@@ -903,7 +932,12 @@
     if (g.shield) chips.push(["shield", "🛡️", t("Щит"), "", E.PU.shield.color]);
     if (g.cfg.artifact === "phantom" && g.charges > 0) chips.push(["phantom", "👻", t("Фантом"), "×" + g.charges, "#b48cff"]);
     if (g.isSafe()) chips.push(["safe", "✨", t("Неуязвимость"), Math.ceil((g.safeUntil - g.gameTime) / 1000) + "с", "#9fffc8"]);
-    if (g.lv) chips.unshift(g.hole ? ["goal", "🕳️", t("в норку!"), "", "#ffd84c"] : ["goal", "🎯", "", `${g.score}/${g.lv.target}`, "#9fffc8"]);
+    if (g.lv) chips.unshift(g.hole ? ["goal", "🕳️", t("в норку!"), "", "#ffd84c"] : g.lv.need ? ["goal", "🍎", "", `${g.floorApples}/${g.lv.need}`, "#9fffc8"] : ["goal", "🎯", "", `${g.score}/${g.lv.target}`, "#9fffc8"]);
+    if (g.cfg.mode === "dungeon") {
+      chips.unshift(["floor", "🗝️", "", String(g.floor), "#ffd84c"]);
+      if (g.up.taken.length) chips.push(["ups", g.up.taken.slice(-5).map((k) => E.UPGRADES[k]?.icon || "").join(""), "", g.up.taken.length > 5 ? "+" + (g.up.taken.length - 5) : "", "#c9b6ff"]);
+    }
+    if (g.lv && g.lv.puzzle) chips.push(["moves", "👣", "", String(g.ticks), "#9fd8ff"]);
     const sig = chips.map((c) => c.join()).join("|");
     if (sig !== fxSig) {
       fxSig = sig;
@@ -972,7 +1006,34 @@
       hudMsg("⚠️ " + t("Поле сужается!"), "#ff9a5c"); haptic("warning");
     } else if (e.t === "shrink") {
       renderer.shake(6, 300); sfx.boom(); haptic("heavy");
+    } else if (e.t === "floor") { // «Подземелье»: этаж пройден — выбор улучшения
+      sfx.claim(); haptic("success"); hudMsg(`🗝️ ${t("Этаж")} ${e.floor} ${t("пройден!")} +${e.bonus}`, "#ffd84c");
+      const h = g.hole || g.snake[0];
+      if (!replay) { renderer.iris(h.x, h.y, false, 450); setTimeout(() => { if (game === g && g.choosing) showUpgrades(g); }, 480); }
+    } else if (e.t === "chosen") { // в реплее
+      const u = E.UPGRADES[e.id]; if (u) hudMsg(`${u.icon} ${t(u.name)}`, "#c9b6ff");
+      renderer.reset(); renderer.iris(12, 12, true, 500); prevSnake = g.snake.map((q) => ({ x: q.x, y: q.y }));
     }
+  }
+
+  // ---------- «Подземелье»: окно выбора улучшения ----------
+  function showUpgrades(g) {
+    const box = $("upgradeList");
+    $("upgradeTitle").textContent = `${t("Этаж")} ${g.choosing.floor} ${t("пройден!")}`;
+    $("upgradeSub").textContent = t("Выбери улучшение на следующий этаж");
+    box.innerHTML = g.choosing.options.map((id, i) => { const u = E.UPGRADES[id]; return `<button class="upg" data-upg="${i}"><i>${u.icon}</i><b>${esc(t(u.name))}</b><small>${esc(t(u.desc))}</small></button>`; }).join("");
+    $("upgrade").classList.add("show");
+    box.onclick = (ev) => {
+      const b = ev.target.closest("[data-upg]"); if (!b || game !== g || !g.choosing) return;
+      const id = g.choosing.options[Number(b.dataset.upg)];
+      if (!g.choose(Number(b.dataset.upg))) return;
+      $("upgrade").classList.remove("show"); sfx.power(); haptic("success");
+      prevSnake = g.snake.map((q) => ({ x: q.x, y: q.y })); lastTick = performance.now(); foodBorn = performance.now(); fxSig = "";
+      renderer.reset(); renderer.iris(12, 12, true, 600);
+      hudMsg(`${E.UPGRADES[id].icon} ${t(E.UPGRADES[id].name)} · ${t("Этаж")} ${g.floor}`, "#c9b6ff");
+      $("gameSub").textContent = `🗝️ ${t("этаж")} ${g.floor} · ${t("собери")} ${g.lv.need} 🍎 ${t("и найди норку")}`;
+      updateHud(); schedule();
+    };
   }
 
   function doTick() {
@@ -980,6 +1041,7 @@
     const g = game, interval = g.stepMs();
     prevSnake = g.snake.map((q) => ({ x: q.x, y: q.y }));
     rivalPrev = g.rival ? g.rival.body.map((q) => ({ x: q.x, y: q.y })) : null;
+    if (g.choosing && !replay) return;
     const ev = replay ? replay.rp.next() : g.tick();
     if (!g.over) stepGhost();
     lastTick = performance.now();
@@ -1015,9 +1077,11 @@
     SA.audio.unlock();
     el.over.classList.remove("show"); $("pauseMenu").classList.remove("show");
     el.game.classList.add("active"); $("startSplash").style.display = "none"; el.game.classList.remove("replay");
-    $("gameTitle").textContent = kindOpt.kind === "level" ? `🕳️ ${t("Уровень")} ${kindOpt.ref}` : t(kindOpt.kind === "daily" ? "📅 Челлендж дня" : kindOpt.kind === "challenge" ? "⚔️ Вызов" : kindOpt.kind === "tournament" ? "🏁 Турнир" : "🐍 Snake Arena");
+    $("upgrade").classList.remove("show");
+    $("gameTitle").textContent = kindOpt.kind === "level" ? `🕳️ ${t("Уровень")} ${kindOpt.ref}` : kindOpt.kind === "puzzle" ? `🧩 ${t("Головоломка дня")}` : kindOpt.kind === "custom" ? `🛠️ ${kindOpt.name || t("Уровень игрока")}`
+      : kindOpt.mode === "dungeon" ? `🗝️ ${t("Подземелье")}` : t(kindOpt.kind === "daily" ? "📅 Челлендж дня" : kindOpt.kind === "challenge" ? "⚔️ Вызов" : kindOpt.kind === "tournament" ? "🏁 Турнир" : "🐍 Snake Arena");
     const art = (p.artifacts || []).find((a) => a.id === sel.artifact);
-    const d = await api("/api/run", { method: "POST", body: JSON.stringify({ mode: sel.mode, diff: sel.diff, artifact: sel.artifact, kind: kindOpt.kind, ref: kindOpt.ref }) });
+    const d = await api("/api/run", { method: "POST", body: JSON.stringify({ mode: kindOpt.mode || sel.mode, diff: kindOpt.mode === "dungeon" ? "normal" : sel.diff, artifact: sel.artifact, kind: kindOpt.kind, ref: kindOpt.ref }) });
     starting = false;
     let cfg, token = null;
     if (d?.token) { cfg = d.cfg; token = d.token; }
@@ -1025,24 +1089,28 @@
     else if (d?._status === 404 && kindOpt.kind === "challenge") { challengeId = ""; renderChallengeBox(); el.game.classList.remove("active"); show("home"); return toast("Вызов уже недоступен"); }
     else if (d?._status === 403 && kindOpt.kind === "level") { el.game.classList.remove("active"); show("levels"); return toast("Сначала пройди предыдущий уровень"); }
     else if (d?._status === 409 && kindOpt.kind === "tournament") { el.game.classList.remove("active"); show("tournament"); return toast("Турнир сейчас не идёт"); }
+    else if (d?._status === 404 && kindOpt.kind === "custom") { el.game.classList.remove("active"); show("workshop"); return toast("Уровень не найден"); }
+    else if (["puzzle", "custom"].includes(kindOpt.kind)) { el.game.classList.remove("active"); show("home"); return toast("Нет связи с сервером"); }
     else {
       cfg = { seed: (Math.random() * 2 ** 31) >>> 0, mode: sel.mode, diff: sel.diff, artifact: sel.artifact, artLevel: art?.level || 1, rules: E.RULES };
       toast("Нет связи с сервером — этот забег не будет засчитан", 3000);
     }
-    run = { token, cfg, kind: d?.kind || kindOpt.kind, ref: kindOpt.ref };
-    lastKind = run.kind === "challenge" ? { kind: "free" } : { kind: run.kind, ref: kindOpt.ref };
+    run = { token, cfg, kind: d?.kind || kindOpt.kind, ref: kindOpt.ref, name: kindOpt.name };
+    lastKind = run.kind === "challenge" ? { kind: "free" } : { kind: run.kind, ref: kindOpt.ref, mode: kindOpt.mode, name: kindOpt.name };
     if (run.kind === "challenge") { challengeId = ""; $("challengeBox").hidden = true; }
     game = new E.Game(cfg);
     ghost = makeGhost(d?.ghost, cfg);
     const m = E.MODES[game.cfg.mode], df = E.DIFFS[game.cfg.diff];
-    $("gameSub").textContent = (game.lv ? `🎯 ${t("цель")} ${game.lv.target} · ${t("потом в норку")} 🕳️` : `${m.emoji} ${t(m.name)} · ${t(df.name)}`) + (ghost ? ` · 👻 ${ghost.label}` : "");
+    $("gameSub").textContent = (game.cfg.mode === "dungeon" ? `🗝️ ${t("этаж")} 1 · ${t("собери")} ${game.lv.need} 🍎 ${t("и найди норку")}`
+      : game.lv && game.lv.puzzle ? `🧩 ${t("собери")} ${game.lv.need} ${t("фруктов по порядку и доползи до норки")}`
+      : game.lv ? `🎯 ${t("цель")} ${game.lv.target} · ${t("потом в норку")} 🕳️` : `${m.emoji} ${t(m.name)} · ${t(df.name)}`) + (ghost ? ` · 👻 ${ghost.label}` : "");
     beginLoop();
     if (!p.tutorial_done && run.kind === "free" && !LS.get("snakeTutorial", "")) showTutorial();
   }
 
   // ---------- пауза и отсчёт ----------
   function pause() {
-    if (!running || countdown) return;
+    if (!running || countdown || (game && game.choosing && !replay)) return;
     if (!paused) {
       paused = true; clearTimeout(timer);
       el.pauseBtn.textContent = "▶"; $("pScore").textContent = game.score;
@@ -1081,7 +1149,8 @@
     if (replay) { finishReplay(); return; }
     const g = game, res = g.result(), cfg = g.cfg, bestKey = cfg.mode + "_" + cfg.diff;
     const prevBest = Math.max(readBest(bestKey), cfg.mode === "classic" && cfg.diff !== "easy" ? Number(p.best_score || 0) : 0);
-    const localRecord = res.score > 0 && prevBest > 0 && res.score > prevBest;
+    const special = ["level", "puzzle", "custom"].includes(run.kind); // «уровневые» забеги: звёзды вместо рекорда
+    const localRecord = !special && res.score > 0 && prevBest > 0 && res.score > prevBest;
     if (res.score > readBest(bestKey)) LS.set("snakeBest_" + bestKey, res.score);
     lastResult = { ...res, cfg, kind: run.kind, reward: E.reward(res, cfg, localRecord), isRecord: localRecord, game_id: null, rated: E.isRated(cfg) };
     const send = run.token ? sendScore(g, res) : Promise.resolve(null);
@@ -1091,7 +1160,7 @@
       return;
     }
     sfx.over(); haptic(res.win ? "success" : "error");
-    const isLevel = run.kind === "level", viaHole = res.reason === "hole";
+    const isLevel = special, viaHole = res.reason === "hole", isDungeon = cfg.mode === "dungeon";
     if (!res.win) renderer.die(g.snake);
     // даём досмотреть, как змейка рассыпается (или заползает в норку), и только потом показываем итоги
     const animMs = viaHole ? Math.min(1100, 120 + g.snake.length * 45) : res.win ? 0 : 750;
@@ -1100,21 +1169,27 @@
     const irisMs = viaHole ? 600 : 0;
     if (viaHole) setTimeout(() => { if (game === g) renderer.iris(g.hole.x, g.hole.y, false, irisMs); }, animMs);
     if (animMs) { dying = true; cancelAnimationFrame(raf); raf = requestAnimationFrame(renderLoop); setTimeout(() => { if (game === g) { dying = false; cancelAnimationFrame(raf); } }, animMs + irisMs + 50); }
-    $("overEmoji").textContent = viaHole ? "🕳️" : res.win ? "🏆" : "💥";
-    $("overTitle").textContent = isLevel ? (viaHole ? `${t("Уровень")} ${run.ref} ${t("пройден!")}` : `${t("Уровень")} ${run.ref} ${t("не пройден")}`) : res.win ? "Поле заполнено!" : "Игра окончена";
+    $("overEmoji").textContent = run.kind === "puzzle" ? (viaHole ? "🧩" : "💥") : isDungeon ? "🗝️" : viaHole ? "🕳️" : res.win ? "🏆" : "💥";
+    const lvName = run.kind === "puzzle" ? t("Головоломка") : run.kind === "custom" ? `«${run.name || t("Уровень игрока")}»` : `${t("Уровень")} ${run.ref}`;
+    $("overTitle").textContent = isDungeon ? `${t("Подземелье")}: ${t("этаж")} ${res.floor}` : isLevel ? (viaHole ? `${lvName} ${t(run.kind === "puzzle" ? "решена!" : "пройден!")}` : `${lvName} ${t(run.kind === "puzzle" ? "не решена" : "не пройден")}`) : res.win ? "Поле заполнено!" : "Игра окончена";
     $("levelStars").hidden = !isLevel; $("levelStars").innerHTML = isLevel ? starsHtml(res.stars || 0) : "";
-    $("nextLevelBtn").hidden = !(isLevel && viaHole && Number(run.ref) < E.LEVELS.length);
-    $("levelsMapBtn").hidden = !isLevel;
-    $("againBtn").textContent = isLevel ? (viaHole ? "🔄 " + t("Пройти быстрее") : "🔄 " + t("Ещё раз")) : "🔄 " + t("Играть ещё");
+    $("nextLevelBtn").hidden = !(run.kind === "level" && viaHole && Number(run.ref) < E.LEVELS.length);
+    $("levelsMapBtn").hidden = !(isLevel || isDungeon);
+    $("levelsMapBtn").textContent = run.kind === "puzzle" ? "🧩 " + t("К головоломке") : run.kind === "custom" ? "🛠️ " + t("В мастерскую") : isDungeon ? "🗝️ " + t("Рейтинг подземелья") : "🗺 " + t("Карта уровней");
+    $("puzzleShareBtn").hidden = !(run.kind === "puzzle" && viaHole);
+    $("likeBtn").hidden = run.kind !== "custom"; $("likeBtn").textContent = "🤍 " + t("Нравится");
+    $("againBtn").textContent = isLevel ? (viaHole ? "🔄 " + t(run.kind === "puzzle" ? "Решить быстрее" : "Пройти быстрее") : "🔄 " + t("Ещё раз")) : "🔄 " + t("Играть ещё");
     $("final").textContent = res.score; $("oapples").textContent = res.apples; $("reward").textContent = lastResult.reward;
     $("recBadge").hidden = !localRecord;
     const m = E.MODES[cfg.mode], df = E.DIFFS[cfg.diff];
-    $("overMode").textContent = run.kind === "level"
+    $("overMode").textContent = run.kind === "level" || run.kind === "custom"
       ? `🎯 ${t("цель")} ${g.lv.target} · ⏱ ${res.ticks} ${t("ходов")} · ⭐⭐⭐ ≤ ${g.lv.par}`
+      : run.kind === "puzzle" ? `🍎 ${g.floorApples}/${g.lv.need} · 👣 ${res.ticks} ${t("ходов")} · ⭐⭐⭐ ≤ ${g.lv.par}`
+      : isDungeon ? `🗝️ ${t("этаж")} ${res.floor}` + (res.upgrades.length ? " · " + res.upgrades.map((k) => E.UPGRADES[k]?.icon || "").join("") : "")
       : `${m.emoji} ${m.name} · ${df.name}` + (run.kind === "daily" ? " · 📅 челлендж дня" : "") + (lastResult.rated ? "" : " · вне общего рейтинга");
     $("overInfo").textContent = run.token ? "Проверяем забег…" : "Забег не засчитан: нет связи с сервером";
     $("overInfo").className = "overinfo" + (run.token ? "" : " warn");
-    $("duelBtn").hidden = true; $("shareResBtn").hidden = res.score <= 0; $("replayShareBtn").hidden = true; $("overExtra").innerHTML = "";
+    $("duelBtn").hidden = true; $("shareResBtn").hidden = res.score <= 0 || special; $("replayShareBtn").hidden = true; $("overExtra").innerHTML = "";
     setTimeout(() => { el.over.classList.add("show"); if (localRecord && !isLevel) showRecord(g, res, prevBest); }, animMs + irisMs);
     send.then((d) => {
       if (!d) return;
@@ -1132,14 +1207,23 @@
           if (d.level.chapter_skin) { const sk = skinCat().find((x) => x.id === d.level.chapter_skin); extra.push(`🎁 ${t("Глава пройдена! Скин")} ${sk ? sk.emoji + " " + t(sk.name) : ""}`); }
           levelsData = null;
         }
+        if (d.puzzle && !d.puzzle.failed) {
+          extra.push(`🧩 #${d.puzzle.num} · ${t("место")} #${d.puzzle.rank} · ${t("лучшее")}: ${d.puzzle.best} ${t("ходов")}`);
+          if (d.puzzle.first) extra.push(`🎉 ${t("Первое решение сегодня")}`);
+          lastResult.puzzle = d.puzzle;
+        }
+        if (d.custom?.completed && d.custom.first) extra.push(`🎉 ${t("Уровень пройден впервые")}`);
+        if (d.dungeon?.record && d.dungeon.floor > 1) extra.push(`🗝️ ${t("Новый рекорд подземелья")}: ${t("этаж")} ${d.dungeon.floor}`);
         $("overInfo").textContent = extra.join(" · ") || "✅ Забег засчитан";
         $("overInfo").className = "overinfo ok";
         const chips = [];
-        for (const b of d.result.bonuses || []) chips.push(b.kind === "event" ? `🎉 ×${b.mult} событие` : `⭐ ×${b.mult} режим недели`);
+        for (const b of d.result.bonuses || []) chips.push(b.kind === "event" ? `🎉 ×${b.mult} событие` : b.kind === "pet" ? `${b.emoji} ×${b.mult} ${t("питомец")}` : `⭐ ×${b.mult} режим недели`);
+        if (d.puzzle?.bonus) chips.push(`🧩 +${d.puzzle.bonus} 🪙`);
+        if (d.result.candies) chips.push(`🍬 +${d.result.candies}`);
         if (d.level?.bonus) chips.push(`🕳️ +${d.level.bonus} 🪙 ${t("за уровень")}`);
         if (d.result.xp) chips.push(`🎟️ +${d.result.xp} XP пропуска`);
         $("overExtra").innerHTML = chips.map((c) => `<span class="ochip">${esc(c)}</span>`).join("");
-        $("duelBtn").hidden = !d.result.game_id || run.kind === "level"; $("replayShareBtn").hidden = !d.result.game_id;
+        $("duelBtn").hidden = !d.result.game_id || special; $("replayShareBtn").hidden = !d.result.game_id;
         if ($("season").classList.contains("active")) renderSeason();
       } else if (d.reason || d.error) {
         $("overInfo").textContent = d.reload ? "Игра обновилась — перезапусти её" : d.expired ? "Сессия устарела — перезапусти игру" : d._status === 409 ? "Этот забег уже засчитан" : "⚠️ Забег не прошёл проверку и не засчитан";
@@ -1315,7 +1399,18 @@
   $("dailyPlay").addEventListener("click", () => { returnTo = "daily"; startRun({ kind: "daily" }); });
   $("againBtn").addEventListener("click", () => startRun(lastKind));
   $("nextLevelBtn").addEventListener("click", () => { const n = Number(run?.ref || lastKind.ref) + 1; lastKind = { kind: "level", ref: n }; startRun(lastKind); });
-  $("levelsMapBtn").addEventListener("click", () => { returnTo = "levels"; closeGame(); });
+  $("levelsMapBtn").addEventListener("click", () => { returnTo = run?.kind === "puzzle" ? "puzzle" : run?.kind === "custom" ? "workshop" : game?.cfg.mode === "dungeon" ? "dungeon" : "levels"; closeGame(); });
+  // поделиться решением головоломки: текстом, как в Wordle
+  $("puzzleShareBtn").addEventListener("click", () => {
+    const pz = lastResult?.puzzle; if (!pz) return;
+    const text = `🧩 Snake Arena · ${t("Головоломка дня")} #${pz.num}\n🍎×8 → 🕳️ ${t("за")} ${pz.ticks} ${t("ходов")} ${"⭐".repeat(pz.stars)}\n${t("Сможешь быстрее?")}`;
+    shareLink(refLink(), text);
+  });
+  $("likeBtn").addEventListener("click", async () => {
+    if (!run?.ref) return;
+    const r = await api("/api/custom/like", { method: "POST", body: JSON.stringify({ id: run.ref }) });
+    if (r?.ok) { $("likeBtn").textContent = (r.liked ? "❤️ " : "🤍 ") + r.likes; haptic("light"); } else toast(r?.error === "Own level" ? "Это твой уровень" : "Не получилось");
+  });
   $("liClose").addEventListener("click", () => $("levelInfo").classList.remove("show"));
   $("menuBtn").addEventListener("click", closeGame);
   $("shareResBtn").addEventListener("click", shareResult);
@@ -1408,5 +1503,10 @@
   try { tg?.disableVerticalSwipes?.(); } catch (e) {}
 
   renderer.setField(fieldId());
+  // для модулей с новыми экранами (extra.js, duel.js)
+  SA.app = {
+    api, toast, confirmBox, show, startRun, shareLink, copyText, fmtN, fmtDay, refLink, lbRow, headHtml, starsHtml, tabsHtml, skinCat, skinPalette, fieldId, haptic, sfx, t, esc,
+    get p() { return p; }, merge(x) { p = { ...p, ...x }; ui(); renderShop(); }, setReturn(id) { returnTo = id; }, fruitOf, renderShop
+  };
   load();
 })();

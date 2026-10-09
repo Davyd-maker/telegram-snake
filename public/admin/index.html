@@ -343,8 +343,13 @@ async function viewCheat() {
 // ---------- События ----------
 async function viewEvents() {
   const r = await api("/api/admin/events"); drawTabs();
+  const hol = await api("/api/admin/holiday").catch(() => null);
   const a = r.auto, now = Date.now();
-  $("#view").innerHTML = `<div class="card"><h2>Сейчас</h2>
+  const holCard = hol ? `<div class="card"><h2>🎃 Праздник</h2>
+      <p>${hol.current ? `Идёт: <b>${esc(hol.current.emoji + " " + hol.current.title)}</b>${hol.current.ends ? " · до " + esc(hol.current.ends) : " (включён вручную)"}` : `Сейчас праздника нет${hol.next ? ` · ближайший: ${esc(hol.next.emoji + " " + hol.next.title)} с ${esc(hol.next.starts)}` : ""}`}</p>
+      <div class="row"><select id="holv"><option value="">По календарю</option>${hol.holidays.map((h) => `<option value="${esc(h.id)}"${hol.forced === h.id ? " selected" : ""}>Включить сейчас: ${esc(h.emoji + " " + h.title)}</option>`).join("")}<option value="off"${hol.forced === "off" ? " selected" : ""}>Выключить</option></select><button class="pri" id="holset">Применить</button></div>
+      <p class="small mute">Во время праздника за фрукты дают конфеты 🍬, на поле — праздничная еда, в магазине — праздничные предметы.</p></div>` : "";
+  $("#view").innerHTML = holCard + `<div class="card"><h2>Сейчас</h2>
       <div class="grid"><div class="kpi"><b>×${a.coinMult}</b><span>множитель монет</span></div><div class="kpi"><b>${esc(MODE_NAMES[a.featured] || a.featured)}</b><span>режим недели (×${a.featuredMult})</span></div>
       <div class="kpi"><b>${a.tour ? "идёт" : "—"}</b><span>турнир выходных${a.tour ? " · " + esc(MODE_NAMES[a.tour.mode] || a.tour.mode) : a.next_tour ? " · с " + esc(a.next_tour) : ""}</span></div></div>
       <p class="small mute">По выходным автоматически: двойные монеты и турнир. Выключить двойные монеты по выходным — переменная WEEKEND_X2=off.</p></div>
@@ -354,6 +359,7 @@ async function viewEvents() {
       <p class="small mute">Начинается сразу. Игроки видят баннер в игре; награда за забеги умножается.</p></div>
     <div class="card"><h2>История</h2>${r.events.length ? `<div class="scroll"><table><tr><th>Название</th><th class="n">×</th><th>Начало</th><th>Конец</th><th></th></tr>${r.events.map((e) =>
       `<tr><td>${esc(e.title)}</td><td class="n">${e.coin_mult}</td><td>${dt(e.starts_at)}</td><td>${dt(e.ends_at)}</td><td>${new Date(e.ends_at).getTime() > now ? `<button class="sm dng" data-stop="${e.id}">Остановить</button>` : '<span class="pill">завершено</span>'}</td></tr>`).join("")}</table></div>` : '<p class="mute">Событий ещё не было</p>'}</div>`;
+  if ($("#holset")) $("#holset").onclick = () => run(async () => { await api("/api/admin/holiday", { value: $("#holv").value }); toast("Готово"); show(); });
   $("#ecreate").onclick = () => run(async () => { await api("/api/admin/events", { title: $("#etitle").value.trim(), coin_mult: +$("#emult").value, hours: +$("#ehours").value }); toast("Событие запущено"); show(); });
   $("#view").onclick = async (e) => { const b = e.target.closest("[data-stop]"); if (b && (await ask("Остановить событие?"))) run(async () => { await api(`/api/admin/events/${b.dataset.stop}/stop`, {}); show(); }); };
 }

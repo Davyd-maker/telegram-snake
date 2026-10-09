@@ -1,9 +1,30 @@
 // Новости обновлений. После выкладки новой версии бот один раз рассылает новость CURRENT всем, кто не отключил
 // сообщения (ANNOUNCE_UPDATES=off — не рассылать), а в игре при первом входе показывается окно «Что нового».
 // Новая версия: добавь запись в NEWS и поменяй CURRENT. Лимит Telegram — 4096 символов; лучше коротко.
-const CURRENT = "30";
+const CURRENT = "31";
 
 const NEWS = {
+  31: {
+    title: { ru: "Дуэли, Подземелье и Хэллоуин!", en: "Duels, the Dungeon and Halloween!" },
+    ru: [
+      "⚔️ Дуэли в реальном времени: позови друга по ссылке или найди случайного соперника",
+      "🗝️ Подземелье: этаж за этажом, после каждого — выбор улучшения",
+      "🧩 Головоломка дня: одно поле для всех, реши за меньшее число ходов и поделись результатом",
+      "🛠️ Мастерская: рисуй свои уровни и проходи чужие, лучшие — в подборке недели",
+      "🐾 Питомцы ползут за змейкой и дают бонус к монетам",
+      "🎡 Колесо удачи каждый день и 🎁 подарки друзьям",
+      "🎃 С 24 октября — Хэллоуин: тыквы, конфеты и жуткие скины"
+    ],
+    en: [
+      "⚔️ Real-time duels: invite a friend with a link or find a random rival",
+      "🗝️ The Dungeon: floor after floor, pick an upgrade after each one",
+      "🧩 Daily puzzle: the same field for everyone — solve it in fewer moves and share your result",
+      "🛠️ Workshop: draw your own levels and play others', the best ones get featured weekly",
+      "🐾 Pets follow your snake and give a coin bonus",
+      "🎡 A daily wheel of fortune and 🎁 gifts for friends",
+      "🎃 Halloween starts October 24: pumpkins, candy and spooky skins"
+    ]
+  },
   30: {
     title: { ru: "Змейка ожила!", en: "The snake comes alive!" },
     ru: [

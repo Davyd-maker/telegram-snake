@@ -85,6 +85,39 @@ const MIGRATIONS = [
       await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS owned_accessories TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`);
       await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS chests INTEGER NOT NULL DEFAULT 0`);
     }
+  },
+  {
+    id: 9, name: "подземелье, головоломка дня, уровни игроков, питомцы, колесо, подарки, праздники, дуэли",
+    up: async (q) => {
+      for (const col of [
+        "best_floor INTEGER NOT NULL DEFAULT 0", "puzzles_solved INTEGER NOT NULL DEFAULT 0",
+        "pet TEXT NOT NULL DEFAULT ''", "pet_xp INTEGER NOT NULL DEFAULT 0", "pet_fed_day TEXT NOT NULL DEFAULT ''",
+        "wheel_day TEXT NOT NULL DEFAULT ''", "candies INTEGER NOT NULL DEFAULT 0",
+        "duel_wins INTEGER NOT NULL DEFAULT 0", "duel_games INTEGER NOT NULL DEFAULT 0"
+      ]) await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS ${col}`);
+      await q(`CREATE TABLE IF NOT EXISTS puzzle_scores (
+        day TEXT NOT NULL, telegram_id TEXT NOT NULL, ticks INTEGER NOT NULL, stars INTEGER NOT NULL DEFAULT 1, attempts INTEGER NOT NULL DEFAULT 1, game_id BIGINT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(day, telegram_id))`);
+      await q(`CREATE INDEX IF NOT EXISTS puzzle_scores_rank_idx ON puzzle_scores (day, ticks)`);
+      await q(`CREATE TABLE IF NOT EXISTS custom_levels (
+        id TEXT PRIMARY KEY, author_id TEXT NOT NULL, name TEXT NOT NULL, walls INTEGER[] NOT NULL, target INTEGER NOT NULL,
+        plays INTEGER NOT NULL DEFAULT 0, wins INTEGER NOT NULL DEFAULT 0, likes INTEGER NOT NULL DEFAULT 0, hidden BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+      await q(`CREATE INDEX IF NOT EXISTS custom_levels_author_idx ON custom_levels (author_id)`);
+      await q(`CREATE INDEX IF NOT EXISTS custom_levels_new_idx ON custom_levels (created_at DESC)`);
+      await q(`CREATE TABLE IF NOT EXISTS custom_likes (level_id TEXT NOT NULL, telegram_id TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(level_id, telegram_id))`);
+      await q(`CREATE TABLE IF NOT EXISTS custom_wins (level_id TEXT NOT NULL, telegram_id TEXT NOT NULL, ticks INTEGER NOT NULL, stars INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(level_id, telegram_id))`);
+      await q(`CREATE TABLE IF NOT EXISTS gifts (
+        id SERIAL PRIMARY KEY, from_id TEXT NOT NULL, to_id TEXT NOT NULL, kind TEXT NOT NULL, item TEXT NOT NULL DEFAULT '', coins INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+      await q(`CREATE INDEX IF NOT EXISTS gifts_from_idx ON gifts (from_id, created_at)`);
+      await q(`CREATE INDEX IF NOT EXISTS gifts_to_idx ON gifts (to_id, created_at)`);
+      await q(`CREATE TABLE IF NOT EXISTS duels (
+        id TEXT PRIMARY KEY, a_id TEXT NOT NULL, b_id TEXT, winner TEXT NOT NULL DEFAULT '', a_score INTEGER NOT NULL DEFAULT 0, b_score INTEGER NOT NULL DEFAULT 0,
+        reason TEXT NOT NULL DEFAULT '', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), finished_at TIMESTAMPTZ)`);
+      await q(`CREATE INDEX IF NOT EXISTS duels_a_idx ON duels (a_id)`);
+      await q(`CREATE INDEX IF NOT EXISTS duels_b_idx ON duels (b_id)`);
+    }
   }
 ];
 

@@ -178,6 +178,71 @@ const tgLog = async () => (TG_LOG ? (await fetch(TG_LOG)).json() : []);
   r = await call(Cc, "GET", "/api/me"); ok(r.data.player.levels_done >= 1 && r.data.player.level_stars >= 1, "в профиле — пройденные уровни и звёзды", { l: r.data.player.levels_done, s: r.data.player.level_stars });
   r = await call(A, "POST", "/api/run", { mode: "rocks" }); ok(r.data.cfg.rules === E.RULES && E.RULES >= 3, "новые забеги идут по правилам v3");
 
+  console.log("• v4: подземелье, головоломка, мастерская, питомец, колесо, подарки, праздник, дуэль");
+  async function playV4(u, body, pick = 0, stopFloor = 2) {
+    const rr = await call(u, "POST", "/api/run", body); if (!rr.data?.token) return { rr };
+    const g = new E.Game(rr.data.cfg);
+    while (!g.over && g.ticks < 4000) { if (g.choosing) { if (g.floor >= stopFloor) break; g.choose(pick); continue; } LB.step(g); g.tick(); }
+    await sleep(Math.max(0, g.gameTime - 130 * g.log.length - 2000) + 200);
+    const sc = await call(u, "POST", "/api/score", { token: rr.data.token, log: E.encodeLog(g.log), ticks: g.ticks });
+    return { rr, g, sc };
+  }
+  let v = await playV4(A, { mode: "dungeon" }, 1, 3);
+  ok(v.rr.data.cfg.mode === "dungeon" && v.sc.data.dungeon?.floor === v.g.floor && v.g.floor >= 2, "подземелье: этаж засчитан сервером", v.sc.data.dungeon);
+  r = await call(A, "GET", "/api/dungeon"); ok(r.data.leaderboard.some((x) => x.is_me) && r.data.upgrades.armor, "рейтинг подземелья");
+  r = await call(A, "POST", "/api/run", { mode: "custom" }); ok(r.data.cfg.mode === "classic", "скрытый режим без разрешения — классика");
+  v = await playV4(B, { kind: "puzzle" });
+  ok(v.sc.data.puzzle && !v.sc.data.puzzle.failed && v.sc.data.puzzle.first && v.sc.data.puzzle.bonus > 0, "головоломка решена, бонус за первое решение", v.sc.data.puzzle);
+  const v2 = await playV4(B, { kind: "puzzle" }); ok(v2.sc.data.puzzle && !v2.sc.data.puzzle.first && !v2.sc.data.puzzle.bonus, "повторное решение — без бонуса");
+  r = await call(A, "GET", "/api/puzzle"); ok(r.data.leaderboard.length >= 1 && r.data.walls && r.data.par > 0, "рейтинг головоломки и схема поля");
+  r = await call(A, "POST", "/api/custom/save", { name: "Тест-уровень", walls: [30, 31, 32, 33, 34, 35], target: 6 }); ok(r.data.id, "уровень сохранён", r.data);
+  const lvId = r.data.id;
+  r = await call(A, "POST", "/api/custom/save", { name: "Коробка", walls: [...Array.from({ length: 15 }, (_, i) => 10 * 24 + 5 + i), ...Array.from({ length: 15 }, (_, i) => 14 * 24 + 5 + i), 11 * 24 + 5, 12 * 24 + 5, 13 * 24 + 5, 11 * 24 + 19, 12 * 24 + 19, 13 * 24 + 19], target: 10 });
+  ok(r.status === 400, "запертый старт — уровень не сохраняется");
+  const coinsA0 = (await call(A, "GET", "/api/me")).data.player.coins;
+  v = await playV4(Cc, { kind: "custom", ref: lvId });
+  ok(v.sc.data.custom?.completed && v.sc.data.custom.first, "чужой уровень пройден", v.sc.data.custom);
+  ok((await call(A, "GET", "/api/me")).data.player.coins === coinsA0 + 10, "автору +10 монет за первое прохождение");
+  r = await call(Cc, "POST", "/api/custom/like", { id: lvId }); ok(r.data.liked && r.data.likes === 1, "лайк");
+  r = await call(A, "POST", "/api/custom/like", { id: lvId }); ok(r.status === 400, "свой уровень лайкать нельзя");
+  r = await call(Cc, "GET", "/api/custom?tab=week"); ok(r.data.levels.some((x) => x.id === lvId && x.liked && x.won), "уровень в подборке недели");
+  r = await call(B, "POST", "/api/run", { kind: "custom", ref: "deadbeef" }); ok(r.status === 404, "несуществующий уровень — 404");
+  r = await call(B, "POST", "/api/pet/adopt", { pet: "cat" }); ok(r.data.player?.pet?.id === "cat" && r.data.player.pet.hungry, "питомец взят");
+  r = await call(B, "POST", "/api/pet/feed", {}); ok(r.data.player?.pet?.fed_today && r.data.player.pet.bonus > 0, "питомец накормлен — бонус активен");
+  r = await call(B, "POST", "/api/pet/feed", {}); ok(r.status === 400, "второй раз за день — нельзя");
+  r = await call(B, "POST", "/api/wheel", {}); ok(r.data.ok && r.data.index >= 0 && r.data.prize, "колесо удачи", r.data.prize);
+  r = await call(B, "POST", "/api/wheel", {}); ok(r.status === 400, "колесо — раз в день");
+  r = await call(B, "GET", "/api/friends"); const fr = r.data.friends[0];
+  ok(fr && r.data.gift.left_today === 1000, "список друзей для подарков", r.data.friends.map((x) => x.name));
+  if (fr) {
+    const before = (await call(B, "GET", "/api/me")).data.player.coins;
+    r = await call(B, "POST", "/api/gift", { to: fr.id, coins: 100 }); ok(r.data.ok && r.data.player.coins === before - 100, "подарок 100 монет");
+    r = await call(B, "POST", "/api/gift", { to: fr.id, coins: 1000 }); ok(r.status === 400 && r.data.error === "Daily gift limit", "дневной лимит подарков");
+  }
+  r = await call(B, "POST", "/api/gift", { to: "999999", coins: 100 }); ok(r.status === 403, "подарок не другу — нельзя");
+  r = await call(admin, "POST", "/api/admin/holiday", { value: "halloween" }); ok(r.data.current?.id === "halloween", "админ включил Хэллоуин");
+  v = await playV4(B, { mode: "classic" });
+  ok(v.sc.data.result?.candies > 0, "конфеты за фрукты в праздник", v.sc.data.result?.candies);
+  r = await call(B, "POST", "/api/profile", { skin: "hw_pumpkin" }); ok(r.status === 200 || r.data?.error === "Not enough candies", "покупка за конфеты", r.data?.error);
+  await call(admin, "POST", "/api/admin/holiday", { value: "" });
+  r = await call(B, "POST", "/api/profile", { skin: "hw_skeleton" }); ok(r.status === 403 || r.status === 400, "после праздника за конфеты не купить");
+  // дуэль через WebSocket: комната по ссылке, бой до конца
+  if (typeof WebSocket === "function") {
+    const wsUrl = BASE.replace(/^http/, "ws") + "/ws/duel";
+    const conn = (u) => new Promise((res) => { const w = new WebSocket(wsUrl), c = { w, msgs: [] }; w.onmessage = (e) => c.msgs.push(JSON.parse(e.data)); w.onopen = () => { w.send(JSON.stringify({ t: "auth", init: u.init })); res(c); }; });
+    const wa = await conn(A), wb = await conn(B); await sleep(300);
+    wa.w.send(JSON.stringify({ t: "create" })); await sleep(300);
+    const room = wa.msgs.find((m) => m.t === "room"); ok(room && /^[0-9a-f]{8}$/.test(room.id), "дуэль: комната создана");
+    wb.w.send(JSON.stringify({ t: "join", id: room?.id })); await sleep(400);
+    wa.w.send(JSON.stringify({ t: "d", d: 0 })); // A ещё во время отсчёта поворачивает вверх — в стену; B едет прямо
+    await sleep(3200);
+    for (let i = 0; i < 40 && !wa.msgs.some((m) => m.t === "end"); i++) await sleep(250);
+    const ea = wa.msgs.find((m) => m.t === "end"), eb = wb.msgs.find((m) => m.t === "end");
+    ok(ea && eb && ea.winner === 1 && eb.reward === 100, "дуэль: A врезался, B победил и получил награду", { ea, eb });
+    r = await call(B, "GET", "/api/me"); ok(r.data.player.duel_wins >= 1, "победа в дуэли записана");
+    wa.w.close(); wb.w.close();
+  } else console.log("  (WebSocket нет в этой версии Node — дуэль не проверяем)");
+
   console.log("• админка: удержание, античит, реплей");
   r = await call(admin, "GET", "/api/admin/retention"); ok(r.data.cohorts.length >= 1 && r.data.funnel.registered >= 5 && r.data.funnel.paid >= 1, "когорты и воронка", r.data.funnel);
   r = await call(admin, "GET", "/api/admin/suspicious"); ok(Array.isArray(r.data.runs), `подозрительных забегов: ${r.data.runs.length} (бот играет почти идеально — должен попадаться)`);

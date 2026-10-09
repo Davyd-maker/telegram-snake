@@ -34,7 +34,8 @@
     { id: "crystal_field", name: "Кристалл", emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" },
     { id: "rain_field", name: "Дождь", emoji: "🌧️", price: 30000, currency: "coins", desc: "Косой дождь и круги на лужах" },
     { id: "autumn_field", name: "Осень", emoji: "🍂", price: 90, currency: "stars", epic: true, desc: "Кружатся жёлтые листья" },
-    { id: "night_field", name: "Ночь", emoji: "🌙", price: 120, currency: "stars", epic: true, desc: "Темнота и светлячки — видно только вокруг головы" }
+    { id: "night_field", name: "Ночь", emoji: "🌙", price: 120, currency: "stars", epic: true, desc: "Темнота и светлячки — видно только вокруг головы" },
+    { id: "halloween_field", name: "Ночь Хэллоуина", emoji: "🦇", price: 400, currency: "candy", epic: true, desc: "Туман, луна и летучие мыши" }
   ];
 
   // Оформление полей: цвета фона, шахматка, сетка, свечение и анимированный эффект (fx)
@@ -52,7 +53,8 @@
     crystal_field: { bg: "#09051a", chk: "rgba(200,180,255,.04)", g0: "rgba(150,90,255,.28)", g1: "rgba(35,15,80,.1)", border: "rgba(210,180,255,.65)", fx: "stars" },
     rain_field: { bg: "#08111a", chk: "rgba(150,190,230,.04)", g0: "rgba(60,110,170,.24)", g1: "rgba(10,30,50,.1)", border: "rgba(140,190,240,.5)", fx: "rain" },
     autumn_field: { bg: "#170d04", chk: "rgba(255,170,60,.05)", g0: "rgba(200,110,30,.24)", g1: "rgba(70,30,5,.1)", border: "rgba(255,170,70,.55)", fx: "leaves" },
-    night_field: { bg: "#03050d", chk: "rgba(120,140,255,.03)", g0: "rgba(40,50,120,.22)", g1: "rgba(5,8,30,.1)", border: "rgba(130,140,255,.45)", fx: "night" }
+    night_field: { bg: "#03050d", chk: "rgba(120,140,255,.03)", g0: "rgba(40,50,120,.22)", g1: "rgba(5,8,30,.1)", border: "rgba(130,140,255,.45)", fx: "night" },
+    halloween_field: { bg: "#0d0716", chk: "rgba(255,140,40,.035)", g0: "rgba(120,60,200,.26)", g1: "rgba(40,10,60,.12)", border: "rgba(255,140,40,.6)", fx: "spooky" }
   };
 
   // Цвета обычных скинов: [голова, хвост]
@@ -63,6 +65,8 @@
   };
   // скины за главы уровней
   Object.assign(SA.SKIN_COLORS, { thief: ["#b48cff", "#2a1240"], lv_garden: ["#c8ffb0", "#2e9e3a"], lv_dungeon: ["#e6d5ff", "#5b4a8a"], lv_volcano: ["#ffe08a", "#d13b0a"] });
+  // Хэллоуин
+  Object.assign(SA.SKIN_COLORS, { hw_pumpkin: ["#ffc46b", "#d35400"], hw_skeleton: ["#f4f4f4", "#3a3a3a"], hw_ghost: ["#ffffff", "#9fb4e8"] });
 
   const hsl = (h, l = 60) => `hsl(${((h % 360) + 360) % 360},95%,${l}%)`;
   const mix = (a, b, t) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
@@ -82,13 +86,15 @@
     season_champion: { color: (t) => mix([255, 245, 160], [255, 150, 20], t), glow: () => "#ffd34d" },
     season_elite: { color: (t) => mix([220, 240, 255], [100, 70, 255], t), glow: () => "#8c6cff" },
     season_master: { color: (t) => mix([160, 255, 255], [0, 190, 255], t), glow: () => "#32e8ff" },
+    hw_skeleton: { color: (t) => (Math.floor(t * 16) % 2 ? "#2b2b30" : "#ececec"), glow: () => "#b8ffb0" },
+    hw_ghost: { color: (t, now) => mix([255, 255, 255], [150, 175, 235], Math.min(1, Math.max(0, t + 0.12 * Math.sin(now / 260 + t * 9)))), glow: () => "#cfe0ff" },
     lv_volcano: { color: (t, now) => mix([255, 224, 138], [209, 59, 10], Math.min(1, t + 0.15 * Math.sin(now / 200 + t * 8))), glow: () => "#ff6a1a" }
   };
 
   // Голова змейки в рейтинге (CSS-градиент)
   SA.HEAD_COLORS = {
     ...SA.SKIN_COLORS, rainbow: ["#ffe14d", "#ff3b3b"], galaxy: ["#b078ff", "#1c0b66"], inferno: ["#fff3a0", "#ff4a00"], diamond: ["#ffffff", "#5fe3ff"],
-    prism: ["#ffffff", "#3bdcff"], lv_volcano: ["#ffe08a", "#d13b0a"], season_champion: ["#fff5a0", "#ff9614"], season_elite: ["#dcf0ff", "#6446ff"], season_master: ["#a0ffff", "#00beff"]
+    prism: ["#ffffff", "#3bdcff"], lv_volcano: ["#ffe08a", "#d13b0a"], hw_skeleton: ["#ffffff", "#3a3a3a"], hw_ghost: ["#ffffff", "#9fb4e8"], season_champion: ["#fff5a0", "#ff9614"], season_elite: ["#dcf0ff", "#6446ff"], season_master: ["#a0ffff", "#00beff"]
   };
 
   SA.esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

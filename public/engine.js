@@ -15,6 +15,7 @@
   const GROWTH = { apple: 1, coin: 1, gold: 3 };
   const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // код направления 0..3: вверх, вправо, вниз, влево
   const OP_RESUME = 4;                              // в логе: «продолжили после паузы»
+  const OP_CHOOSE = 5;                              // 5..7 — выбор улучшения 0..2 в «Подземелье» (правила v4)
 
   // Режимы: mult — множитель награды, rated — идёт в общий рейтинг и сезон
   const MODES = {
@@ -23,7 +24,11 @@
     rocks:   { name: "Камни",          emoji: "🪨", mult: 1.25, rated: false, hint: "Случайные камни на поле · награда ×1.25" },
     maze:    { name: "Лабиринт",       emoji: "🧩", mult: 1.25, rated: false, hint: "Фиксированные стены · награда ×1.25" },
     moving:  { name: "Живые стены",    emoji: "⚡", mult: 1.5,  rated: false, hint: "Камни появляются и исчезают · награда ×1.5" },
-    level:   { name: "Уровни",         emoji: "🕳️", mult: 1,    rated: false, hidden: true, hint: "Набери цель и заползи в норку" }
+    level:   { name: "Уровни",         emoji: "🕳️", mult: 1,    rated: false, hidden: true, hint: "Набери цель и заползи в норку" },
+    // правила v4
+    dungeon: { name: "Подземелье",     emoji: "🗝️", mult: 1.2,  rated: false, hidden: true, hint: "Этаж за этажом: после каждого выбери улучшение" },
+    puzzle:  { name: "Головоломка",    emoji: "🧩", mult: 0.5,  rated: false, hidden: true, hint: "Собери фрукты и доползи до норки за меньшее число ходов" },
+    custom:  { name: "Уровень игрока", emoji: "🛠️", mult: 0.5,  rated: false, hidden: true, hint: "Поле, нарисованное другим игроком" }
   };
   // Сложность: speed — множитель длительности хода (меньше — быстрее)
   const DIFFS = {
@@ -49,7 +54,19 @@
   // Версия правил. Старые забеги (реплеи, призраки) переигрываются по своей версии, новые — по последней.
   // 2 — новый магнит: тянет еду на клетку перед головой и только спереди.
   // 3 — боссы на уровнях 10/20/30, бонусы «Портал» и «Заморозка комбо», щит разбивает камни.
-  const RULES = 3;
+  // 4 — режимы «Подземелье», «Головоломка дня» и уровни игроков (на старые режимы не влияет).
+  const RULES = 4;
+  // Улучшения «Подземелья»: после каждого этажа предлагаются три на выбор. once — можно взять только раз
+  const UPGRADES = {
+    armor:  { icon: "🛡️", name: "Броня",         desc: "+1 спасение от столкновения" },
+    magnet: { icon: "🧲", name: "Вечный магнит", desc: "Магнит до конца забега, повтор — +1 к радиусу" },
+    slow:   { icon: "🐢", name: "Спокойствие",   desc: "Змейка ползёт на 10% медленнее" },
+    greed:  { icon: "💰", name: "Жадность",      desc: "Монеты и звёзды попадаются чаще" },
+    points: { icon: "💎", name: "Огранка",       desc: "+30% очков за еду" },
+    rhythm: { icon: "⚡", name: "Ритм",          desc: "Комбо держится дольше" },
+    luck:   { icon: "🍀", name: "Удача",         desc: "Бонусы на поле появляются чаще" },
+    lean:   { icon: "✂️", name: "Стройность",    desc: "Змейка растёт вдвое медленнее", once: true }
+  };
   const BONUS_MAGNET_RANGE = 6;
   // Артефакты по уровням прокачки
   const artifactStats = (id, lvl) => {
@@ -150,15 +167,138 @@
   })();
   // Звёзды за пройденный уровень: быстрее — больше
   const levelStars = (n, ticks) => { const L = LEVELS[n - 1]; if (!L) return 0; return ticks <= L.par ? 3 : ticks <= L.par * 1.6 ? 2 : 1; };
+  // звёзды для любой «уровневой» раскладки: par — на 3 звезды, par2 — на 2
+  const starsFor = (L, ticks) => (!L ? 0 : ticks <= L.par ? 3 : ticks <= (L.par2 || L.par * 1.6) ? 2 : 1);
 
+  // ---- общие помощники раскладок ----
+  const inStartZone = (x, y) => y >= 11 && y <= 13 && x >= 6 && x <= 18;
+  // Клетки, достижимые от старта (12,12), при заданных стенах (Uint8Array N*N)
+  function reachMap(wall) {
+    const seen = new Uint8Array(N * N), st = [12 * N + 12]; seen[st[0]] = 1;
+    while (st.length) {
+      const k = st.pop(), x = k % N, y = (k / N) | 0;
+      for (const [dx, dy] of DIRS) {
+        const nx = x + dx, ny = y + dy, nk = ny * N + nx;
+        if (nx < 0 || ny < 0 || nx >= N || ny >= N || seen[nk] || wall[nk]) continue;
+        seen[nk] = 1; st.push(nk);
+      }
+    }
+    return seen;
+  }
+  // Кратчайшее расстояние между клетками по полю со стенами (для «пара» головоломки)
+  function bfsDist(wall, a, b) {
+    if (a.x === b.x && a.y === b.y) return 0;
+    const dist = new Int16Array(N * N).fill(-1), q = [a.y * N + a.x]; dist[q[0]] = 0;
+    for (let i = 0; i < q.length; i++) {
+      const k = q[i], x = k % N, y = (k / N) | 0;
+      for (const [dx, dy] of DIRS) {
+        const nx = x + dx, ny = y + dy, nk = ny * N + nx;
+        if (nx < 0 || ny < 0 || nx >= N || ny >= N || dist[nk] >= 0 || wall[nk]) continue;
+        dist[nk] = dist[k] + 1; if (nx === b.x && ny === b.y) return dist[nk]; q.push(nk);
+      }
+    }
+    return 999;
+  }
+  // Случайные фигуры-стены: отрезки, блоки и уголки (вне стартового коридора)
+  function shapes(r, count, opts = {}) {
+    const out = [], add = (x, y) => { if (x >= 0 && y >= 0 && x < N && y < N && !inStartZone(x, y)) out.push({ x, y }); };
+    for (let i = 0; i < count; i++) {
+      const x = Math.floor(r() * N), y = Math.floor(r() * N), kind = Math.floor(r() * 4), len = 3 + Math.floor(r() * 4);
+      if (kind === 0) for (let k = 0; k < len; k++) add(x + k, y);
+      else if (kind === 1) for (let k = 0; k < len; k++) add(x, y + k);
+      else if (kind === 2) { add(x, y); add(x + 1, y); add(x, y + 1); add(x + 1, y + 1); }
+      else { for (let k = 0; k < 3; k++) add(x + k, y); for (let k = 1; k < 3; k++) add(x, y + k); }
+    }
+    if (opts.mirror) for (const c of out.slice()) add(N - 1 - c.x, c.y);
+    const seen = new Set();
+    return out.filter((c) => { const k = c.y * N + c.x; if (seen.has(k)) return false; seen.add(k); return true; });
+  }
+  // Убирает тупики: клетки, из которых меньше двух выходов (и цепочки за ними), — туда не ставим еду и норку,
+  // иначе длинная змейка заползёт и не развернётся. ok[k]=1 — клетка годится.
+  function peel(wall, reach) {
+    const ok = new Uint8Array(N * N);
+    for (let i = 0; i < N * N; i++) ok[i] = reach[i] && !wall[i] ? 1 : 0;
+    const deg = (k) => { const x = k % N, y = (k / N) | 0; let d = 0; for (const [dx, dy] of DIRS) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < N && ny < N && ok[ny * N + nx]) d++; } return d; };
+    const st = []; for (let i = 0; i < N * N; i++) if (ok[i] && deg(i) <= 1) st.push(i);
+    while (st.length) {
+      const k = st.pop(); if (!ok[k] || deg(k) > 1) continue; ok[k] = 0;
+      const x = k % N, y = (k / N) | 0;
+      for (const [dx, dy] of DIRS) { const nx = x + dx, ny = y + dy, nk = ny * N + nx; if (nx >= 0 && ny >= 0 && nx < N && ny < N && ok[nk] && deg(nk) <= 1) st.push(nk); }
+    }
+    return ok;
+  }
+  const wallMap = (walls) => { const m = new Uint8Array(N * N); for (const c of walls) m[c.y * N + c.x] = 1; return m; };
+
+  // ---- «Подземелье»: этаж f — свои стены, цель по числу фруктов, скорость растёт ----
+  function dungeonFloor(seed, f) {
+    const r = mulberry32(((seed ^ 0x9E3779B9) >>> 0) + f * 7919);
+    let walls = shapes(r, Math.min(3 + f, 16));
+    const reach = reachMap(wallMap(walls));
+    let free = 0; for (let i = 0; i < N * N; i++) if (reach[i]) free++;
+    if (free < 300) walls = walls.slice(0, Math.floor(walls.length / 2)); // слишком тесно — убираем половину
+    return { n: 0, floor: f, need: Math.min(14, 4 + f), target: 0, speed: Math.max(0.72, 1.06 - 0.03 * f), moving: f >= 4 && f % 2 === 0,
+      boss: false, rival: false, shrink: false, walls, gates: [], par: 1e9 };
+  }
+
+  // ---- «Головоломка дня»: фиксированные фрукты по порядку и норка; меньше ходов — больше звёзд ----
+  const PUZZLE_FRUITS = 8;
+  function makePuzzle(seed) {
+    const r = mulberry32((seed ^ 0x2545F491) >>> 0);
+    let walls = shapes(r, 5 + Math.floor(r() * 4), { mirror: true });
+    const wall = wallMap(walls), good = peel(wall, reachMap(wall));
+    const cells = [];
+    for (let i = 0; i < N * N; i++) { const x = i % N, y = (i / N) | 0; if (good[i] && !(y === 12 && x >= 8 && x <= 12)) cells.push({ x, y }); }
+    const foods = []; let prev = { x: 12, y: 12 };
+    for (let k = 0; k < PUZZLE_FRUITS; k++) {
+      const pool = cells.filter((c) => { const d = Math.abs(c.x - prev.x) + Math.abs(c.y - prev.y); return d >= 5 && d <= 14 && !foods.some((f) => f.x === c.x && f.y === c.y); });
+      const c = (pool.length ? pool : cells)[Math.floor(r() * (pool.length || cells.length))];
+      foods.push({ x: c.x, y: c.y }); prev = c;
+    }
+    const hp = cells.filter((c) => Math.abs(c.x - prev.x) + Math.abs(c.y - prev.y) >= 6 && !foods.some((f) => f.x === c.x && f.y === c.y));
+    const hole = (hp.length ? hp : cells)[Math.floor(r() * (hp.length || cells.length))];
+    let par = 0, at = { x: 12, y: 12 };
+    for (const f of [...foods, hole]) { par += bfsDist(wall, at, f); at = f; }
+    par = Math.ceil(par * 1.12) + 4;
+    return { n: 0, puzzle: true, need: PUZZLE_FRUITS, target: 0, speed: 1, moving: false, boss: false, rival: false, shrink: false,
+      walls, gates: [], foods, holeAt: { x: hole.x, y: hole.y }, par, par2: Math.ceil(par * 1.5) };
+  }
+
+  // ---- уровни игроков (редактор): стены — номера клеток y*N+x, t — цель по очкам ----
+  const CUSTOM_MAX_WALLS = 220;
+  function normCustom(c) {
+    const src = Array.isArray(c && c.w) ? c.w : [];
+    const seen = new Set(), w = [];
+    for (const v of src) {
+      const k = Math.floor(Number(v)); if (!(k >= 0 && k < N * N) || seen.has(k)) continue;
+      if (inStartZone(k % N, (k / N) | 0)) continue;
+      seen.add(k); w.push(k); if (w.length >= CUSTOM_MAX_WALLS) break;
+    }
+    w.sort((a, b) => a - b);
+    return { w, t: Math.max(5, Math.min(80, Math.floor(Number(c && c.t)) || 20)) };
+  }
+  function customLevel(c) {
+    const walls = c.w.map((k) => ({ x: k % N, y: (k / N) | 0 }));
+    const par = c.t * 8 + 70;
+    return { n: 0, custom: true, target: c.t, speed: 1, moving: false, boss: false, rival: false, shrink: false, walls, gates: [], par, par2: Math.round(par * 1.6) };
+  }
+  // Можно ли играть на такой раскладке: достаточно свободного места для еды
+  function customCheck(c) {
+    const n = normCustom(c), reach = reachMap(wallMap(n.w.map((k) => ({ x: k % N, y: (k / N) | 0 }))));
+    let free = 0; for (let i = 0; i < N * N; i++) if (reach[i]) free++;
+    return { ok: free >= 120, free, walls: n.w.length, norm: n };
+  }
+
+  const V4_MODES = ["dungeon", "puzzle", "custom"];
   const normCfg = (cfg) => ({
     seed: (Number(cfg && cfg.seed) >>> 0) || 1,
-    mode: MODES[cfg && cfg.mode] ? cfg.mode : "classic",
+    // режимы v4 существуют только с правилами v4
+    mode: MODES[cfg && cfg.mode] && !(V4_MODES.includes(cfg.mode) && ((cfg.rules | 0) || 1) < 4) ? cfg.mode : "classic",
     diff: DIFFS[cfg && cfg.diff] ? cfg.diff : "normal",
     artifact: ["magnet", "berserk", "phantom"].includes(cfg && cfg.artifact) ? cfg.artifact : "",
     artLevel: Math.max(1, Math.min(MAX_ART_LEVEL, (cfg && cfg.artLevel) | 0 || 1)),
     rules: Math.max(1, Math.min(RULES, (cfg && cfg.rules) | 0 || 1)),
-    level: cfg && cfg.mode === "level" ? Math.max(1, Math.min(LEVELS.length, (cfg.level | 0) || 1)) : 0
+    level: cfg && cfg.mode === "level" ? Math.max(1, Math.min(LEVELS.length, (cfg.level | 0) || 1)) : 0,
+    ...(cfg && cfg.mode === "custom" ? { custom: normCustom(cfg.custom) } : {})
   });
 
   class Game {
@@ -187,7 +327,11 @@
       this.rocks = []; this.pending = [];   // pending — камни «живых стен», которые вот-вот станут твёрдыми
       this.rockSet = new Uint8Array(N * N);
       // режим уровней: постоянные стены, ворота, норка, клетки, куда нельзя доползти
-      this.lv = cfg.mode === "level" ? LEVELS[cfg.level - 1] : null;
+      this.lv = cfg.mode === "level" ? LEVELS[cfg.level - 1] : cfg.mode === "dungeon" ? dungeonFloor(cfg.seed, 1)
+        : cfg.mode === "puzzle" ? makePuzzle(cfg.seed) : cfg.mode === "custom" ? customLevel(cfg.custom) : null;
+      // «Подземелье»: этаж, фрукты на этаже, взятые улучшения, ожидание выбора
+      this.floor = 1; this.floorApples = 0; this.choosing = null; this.leanTick = 0;
+      this.up = { magnet: 0, slow: 1, greed: 0, points: 0, rhythm: 0, luck: 0, lean: false, taken: [] };
       this.baseRocks = []; this.gates = []; this.gateSet = new Uint8Array(N * N); this.blocked = new Uint8Array(N * N); this.hole = null;
       this.food = null;
       // статистика забега: для заданий и для античита (на правила не влияет)
@@ -195,6 +339,7 @@
       this._foodAt = null;
       this._initObstacles();
       if (this.lv && cfg.rules >= 3 && this.lv.rival) this._initRival();
+      if (this.lv && this.lv.puzzle) this.nextPuAt = Infinity; // в головоломке бонусов нет
       this.placeFood();
     }
 
@@ -220,6 +365,8 @@
         }
       }
       for (let i = 0; i < N * N; i++) this.blocked[i] = seen[i] ? 0 : 1;
+      // новые режимы (v4: подземелье, головоломка, уровни игроков) — без еды в тупиках; старые уровни не трогаем
+      if (!L.n) { const ok = peel(this.rockSet, seen); for (let i = 0; i < N * N; i++) if (!ok[i]) this.blocked[i] = 1; }
     }
     // Ворота: закрыты половину периода; за 6 ходов до закрытия — предупреждение. Закрываются, только когда клетка свободна.
     _updateGates(ev) {
@@ -238,6 +385,7 @@
     _spawnHole(ev) {
       const free = this.freeCells(), h = this.snake[0];
       if (!free.length) return;
+      if (this.lv.puzzle) { const c = this._nearestFree(this.lv.holeAt, free); this.hole = { x: c.x, y: c.y }; ev.push({ t: "hole", x: c.x, y: c.y }); return; }
       const far = free.filter((c) => Math.abs(c.x - h.x) + Math.abs(c.y - h.y) >= 6);
       const pool = far.length ? far : free;
       const c = pool[Math.floor(this.rng() * pool.length)];
@@ -246,7 +394,7 @@
     }
     _initObstacles() {
       const m = this.cfg.mode;
-      if (m === "level") this._initLevel();
+      if (this.lv) this._initLevel();
       else if (m === "maze") this._setRocks(MAZE.map(([x, y]) => ({ x, y })));
       else if (m === "rocks") {
         const r = mulberry32(this.cfg.seed ^ 0xA5A5A5A5), list = [], seen = new Set();
@@ -286,7 +434,7 @@
     }
 
     // ---- скорость ----
-    stepMs() { return this.speedMs * (this.fx.slow > this.gameTime ? 1.6 : 1) * DIFFS[this.cfg.diff].speed * (this.lv ? this.lv.speed : 1); }
+    stepMs() { return this.speedMs * (this.fx.slow > this.gameTime ? 1.6 : 1) * DIFFS[this.cfg.diff].speed * (this.lv ? this.lv.speed : 1) * this.up.slow; }
     updateSpeed() {
       const len = this.snake.length + this.pendingGrowth;
       this.speedMs = Math.round(SPEED_MIN + (SPEED_START - SPEED_MIN) * Math.exp(-Math.max(0, len - START_LEN) / 40));
@@ -329,11 +477,34 @@
       for (let i = 0; i < N * N; i++) if (!busy[i]) free.push({ x: i % N, y: (i / N) | 0 });
       return free;
     }
+    // ближайшая свободная клетка к нужной (поиск в ширину) — для фиксированных мест головоломки
+    _nearestFree(t, free) {
+      const ok = new Uint8Array(N * N); for (const c of free) ok[c.y * N + c.x] = 1;
+      if (ok[t.y * N + t.x]) return t;
+      const seen = new Uint8Array(N * N), q = [t.y * N + t.x]; seen[q[0]] = 1;
+      for (let i = 0; i < q.length; i++) {
+        const k = q[i], x = k % N, y = (k / N) | 0;
+        for (const [dx, dy] of DIRS) {
+          const nx = x + dx, ny = y + dy, nk = ny * N + nx;
+          if (nx < 0 || ny < 0 || nx >= N || ny >= N || seen[nk]) continue;
+          if (ok[nk]) return { x: nx, y: ny };
+          seen[nk] = 1; q.push(nk);
+        }
+      }
+      return free[0];
+    }
     placeFood() {
       const free = this.freeCells();
       if (!free.length) return false;
+      if (this.lv && this.lv.puzzle) {
+        if (this.floorApples >= this.lv.foods.length) { this.food = null; return true; }
+        const c = this._nearestFree(this.lv.foods[this.floorApples], free);
+        this.food = { x: c.x, y: c.y, type: "apple" };
+        const h = this.snake[0]; this._foodAt = { t: this.ticks, x: h.x, y: h.y };
+        return true;
+      }
       const c = free[Math.floor(this.rng() * free.length)];
-      this.food = { x: c.x, y: c.y, type: this.rng() < 0.82 ? "apple" : (this.rng() < 0.5 ? "coin" : "gold") };
+      this.food = { x: c.x, y: c.y, type: this.rng() < 0.82 - 0.08 * Math.min(4, this.up.greed) ? "apple" : (this.rng() < 0.5 ? "coin" : "gold") };
       const h = this.snake[0];
       this._foodAt = { t: this.ticks, x: h.x, y: h.y };
       return true;
@@ -344,7 +515,7 @@
       let type;
       do { type = types[Math.floor(this.rng() * types.length)]; } while (type === "bomb" && this.snake.length < 8);
       this.pu = { x: c.x, y: c.y, type, expires: this.gameTime + PU_LIFE };
-      this.nextPuAt = this.gameTime + 16000 + this.rng() * 8000;
+      this.nextPuAt = this.gameTime + (16000 + this.rng() * 8000) / (1 + this.up.luck * 0.5);
     }
     activatePu(type, ev) {
       if (type === "shield") this.shield = true;
@@ -485,10 +656,55 @@
         && !(this.portals && this.portals.some((c) => c.x === x && c.y === y));
     }
 
+    // ---- «Подземелье»: выбор улучшения после этажа ----
+    _rollUpgrades() {
+      const pool = Object.keys(UPGRADES).filter((k) => !(UPGRADES[k].once && this.up.taken.includes(k))), out = [];
+      while (out.length < 3 && pool.length) out.push(pool.splice(Math.floor(this.rng() * pool.length), 1)[0]);
+      return out;
+    }
+    _floorDone(ev) {
+      const bonus = 5 * this.floor;
+      this.score += bonus;
+      this.choosing = { floor: this.floor, options: this._rollUpgrades() };
+      ev.push({ t: "floor", floor: this.floor, bonus, options: this.choosing.options });
+    }
+    // i — номер варианта 0..2. Возвращает true, если выбор принят (и записан в лог)
+    choose(i) {
+      if (!this.choosing || this.over) return false;
+      const id = this.choosing.options[i]; if (!id) return false;
+      if (this.record) this.log.push(this.ticks * 8 + OP_CHOOSE + i);
+      const u = this.up; u.taken.push(id);
+      if (id === "armor") this.charges++;
+      else if (id === "magnet") u.magnet = u.magnet ? u.magnet + 1 : 3;
+      else if (id === "slow") u.slow = Math.round(u.slow * 1.1 * 1000) / 1000;
+      else if (id === "greed") u.greed++;
+      else if (id === "points") u.points = Math.round((u.points + 0.3) * 10) / 10;
+      else if (id === "rhythm") u.rhythm += 15;
+      else if (id === "luck") u.luck++;
+      else if (id === "lean") u.lean = true;
+      this.choosing = null; this.floor++;
+      this._nextFloor();
+      return true;
+    }
+    _nextFloor() {
+      this.occ.fill(0); this.rockSet.fill(0); this.gateSet.fill(0); this.blocked.fill(0);
+      this.snake = [{ x: 12, y: 12 }, { x: 11, y: 12 }, { x: 10, y: 12 }, { x: 9, y: 12 }];
+      for (const s of this.snake) this.occ[s.y * N + s.x]++;
+      this.dir = { x: 1, y: 0 }; this.queue = []; this.pendingGrowth = 0;
+      this.hole = null; this.food = null; this.pu = null; this.pending = []; this.portals = null; this.baseRocks = []; this.gates = [];
+      for (const k of Object.keys(this.fx)) this.fx[k] = 0;
+      this.combo = 0; this.comboTimer = 0; this.floorApples = 0;
+      this.lv = dungeonFloor(this.cfg.seed, this.floor);
+      this._initLevel();
+      this.updateSpeed();
+      this.safeUntil = this.gameTime + SAFE_MS; this.nextPuAt = this.gameTime + 8000;
+      this.placeFood();
+    }
+
     // ---- один ход ----
     tick() {
       const ev = [];
-      if (this.over) return ev;
+      if (this.over || this.choosing) return ev;
       const interval = this.stepMs(), cfg = this.cfg;
       if (this.queue.length) this.dir = this.queue.shift();
       const ghost = this.ghostOn();
@@ -525,23 +741,25 @@
       // норка: заполз — уровень пройден
       if (this.hole && hx === this.hole.x && hy === this.hole.y) {
         const q = this.snake.pop(); this.occ[q.y * N + q.x]--;
+        if (cfg.mode === "dungeon") { this._floorDone(ev); return ev; }
         this.over = true; this.win = true; this.reason = "hole";
         ev.push({ t: "over", reason: "hole", win: true }); return ev;
       }
       const mult = this.fx.x2 > this.gameTime ? 2 : 1;
 
-      const f = this.food, ate = hx === f.x && hy === f.y;
+      const f = this.food, ate = !!f && hx === f.x && hy === f.y;
       if (ate) {
-        this.combo++; this.comboTimer = COMBO_WINDOW; this.bestRun = Math.max(this.bestRun, this.combo);
+        this.combo++; this.comboTimer = COMBO_WINDOW + this.up.rhythm; this.bestRun = Math.max(this.bestRun, this.combo);
         const cm = Math.min(this.combo, COMBO_MAX);
         const berserk = cfg.artifact === "berserk" && cm >= 3 ? this.art.berserkBonus : 1;
-        const pts = Math.floor((f.type === "gold" ? 5 : 1) * cm * mult * berserk);
+        const pts = Math.floor((f.type === "gold" ? 5 : 1) * cm * mult * berserk * (1 + this.up.points));
         this.score += pts;
         let coins = 0;
         if (f.type === "coin") coins = 10 * mult; else if (f.type === "gold") coins = 50 * mult;
         this.runCoins += coins;
-        this.pendingGrowth += GROWTH[f.type] || 1;
-        this.apples++;
+        if (this.up.lean && (this.leanTick++ % 2)) { /* «Стройность»: каждый второй фрукт без роста */ }
+        else this.pendingGrowth += GROWTH[f.type] || 1;
+        this.apples++; this.floorApples++;
         if (f.type === "gold") this.stats.gold++; else if (f.type === "coin") this.stats.coin++;
         // насколько путь к еде близок к кратчайшему (люди петляют, боты — нет)
         if (this._foodAt) {
@@ -551,17 +769,17 @@
         }
         ev.push({ t: "ate", x: f.x, y: f.y, type: f.type, pts, cm, coins, mult, combo: this.combo });
         this.updateSpeed();
-        if (this.lv && !this.hole && this.score >= this.lv.target) this._spawnHole(ev);
+        if (this.lv && !this.hole && (this.lv.need ? this.floorApples >= this.lv.need : this.score >= this.lv.target)) this._spawnHole(ev);
         if (!this.placeFood()) { this.over = true; this.win = true; this.reason = "win"; ev.push({ t: "over", reason: "win", win: true }); return ev; }
       }
 
       // Магнит
-      if (!ate && cfg.rules >= 2) {
-        const R = this.fx.magnet > this.gameTime ? BONUS_MAGNET_RANGE : cfg.artifact === "magnet" ? this.art.magnetRange : 0;
+      if (!ate && cfg.rules >= 2 && this.food) {
+        const R = Math.max(this.fx.magnet > this.gameTime ? BONUS_MAGNET_RANGE : cfg.artifact === "magnet" ? this.art.magnetRange : 0, this.up.magnet);
         if (R) this._magnet(hx, hy, R, ev);
       }
       // магнит старых правил (версия 1) — только для переигровки старых забегов
-      if (!ate && cfg.rules < 2) {
+      if (!ate && cfg.rules < 2 && this.food) {
         const fd = this.food;
         let dx = fd.x - hx, dy = fd.y - hy, moved = false;
         if (cfg.artifact === "magnet" && ((dx === 0 && Math.abs(dy) >= 2 && Math.abs(dy) <= this.art.magnetRange) || (dy === 0 && Math.abs(dx) >= 2 && Math.abs(dx) <= this.art.magnetRange))) {
@@ -600,7 +818,8 @@
     result() {
       const done = this.reason === "hole";
       return { score: this.score, apples: this.apples, runCoins: this.runCoins, bestRun: this.bestRun, ticks: this.ticks, gameTime: this.gameTime, over: this.over, reason: this.reason, win: this.win, stats: { ...this.stats },
-        level: this.lv ? this.lv.n : 0, completed: done, stars: done ? levelStars(this.lv.n, this.ticks) : 0 };
+        level: this.lv ? this.lv.n : 0, completed: done, stars: done ? (this.lv.n ? levelStars(this.lv.n, this.ticks) : starsFor(this.lv, this.ticks)) : 0,
+        floor: this.cfg.mode === "dungeon" ? this.floor : 0, upgrades: this.up.taken.slice() };
     }
   }
 
@@ -623,7 +842,7 @@
     for (const e of arr) {
       if (!Number.isInteger(e) || e < 0 || e > 8 * 10000000) return null;
       const t = e >> 3;
-      if (t < prev || (e & 7) > OP_RESUME) return null;
+      if (t < prev) return null;
       prev = t;
     }
     return arr;
@@ -640,8 +859,10 @@
       while (ptr < log.length && (log[ptr] >> 3) <= g.ticks) {
         const c = log[ptr++] & 7;
         if (c === OP_RESUME) g.resume();
+        else if (c >= OP_CHOOSE) g.choose(c - OP_CHOOSE);
         else if (g.setdir(DIRS[c][0], DIRS[c][1])) turns++;
       }
+      if (g.choosing) break; // ждали выбора улучшения, а его нет — забег закончился здесь
       g.tick();
     }
     return { ...g.result(), turns };
@@ -654,17 +875,20 @@
     ticks = Math.max(0, Math.floor(ticks) || 0);
     return {
       game: g,
-      done: () => g.over || g.ticks >= ticks,
+      done: () => g.over || g.ticks >= ticks || (!!g.choosing && !(ptr < log.length && (log[ptr] >> 3) <= g.ticks)),
       next() {
+        const ev = [];
         while (ptr < log.length && (log[ptr] >> 3) <= g.ticks) {
           const c = log[ptr++] & 7;
-          if (c === OP_RESUME) g.resume(); else g.setdir(DIRS[c][0], DIRS[c][1]);
+          if (c === OP_RESUME) g.resume();
+          else if (c >= OP_CHOOSE) { const opt = g.choosing && g.choosing.options[c - OP_CHOOSE]; if (g.choose(c - OP_CHOOSE)) ev.push({ t: "chosen", id: opt, floor: g.floor }); }
+          else g.setdir(DIRS[c][0], DIRS[c][1]);
         }
-        return g.tick();
+        return ev.concat(g.tick());
       }
     };
   }
 
-  return { N, START_LEN, SAFE_MS, DIRS, RULES, PU_V2, BONUS_MAGNET_RANGE, LEVELS, levelStars, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
+  return { N, START_LEN, SAFE_MS, DIRS, RULES, PU_V2, UPGRADES, OP_CHOOSE, PUZZLE_FRUITS, CUSTOM_MAX_WALLS, dungeonFloor, makePuzzle, normCustom, customCheck, starsFor, inStartZone, BONUS_MAGNET_RANGE, LEVELS, levelStars, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
     artifactStats, mulberry32, normCfg, Game, reward, isRated, parseLog, encodeLog, simulate, player };
 });

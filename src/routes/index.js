@@ -6,5 +6,6 @@ module.exports = (app) => {
   require("./social")(app);
   require("./payments")(app);
   require("./clans")(app);
+  require("./fun")(app);
   require("./admin")(app);
 };

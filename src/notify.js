@@ -22,7 +22,9 @@ async function toPlayer(uid, key, params = {}, opts = {}) {
     if (c.rows[0].n > MAX_PER_DAY) return "capped";
   }
   try {
-    await tgApi("sendMessage", { chat_id: String(uid), text: t(p.lang, key, params), reply_markup: opts.button === false ? undefined : playButton(p.lang) });
+    // opts.link = { key, url } — своя кнопка-ссылка (например «Отыграться» → вызов на том же поле)
+    const markup = opts.button === false ? undefined : opts.link ? { inline_keyboard: [[{ text: t(p.lang, opts.link.key), url: opts.link.url }]] } : playButton(p.lang);
+    await tgApi("sendMessage", { chat_id: String(uid), text: t(p.lang, key, params), reply_markup: markup });
     return "sent";
   } catch (e) {
     if (isBlockedError(e)) await pool.query(`UPDATE players SET bot_blocked=TRUE WHERE telegram_id=$1`, [String(uid)]).catch(() => {});

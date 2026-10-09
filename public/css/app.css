@@ -517,3 +517,89 @@ body.light .achsum{color:#a87400}
 .achievement .ab b,.achievement .ab small{display:block}.achievement .ab small{margin-top:2px}
 body.light #game .card{background:linear-gradient(145deg,#0d2117,#07110c);border-color:rgba(89,255,166,.18);color:#f3fff8}body.light #game .card *{--text:#f3fff8;--muted:#83a296}body.light #plook{background:transparent}
 body.light #game .tabs,body.light #game .artifact,body.light #game .xbtn{background:rgba(4,14,9,.7);border-color:rgba(89,255,166,.18);color:#f3fff8}body.light #game .tabs button:not(.on){color:#83a296}
+
+/* ===== v37: подземелье, головоломка, мастерская, питомец, колесо, подарки, дуэль ===== */
+#game.screen.active,#duelGame.screen.active{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:radial-gradient(circle at 50% 12%,rgba(37,150,91,.28),transparent 32%),radial-gradient(circle at 10% 90%,rgba(0,130,70,.13),transparent 28%),#020604;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));touch-action:none}
+#duelGame.dpad-on .dpad{display:grid}
+#duelGame.dpad-on .board-shell{width:min(100%,calc(100vh - 300px),calc(100dvh - 300px))}
+#duelGame .board-shell{width:min(100%,calc(100vh - 150px),calc(100dvh - 150px))}
+.duelbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:4px 2px 10px}
+.dside{display:flex;flex-direction:column;padding:8px 12px;border-radius:16px;background:rgba(5,18,11,.88);border:1px solid var(--line);min-width:0}
+.dside b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dside span{font-size:22px;font-weight:950}
+.dside.me{border-color:rgba(85,255,173,.55)}.dside.me span{color:var(--accent)}
+.dside.opp{text-align:right;border-color:rgba(255,120,140,.5)}.dside.opp span{color:#ff9a9a}
+.dmid{display:flex;flex-direction:column;align-items:center}.dmid span{font-size:20px;font-weight:950;font-variant-numeric:tabular-nums}.dmid small{font-size:11px}
+.nav button.duelbtn{background:linear-gradient(135deg,rgba(255,90,120,.25),rgba(5,16,10,.9));border-color:rgba(255,110,140,.45)}
+.nav button.dungeonbtn{background:linear-gradient(150deg,rgba(150,110,255,.2),rgba(5,16,10,.9));border-color:rgba(170,130,255,.35)}
+.nav button.puzzlebtn{background:linear-gradient(150deg,rgba(90,200,255,.18),rgba(5,16,10,.9));border-color:rgba(90,200,255,.35)}
+.homeextras{display:grid;gap:8px;margin-top:11px}.homeextras[hidden],.homeextras:empty{display:none}
+.hx{display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border-radius:18px;background:rgba(4,14,9,.72);border:1px solid rgba(120,255,190,.15)}
+.hx i{font-style:normal;font-size:28px}.hx b{display:block;font-weight:900}.hx small{font-size:12px}
+.hx.hol{background:linear-gradient(135deg,rgba(255,140,30,.28),rgba(60,20,90,.55));border-color:rgba(255,150,50,.5)}
+.hx.wheelb{background:linear-gradient(135deg,rgba(255,216,76,.22),rgba(5,16,10,.9));border-color:rgba(255,216,76,.45);animation:pulse2 2s infinite}
+.hx.petb{background:linear-gradient(135deg,rgba(255,150,170,.18),rgba(5,16,10,.9));border-color:rgba(255,150,170,.35)}
+.upglist{display:grid;gap:10px;margin-top:14px}
+.upg{display:grid;grid-template-columns:48px 1fr;grid-template-rows:auto auto;column-gap:10px;text-align:left;padding:14px;border-radius:18px;background:linear-gradient(145deg,#1a2f45,#0b1520);border:1px solid rgba(150,170,255,.35);animation:rise .35s ease both}
+.upg:nth-child(2){animation-delay:.07s}.upg:nth-child(3){animation-delay:.14s}
+.upg i{grid-row:1/3;font-style:normal;font-size:34px;display:grid;place-items:center}.upg b{font-size:16px}.upg small{font-size:12px}
+.upg:active{transform:scale(.97)}
+.upgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.upmini{padding:10px;border-radius:14px;background:rgba(4,14,9,.6);border:1px solid rgba(120,255,190,.08)}.upmini i{font-style:normal;font-size:22px}.upmini b{display:block;font-size:13px}.upmini small{font-size:11px}
+.pzhead{display:flex;align-items:baseline;gap:10px}.pzhead b{font-size:28px;font-weight:950;color:#7fd8ff}
+.pzwrap{display:grid;place-items:center;margin:10px 0}
+.pzcv{width:min(260px,70vw);aspect-ratio:1;border-radius:14px;border:1px solid rgba(90,200,255,.35)}
+.tabs.four{grid-template-columns:repeat(4,1fr)}.tabs.four button{padding:9px 2px;font-size:12px}
+.cllist{display:grid;gap:10px}
+.cl{display:flex;gap:12px;padding:10px;border-radius:16px;background:rgba(4,14,9,.6);border:1px solid rgba(120,255,190,.1)}
+.clcv{width:96px;height:96px;flex:none;border-radius:10px}
+.clb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.clb b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.clb small{font-size:11px}
+.clbtn{display:flex;gap:6px;margin-top:auto}
+button.sm{padding:7px 11px;border-radius:11px;background:#13281d;border:1px solid var(--line);font-weight:800;font-size:13px}
+button.sm.primary{background:linear-gradient(135deg,#64ffb5,#1bd778);color:#03170d;padding:7px 16px}
+button.sm.on{border-color:#ff6b8b}
+.edtools{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.edtools button{padding:10px 4px;border-radius:12px;background:#10241a;border:1px solid var(--line);font-weight:800;font-size:13px}
+.edtools button.on{background:#1d4a31;border-color:var(--accent)}
+.edwrap{display:grid;place-items:center}
+#edCanvas{width:min(100%,460px);aspect-ratio:1;border-radius:14px;border:1px solid var(--line);touch-action:none;cursor:crosshair}
+.edinfo{margin:8px 0;font-weight:700;font-size:13px;text-align:center}
+#edName{width:100%;margin-top:8px}
+#edName,#clanName,#clanTag,#clanSearch{padding:12px;border-radius:12px;background:#06100b;border:1px solid var(--line);color:var(--text);font:inherit}
+.petgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.petpick{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;border-radius:18px;background:rgba(4,14,9,.6);border:1px solid rgba(120,255,190,.15)}
+.petpick i{font-style:normal;font-size:24px}.petpick span{padding:6px 14px;border-radius:10px;font-size:13px}
+.petcard{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px;border-radius:20px;background:radial-gradient(circle at 50% 30%,rgba(255,220,150,.15),transparent 60%),rgba(4,14,9,.6);border:1px solid rgba(255,220,150,.25)}
+.petcard .bar{width:80%;margin-top:6px}
+.petbig{font-size:84px;line-height:1.1;animation:petbob 1.6s ease-in-out infinite}
+.petbig.hungry{filter:grayscale(.5);animation:petsad 2.4s ease-in-out infinite}
+@keyframes petbob{50%{transform:translateY(-8px) scale(1.04)}}
+@keyframes petsad{50%{transform:rotate(-6deg)}}
+.petbonus{margin-top:8px;font-weight:700;font-size:14px}
+.wheelwrap{position:relative;width:min(280px,72vw);aspect-ratio:1;margin:14px auto 4px}
+#wheelCv{width:100%;height:100%;border-radius:50%;box-shadow:0 0 0 6px #0b1912,0 0 0 8px rgba(255,216,76,.6),0 10px 40px rgba(0,0,0,.5)}
+.wheelptr{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-style:normal;font-size:28px;color:#ffd84c;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+.wheelres{min-height:30px;font-size:22px;font-weight:950;color:#ffd84c;margin-top:6px}
+.giftamts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.giftamts button{padding:12px 4px;border-radius:13px;background:#13281d;border:1px solid var(--line);font-weight:900}
+.giftamts button:disabled{opacity:.35}
+.giftskins{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;max-height:220px;overflow:auto}
+.giftskins button{display:flex;flex-direction:column;align-items:center;padding:8px 4px;border-radius:13px;background:#0b1912;border:1px solid var(--line)}
+.giftskins span{font-size:22px}.giftskins b{font-size:12px}.giftskins small{font-size:11px}.giftskins button:disabled{opacity:.35}
+.duelwait{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;margin-top:14px;padding:18px;border-radius:20px;background:rgba(4,14,9,.6);border:1px dashed rgba(255,120,140,.4)}
+.duelwait .refbtns{width:100%}
+.spin{font-size:40px;animation:spin 1.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.duelbtns{display:grid;gap:10px;margin-top:14px}
+.big2{padding:16px;font-size:16px;font-weight:900;border-radius:16px}
+.duelbtns .alt{background:#13281d;border:1px solid var(--line)}
+.holsect{color:#ffb35a}
+.pv-hw_pumpkin{background:linear-gradient(90deg,#d35400,#ffc46b)}
+.pv-hw_skeleton{background:repeating-linear-gradient(90deg,#ececec 0 8px,#2b2b30 8px 16px);box-shadow:0 0 12px rgba(184,255,176,.5)}
+.pv-hw_ghost{background:linear-gradient(90deg,#9fb4e8,#ffffff);opacity:.85;animation:flicker 1.6s ease-in-out infinite}
+.fv-halloween_field{background:radial-gradient(circle at 78% 22%,rgba(255,236,170,.75) 0 10%,transparent 11%),radial-gradient(circle at 50% 80%,rgba(190,170,255,.18),transparent 55%),#0d0716}
+body.light .hx,body.light .upmini,body.light .cl,body.light .petpick,body.light .duelwait,body.light .dside{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .hx.hol{background:linear-gradient(135deg,#ffe2c2,#efe2ff)}
+body.light button.sm,body.light .edtools button,body.light .giftamts button,body.light .giftskins button,body.light .duelbtns .alt{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .petcard{background:#fff8ec;border-color:rgba(200,150,60,.25)}
+body.light #edName{background:#fff;color:var(--text)}
+body.light #duelGame .dside{background:rgba(5,18,11,.88);color:#f3fff8}

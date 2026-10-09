@@ -13,11 +13,14 @@ app.use(["/api", "/s"], ipLimit);
 app.use(express.json({ limit: "400kb" })); // лог забега может быть до ~100 КБ
 app.use(express.static(path.join(__dirname, "public"), { maxAge: "5m" }));
 require("./src/routes")(app);
+const Duel = require("./src/duel");
+Duel.routes(app);
 
 async function start() {
   try {
     await initDb();
-    app.listen(config.PORT, "0.0.0.0", () => console.log(`Snake Arena running on ${config.PORT} with PostgreSQL`));
+    const server = app.listen(config.PORT, "0.0.0.0", () => console.log(`Snake Arena running on ${config.PORT} with PostgreSQL`));
+    Duel.attach(server); // WebSocket /ws/duel — дуэли в реальном времени
     if (!config.botUsername && config.BOT_TOKEN) {
       try { config.botUsername = (await tgApi("getMe")).username || ""; console.log("BOT_USERNAME определён автоматически:", config.botUsername); }
       catch (e) { console.warn("getMe failed:", e.message); }

@@ -8,6 +8,16 @@ const Engine = require("../../public/engine.js");
 const M = require("../missions");
 const Pass = require("../pass");
 const Ev = require("../events");
+const Holiday = require("../seasonal");
+// Покупка праздничного предмета за конфеты (только пока идёт праздник). col — колонка-список, setCol — что надеть
+async function buyForCandy(res, uid, def, col, setCol) {
+  if (!Holiday.current()) { res.status(403).json({ error: "Holiday is over" }); return false; }
+  const r = await pool.query(
+    `UPDATE players SET candies=candies-$1, ${setCol}=$2, ${col}=ARRAY(SELECT DISTINCT unnest(${col} || ARRAY[$2]::TEXT[])), updated_at=NOW()
+     WHERE telegram_id=$3 AND candies>=$1 RETURNING 1`, [def.price, def.id, uid]);
+  if (!r.rowCount) { res.status(400).json({ error: "Not enough candies" }); return false; }
+  return true;
+}
 
 module.exports = (app) => {
   app.get("/health", async (_req, res) => {
@@ -40,6 +50,7 @@ module.exports = (app) => {
 
     if (!owned.includes(skin)) {
       if (def.currency === "stars") return res.status(402).json({ error: "Buy with Telegram Stars" });
+      if (def.currency === "candy") { if (!(await buyForCandy(res, uid, def, "owned_skins", "skin"))) return; return res.json({ player: P.responsePlayer(await P.getPlayer(u)), bot_username: config.botUsername }); }
       const r = await pool.query(
         `UPDATE players SET coins=coins-$1, skin=$2,
              owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$2]::TEXT[])), updated_at=NOW()
@@ -62,6 +73,7 @@ module.exports = (app) => {
 
     if (!owned.includes(id)) {
       if (def.currency === "stars") return res.status(402).json({ error: "Buy with Telegram Stars" });
+      if (def.currency === "candy") { if (!(await buyForCandy(res, uid, def, "owned_fields", "field_skin"))) return; return res.json({ player: P.responsePlayer(await P.getPlayer(u)), bot_username: config.botUsername }); }
       const r = await pool.query(
         `UPDATE players SET coins=coins-$1, field_skin=$2,
              owned_fields=ARRAY(SELECT DISTINCT unnest(owned_fields || ARRAY[$2]::TEXT[])), updated_at=NOW()
@@ -83,6 +95,7 @@ module.exports = (app) => {
     if (!def) return res.status(400).json({ error: "Bad accessory" });
     if (!(p.owned_accessories || []).includes(id)) {
       if (def.currency === "stars") return res.status(402).json({ error: "Buy with Telegram Stars" });
+      if (def.currency === "candy") { if (!(await buyForCandy(res, uid, def, "owned_accessories", "accessory"))) return; return res.json({ player: P.responsePlayer(await P.getPlayer(u)) }); }
       const r = await pool.query(
         `UPDATE players SET coins=coins-$1, accessory=$2, owned_accessories=ARRAY(SELECT DISTINCT unnest(owned_accessories || ARRAY[$2]::TEXT[])), updated_at=NOW()
          WHERE telegram_id=$3 AND coins>=$1 RETURNING 1`, [def.price, id, uid]);
