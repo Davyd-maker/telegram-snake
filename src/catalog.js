@@ -34,7 +34,7 @@ const SKIN_CATALOG = [
 const SKIN_BY_ID = Object.fromEntries(SKIN_CATALOG.map((s) => [s.id, s]));
 
 const ARTIFACT_CATALOG = [
-  { id: "magnet",  name: "Магнит",  emoji: "🧲", rarity: "rare",      desc: "Подтягивает еду по прямой (радиус растёт с уровнем).", color: "#55d6ff" },
+  { id: "magnet",  name: "Магнит",  emoji: "🧲", rarity: "rare",      desc: "Тянет еду перед змейкой прямо в рот (радиус 2 → 4 клетки с уровнем).", color: "#55d6ff" },
   { id: "berserk", name: "Берсерк", emoji: "🔥", rarity: "epic",      desc: "После 3+ комбо каждый предмет даёт +25% очков и больше с уровнем.", color: "#ff7a32" },
   { id: "phantom", name: "Фантом",  emoji: "👻", rarity: "legendary", desc: "Спасает от столкновения (раз за забег, больше с уровнем).", color: "#b48cff" }
 ];

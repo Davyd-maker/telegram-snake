@@ -20,10 +20,10 @@ const nameOf = (x) => x.first_name || x.username || "Игрок";
 // Призрак: забег из game_log, по которому можно проиграть змейку рядом с игроком
 async function ghostFromGame(gameId, label) {
   if (!gameId) return null;
-  const g = await q(`SELECT g.score, g.ticks, g.run_log, p.first_name, p.username, p.skin FROM game_log g JOIN players p ON p.telegram_id=g.telegram_id
+  const g = await q(`SELECT g.score, g.ticks, g.run_log, g.cfg, p.first_name, p.username, p.skin FROM game_log g JOIN players p ON p.telegram_id=g.telegram_id
                      WHERE g.id=$1 AND g.verified AND g.run_log IS NOT NULL`, [gameId]);
   const x = g.rows[0];
-  return x ? { label: label || nameOf(x), score: x.score, ticks: x.ticks, log: x.run_log, skin: C.skinDef(x.skin) ? x.skin : "classic", palette: C.skinPalette(x.skin) } : null;
+  return x ? { label: label || nameOf(x), score: x.score, ticks: x.ticks, log: x.run_log, cfg: x.cfg, skin: C.skinDef(x.skin) ? x.skin : "classic", palette: C.skinPalette(x.skin) } : null;
 }
 
 // Друзья, чей рекорд только что побили (их рекорд был ≥ прошлого рекорда игрока и < нового)
@@ -72,7 +72,8 @@ module.exports = (app) => {
       cfg = { mode: c.mode, diff: c.diff, artifact: c.art || "", artLevel: c.art_level || 1, seed: c.seed ? Number(c.seed) : R.randomSeed() };
       if (c.seed) ghost = await ghostFromGame(c.game_id); // соперник едет рядом призраком — только на том же поле
     }
-    const token = R.makeRunToken(uid, { seed: cfg.seed, mode: cfg.mode, diff: cfg.diff, art: cfg.artifact, lvl: cfg.artLevel, kind, ref });
+    cfg.rules = Engine.RULES; // новые забеги — по последней версии правил
+    const token = R.makeRunToken(uid, { seed: cfg.seed, mode: cfg.mode, diff: cfg.diff, art: cfg.artifact, lvl: cfg.artLevel, rl: cfg.rules, kind, ref });
     res.json({ token, cfg, kind, ghost });
   }, { limit: [40, 60000] }));
 

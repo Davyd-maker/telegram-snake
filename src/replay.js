@@ -37,7 +37,8 @@ function verifyRun(token, uid, logSrc, ticksIn) {
   if (!log) return { ok: false, reason: "bad_log", t };
   const ticks = Math.floor(Number(ticksIn));
   if (!Number.isFinite(ticks) || ticks < 0 || ticks > MAX_TICKS) return { ok: false, reason: "bad_ticks", t };
-  const cfg = Engine.normCfg({ seed: t.seed, mode: t.mode, diff: t.diff, artifact: t.art, artLevel: t.lvl });
+  // rl — версия правил игры (старые токены без неё — правила v1)
+  const cfg = Engine.normCfg({ seed: t.seed, mode: t.mode, diff: t.diff, artifact: t.art, artLevel: t.lvl, rules: t.rl || 1 });
   const sim = Engine.simulate(cfg, log, ticks);
   // игра не может идти быстрее реального времени: каждый поворот может «сэкономить» до ~половины хода
   const allowed = t.age + 130 * sim.turns + 2500;

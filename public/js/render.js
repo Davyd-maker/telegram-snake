@@ -25,7 +25,7 @@
     const mainCtx = canvas.getContext("2d", { alpha: false });
     let ctx = mainCtx, layerc = null, layerx = null, bgc = null, dprV = 1;
     let cell = 30, side = 0, fieldName = "", fieldFx = [];
-    let particles = [], floaters = [], eaten = [], bulges = [], rings = [];
+    let particles = [], floaters = [], eaten = [], bulges = [], rings = [], sparks = [];
     let shakeUntil = 0, shakePow = 0, flashUntil = 0, flashColor = "255,60,80", lightSprite = null, rockSprite = null;
     const headDir = { x: 1, y: 0 };
     let v = null; // текущий вид
@@ -158,7 +158,12 @@
 
     function drawFood(now) {
       if (!v.snake.length || !v.food) return;
-      drawFoodItem(v.food, now, v.foodBorn || 0, 1);
+      let food = v.food;
+      if (v.foodFrom) { // еда, которую тянет магнит, плавно едет из прошлой клетки в новую
+        const k = Math.min(1, (now - v.foodFrom.t) / v.foodFrom.dur), e = 1 - (1 - k) * (1 - k);
+        food = { ...v.food, x: v.foodFrom.x + (v.food.x - v.foodFrom.x) * e, y: v.foodFrom.y + (v.food.y - v.foodFrom.y) * e };
+      }
+      drawFoodItem(food, now, v.foodBorn || 0, 1);
       eaten = eaten.filter((e) => now - e.t < e.dur);
       for (const e of eaten) { const k = (now - e.t) / e.dur; drawFoodItem(e, now, 0, k < 0.7 ? 1 : Math.max(0, 1 - (k - 0.7) / 0.3)); }
     }
@@ -371,6 +376,27 @@
       ctx.restore();
     }
 
+    // Поле магнита: у бонуса — пульсирующие кольца вокруг головы; при каждом притяжении — искры от еды к голове
+    function drawMagnet(now) {
+      if (!v.snake.length || (!v.magnetR && !v.magnetArt)) return;
+      const h = snakePoints(now, mainSnake())[0], cx = (h.x + 0.5) * cell, cy = (h.y + 0.5) * cell;
+      ctx.save();
+      if (v.magnetR) {
+        for (let i = 0; i < 2; i++) {
+          const k = ((now / 900 + i / 2) % 1), r = cell * (0.8 + k * (v.magnetR - 0.3));
+          ctx.globalAlpha = 0.28 * (1 - k); ctx.strokeStyle = "#55d6ff"; ctx.lineWidth = cell * 0.06;
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+      for (const s of sparks) { // искры от еды к голове
+        const k = (now - s.t) / 380; if (k >= 1 || k < 0) continue;
+        const x = (s.x + (s.tx - s.x) * k + 0.5) * cell, y = (s.y + (s.ty - s.y) * k + 0.5) * cell;
+        ctx.globalAlpha = 0.8 * (1 - k); ctx.fillStyle = "#8be9ff";
+        ctx.beginPath(); ctx.arc(x, y, cell * 0.08 * (1 - k * 0.5), 0, Math.PI * 2); ctx.fill();
+      }
+      sparks = sparks.filter((s) => now - s.t < 380);
+      ctx.restore();
+    }
     function drawLight(now) {
       if (!lightSprite || !v.snake.length) return;
       const pts = snakePoints(now, mainSnake()), h = pts[0], L = cell * 7;
@@ -403,7 +429,7 @@
       ctx.save();
       if (now < shakeUntil) { const k = (shakeUntil - now) / 400 * shakePow; ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k); }
       if (bgc) ctx.drawImage(bgc, 0, 0, side, side); else { ctx.fillStyle = "#04100a"; ctx.fillRect(0, 0, side, side); }
-      drawFieldFx(now); drawLight(now); drawRocks(now); drawFood(now); drawPowerUp(now); drawRings(now); drawSnake(now); drawParticles(); drawFloaters(); drawComboGlow(now);
+      drawFieldFx(now); drawLight(now); drawRocks(now); drawMagnet(now); drawFood(now); drawPowerUp(now); drawRings(now); drawSnake(now); drawParticles(); drawFloaters(); drawComboGlow(now);
       ctx.restore();
       if (now < flashUntil) { ctx.save(); ctx.globalAlpha = ((flashUntil - now) / 350) * 0.45; ctx.fillStyle = `rgb(${flashColor})`; ctx.fillRect(0, 0, side, side); ctx.restore(); }
       if (v.countdown) { // обратный отсчёт после паузы
@@ -433,6 +459,7 @@
         }
       },
       floater(x, y, text) { floaters.push({ x, y, life: 1, text }); },
+      magnetSpark(fx, fy, x, y) { for (let i = 0; i < 3; i++) sparks.push({ x: fx, y: fy, tx: x + (x - fx) * 0.6, ty: y + (y - fy) * 0.6, t: performance.now() + i * 60 }); },
       ring(x, y, color = "#7dffbd") { rings.push({ x, y, color, t: performance.now() }); },
       shake(pow = 10, ms = 400) { shakeUntil = performance.now() + ms; shakePow = pow; },
       flash(color = "255,60,80") { flashUntil = performance.now() + 350; flashColor = color; },

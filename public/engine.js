@@ -41,6 +41,10 @@
   };
   const TIMED = ["slow", "x2", "ghost", "magnet"];
   const MAX_ART_LEVEL = 5;
+  // Версия правил. Старые забеги (реплеи, призраки) переигрываются по своей версии, новые — по последней.
+  // 2 — новый магнит: тянет еду на клетку перед головой и только спереди.
+  const RULES = 2;
+  const BONUS_MAGNET_RANGE = 6;
   // Артефакты по уровням прокачки
   const artifactStats = (id, lvl) => {
     lvl = Math.max(1, Math.min(MAX_ART_LEVEL, lvl | 0 || 1));
@@ -77,7 +81,8 @@
     mode: MODES[cfg && cfg.mode] ? cfg.mode : "classic",
     diff: DIFFS[cfg && cfg.diff] ? cfg.diff : "normal",
     artifact: ["magnet", "berserk", "phantom"].includes(cfg && cfg.artifact) ? cfg.artifact : "",
-    artLevel: Math.max(1, Math.min(MAX_ART_LEVEL, (cfg && cfg.artLevel) | 0 || 1))
+    artLevel: Math.max(1, Math.min(MAX_ART_LEVEL, (cfg && cfg.artLevel) | 0 || 1)),
+    rules: Math.max(1, Math.min(RULES, (cfg && cfg.rules) | 0 || 1))
   });
 
   class Game {
@@ -221,6 +226,24 @@
       ev.push({ t: "pu", type });
     }
 
+    // Магнит (правила v2): еда в радиусе R перед головой подтягивается на одну клетку за ход —
+    // сначала на линию движения, потом к голове — и оказывается прямо «во рту». Еда сзади не притягивается.
+    _magnet(hx, hy, R, ev) {
+      const f = this.food, d = this.dir, wrap = this.cfg.mode === "nowalls" || this.ghostOn();
+      let rx = f.x - hx, ry = f.y - hy;
+      if (wrap) { if (Math.abs(rx) > N / 2) rx -= Math.sign(rx) * N; if (Math.abs(ry) > N / 2) ry -= Math.sign(ry) * N; }
+      const along = rx * d.x + ry * d.y, side = d.x ? ry : rx;
+      if (along < 1 || Math.abs(rx) + Math.abs(ry) > R) return;   // сзади, сбоку на уровне головы или далеко
+      if (along === 1 && side === 0) return;                       // уже прямо перед головой
+      let nx = f.x, ny = f.y;
+      if (side !== 0) { if (d.x) ny -= Math.sign(side); else nx -= Math.sign(side); } // на линию движения
+      else { nx -= d.x; ny -= d.y; }                                                    // ближе к голове
+      if (wrap) { nx = (nx + N) % N; ny = (ny + N) % N; }
+      if (!this._free(nx, ny)) return;
+      ev.push({ t: "pull", fx: f.x, fy: f.y, x: nx, y: ny });
+      f.x = nx; f.y = ny;
+    }
+
     _bodyHit(x, y) {
       let c = this.occ[y * N + x];
       const tail = this.snake[this.snake.length - 1];
@@ -281,8 +304,13 @@
         if (!this.placeFood()) { this.over = true; this.win = true; this.reason = "win"; ev.push({ t: "over", reason: "win", win: true }); return ev; }
       }
 
-      // Магнит (артефакт): еда в 2..R клетках по прямой подтягивается на клетку; бонус «магнит» — еда рядом притягивается в любую сторону
-      if (!ate) {
+      // Магнит
+      if (!ate && cfg.rules >= 2) {
+        const R = this.fx.magnet > this.gameTime ? BONUS_MAGNET_RANGE : cfg.artifact === "magnet" ? this.art.magnetRange : 0;
+        if (R) this._magnet(hx, hy, R, ev);
+      }
+      // магнит старых правил (версия 1) — только для переигровки старых забегов
+      if (!ate && cfg.rules < 2) {
         const fd = this.food;
         let dx = fd.x - hx, dy = fd.y - hy, moved = false;
         if (cfg.artifact === "magnet" && ((dx === 0 && Math.abs(dy) >= 2 && Math.abs(dy) <= this.art.magnetRange) || (dy === 0 && Math.abs(dx) >= 2 && Math.abs(dx) <= this.art.magnetRange))) {
@@ -378,6 +406,6 @@
     };
   }
 
-  return { N, START_LEN, SAFE_MS, DIRS, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
+  return { N, START_LEN, SAFE_MS, DIRS, RULES, BONUS_MAGNET_RANGE, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
     artifactStats, mulberry32, normCfg, Game, reward, isRated, parseLog, encodeLog, simulate, player };
 });

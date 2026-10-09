@@ -681,11 +681,12 @@
   let running = false, paused = false, countdown = 0, countdownAt = 0, cdTimer = 0, timer = 0, raf = 0, starting = false;
   let prevSnake = [], lastTick = 0, foodBorn = 0, fxSig = "";
   let replay = null; // { rp, name, score, skin, palette, speed }
+  let pullAnim = null; // анимация еды, которую тянет магнит
   let ghost = null;  // призрак: { rp, prev, label, skin, palette, dead, hd } — соперник или свой лучший забег на том же поле
   function makeGhost(gd, cfg) {
     if (!gd?.log && gd?.log !== "") return null;
     const log = E.parseLog(gd.log); if (!log) return null;
-    const rp = E.player(cfg, log, gd.ticks);
+    const rp = E.player(gd.cfg ? E.normCfg(gd.cfg) : cfg, log, gd.ticks); // призрак — по правилам своего забега
     return { rp, prev: rp.game.snake.map((q) => ({ ...q })), label: gd.label === "Твой лучший" ? t("Твой лучший") : `${gd.label} · ${gd.score}`, skin: gd.skin, palette: gd.palette, dead: false, hd: { x: 1, y: 0 } };
   }
   function stepGhost() {
@@ -705,6 +706,8 @@
       rocks: g.rocks, pending: g.pending, stepMs: g.stepMs() / (replay ? replay.speed : 1), lastTick, paused: paused || !!countdown,
       ghost: g.ghostOn(), safe: g.isSafe() && !g.over, shield: g.shield, skin: curSkin(), palette: curPalette(), countdown, countdownAt,
       combo: g.combo >= 2 ? Math.min(g.combo, 8) : 0,
+      foodFrom: pullAnim && pullAnim.food === g.food ? pullAnim : null,
+      magnetR: g.fx.magnet > g.gameTime ? E.BONUS_MAGNET_RANGE : 0, magnetArt: g.cfg.artifact === "magnet" && g.cfg.rules >= 2,
       ghosts: ghost ? [{ snake: ghost.rp.game.snake, prevSnake: ghost.prev, dir: ghost.rp.game.dir, skin: ghost.skin, palette: ghost.palette, label: ghost.label, dead: ghost.dead, hd: ghost.hd }] : []
     };
   }
@@ -757,6 +760,9 @@
     } else if (e.t === "bomb") {
       for (const c of e.cells) renderer.burst(c.x, c.y, "bomb", 6);
       sfx.boom(); haptic("heavy"); renderer.shake(9, 350); renderer.flash("255,140,60");
+    } else if (e.t === "pull") { // магнит: еда плавно едет к голове
+      pullAnim = { food: g.food, x: e.fx, y: e.fy, t: performance.now(), dur: interval };
+      renderer.magnetSpark(e.fx, e.fy, e.x, e.y);
     } else if (e.t === "pu_spawn") {
       if (g.pu) g.pu.born = performance.now();
     } else if (e.t === "save") {
@@ -814,7 +820,7 @@
     else if (d?._status === 404 && kindOpt.kind === "challenge") { challengeId = ""; renderChallengeBox(); el.game.classList.remove("active"); show("home"); return toast("Вызов уже недоступен"); }
     else if (d?._status === 409 && kindOpt.kind === "tournament") { el.game.classList.remove("active"); show("tournament"); return toast("Турнир сейчас не идёт"); }
     else {
-      cfg = { seed: (Math.random() * 2 ** 31) >>> 0, mode: sel.mode, diff: sel.diff, artifact: sel.artifact, artLevel: art?.level || 1 };
+      cfg = { seed: (Math.random() * 2 ** 31) >>> 0, mode: sel.mode, diff: sel.diff, artifact: sel.artifact, artLevel: art?.level || 1, rules: E.RULES };
       toast("Нет связи с сервером — этот забег не будет засчитан", 3000);
     }
     run = { token, cfg, kind: d?.kind || kindOpt.kind, ref: kindOpt.ref };

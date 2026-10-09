@@ -36,10 +36,10 @@ test("одинаковый seed — одинаковое поле", () => {
   assert.notDeepEqual(foods(42), foods(43));
 });
 
-for (const mode of Object.keys(E.MODES)) {
+for (const rules of [1, E.RULES]) for (const mode of Object.keys(E.MODES)) {
   for (const diff of Object.keys(E.DIFFS)) {
-    test(`переигровка по логу даёт тот же результат: ${mode}/${diff}`, () => {
-      const cfg = { seed: 1000 + mode.length * 7 + diff.length, mode, diff, artifact: "magnet", artLevel: 3 };
+    test(`переигровка по логу даёт тот же результат: правила v${rules}, ${mode}/${diff}`, () => {
+      const cfg = { seed: 1000 + mode.length * 7 + diff.length, mode, diff, artifact: "magnet", artLevel: 3, rules };
       const g = play(cfg, 500);
       const res = g.result();
       const sim = E.simulate(cfg, E.parseLog(E.encodeLog(g.log)), res.ticks);
@@ -120,4 +120,44 @@ test("испорченный лог отклоняется", () => {
   assert.equal(E.parseLog("-8"), null);
   assert.deepEqual(E.parseLog(""), []);
   assert.deepEqual(E.parseLog("8,17,20"), [8, 17, 20]);
+});
+
+
+// ---- магнит (правила v2) ----
+function magnetGame(food, opts = {}) {
+  const g = new E.Game({ seed: 3, artifact: opts.artifact ?? "magnet", artLevel: opts.level || 1, rules: opts.rules || E.RULES });
+  g.food = { ...food, type: "apple" };
+  if (opts.bonus) g.fx.magnet = 1e9;
+  return g;
+}
+test("магнит: еда спереди по диагонали подтягивается на линию движения и съедается", () => {
+  // голова (12,12) едет вправо; после хода голова (13,12), еда (14,13) — спереди и на клетку в сторону
+  const g = magnetGame({ x: 14, y: 13 });
+  const ev = g.tick();
+  assert.ok(ev.some((e) => e.t === "pull"));
+  assert.deepEqual([g.food.x, g.food.y], [14, 12], "еда встала прямо перед головой");
+  g.tick();
+  assert.equal(g.apples, 1, "и съедена следующим ходом");
+});
+test("магнит: еда сзади и сбоку на уровне головы не притягивается", () => {
+  for (const f of [{ x: 11, y: 10 }, { x: 13, y: 10 }]) { // после хода голова (13,12): (11,10) — сзади, (13,10) — сбоку
+    const g = magnetGame(f);
+    const ev = g.tick();
+    assert.ok(!ev.some((e) => e.t === "pull"), JSON.stringify(f));
+    assert.deepEqual([g.food.x, g.food.y], [f.x, f.y]);
+  }
+});
+test("магнит: радиус артефакта растёт с уровнем, бонус тянет издалека", () => {
+  const far = { x: 15, y: 14 }; // после хода голова (13,12): 2 вперёд + 2 вбок = 4
+  assert.ok(!magnetGame(far, { level: 1 }).tick().some((e) => e.t === "pull"), "ур. 1 (радиус 2) — не достаёт");
+  assert.ok(magnetGame(far, { level: 5 }).tick().some((e) => e.t === "pull"), "ур. 5 (радиус 4) — тянет");
+  assert.ok(magnetGame({ x: 17, y: 14 }, { artifact: "", bonus: true }).tick().some((e) => e.t === "pull"), "бонус — радиус 6");
+  assert.ok(!magnetGame(far, { artifact: "" }).tick().some((e) => e.t === "pull"), "без магнита — ничего");
+});
+test("старые забеги (правила v1) переигрываются по старому магниту", () => {
+  const g = magnetGame({ x: 14, y: 13 }, { rules: 1 });
+  g.tick();
+  assert.deepEqual([g.food.x, g.food.y], [14, 13], "старый магнит не тянет по диагонали");
+  assert.equal(E.normCfg({}).rules, 1);
+  assert.equal(E.normCfg({ rules: 2 }).rules, 2);
 });
