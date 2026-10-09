@@ -6,6 +6,7 @@ function blockedAt(g, x, y, tailFree) {
   if (x < 0 || y < 0 || x >= N || y >= N) return true;
   const k = y * N + x;
   if (g.rockSet[k] || (g.lv && g.gateClosed(x, y))) return true;
+  if (g.shrinkWarn && g.shrinkWarn.some((c) => c.x === x && c.y === y)) return true;
   if (g.pending.some((c) => c.x === x && c.y === y && c.solidAt - g.ticks <= 2)) return true;
   if (g.gateSet && g.gateSet[k]) { const gt = g.gates.find((q) => q.x === x && q.y === y); if (gt && (gt.warn || gt.closed)) return true; }
   if (g.occ[k]) { const t = g.snake[g.snake.length - 1]; if (!(tailFree && t.x === x && t.y === y)) return true; }

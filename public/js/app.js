@@ -76,7 +76,7 @@
     $("pcoins").textContent = fmtN(p.coins); $("pbestnw").textContent = p.best_nowalls || 0; $("refs").textContent = p.referrals || 0; $("pref").textContent = p.referrals || 0;
     $("name").textContent = p.first_name || "Игрок"; el.gc.textContent = fmtN(p.coins); $("streak").textContent = p.daily?.streak || 0;
     $("pseason").textContent = p.season?.number ? `🏅 Сезон #${p.season.number} — ${p.season_rank ? "место " + p.season_rank : "ты ещё не играл"}` : "";
-    renderDaily(); renderMissions(); renderer.setField(fieldId());
+    renderDaily(); renderMissions(); renderProfile(); renderer.setField(fieldId());
     const dot = (scr, on) => { const b = document.querySelector(`.nav [data-screen="${scr}"]`); if (b) b.classList.toggle("has-dot", !!on); };
     dot("missions", p.daily?.can_claim || (p.missions || []).some((m) => m.progress >= m.target && !m.claimed));
     dot("achievements", (p.achievements_list || []).some((a) => !a.claimed && a.ready));
@@ -88,17 +88,30 @@
     if (!d) { box.innerHTML = ""; return; }
     const tiles = d.rewards.map((r, i) => {
       const done = i < d.cycle_claimed, today = d.can_claim && i === d.cycle_claimed;
-      return `<div class="day${done ? " done" : ""}${today ? " today" : ""}${i === d.rewards.length - 1 ? " last" : ""}">Д${i + 1}<b>${done ? "✅" : r}</b></div>`;
+      const last = i === d.rewards.length - 1;
+      return `<div class="day${done ? " done" : ""}${today ? " today" : ""}${last ? " last" : ""}">Д${i + 1}<b>${done ? "✅" : r}</b>${last && !done ? '<span class="chest">🎁</span>' : ""}</div>`;
     }).join("");
-    const note = d.broken ? "Серия прервалась — начинаем с 1-го дня 😢" : d.can_claim ? "Заходи каждый день — награда растёт. Пропустишь день — серия сбросится." : "Награда получена! Возвращайся завтра за следующей.";
+    const note = (d.broken ? "Серия прервалась — начинаем с 1-го дня 😢" : d.can_claim ? "Заходи каждый день — награда растёт. Пропустишь день — серия сбросится." : "Награда получена! Возвращайся завтра за следующей.") + " " + t("На 7-й день — сундук с аксессуаром 🎁");
     box.innerHTML = `<h3>📅 Ежедневная награда · 🔥 серия ${d.streak}</h3><small>${note}</small><div class="days">${tiles}</div>
       <button class="primary" id="dailyBtn" style="width:100%" ${d.can_claim ? "" : "disabled"}>${d.can_claim ? `🎁 Забрать +${d.reward} 🪙` : "Приходи завтра ⏳"}</button>`;
   }
   async function claimDaily() {
     const b = $("dailyBtn"); if (!b || b.disabled) return; b.disabled = true;
     const r = await api("/api/daily", { method: "POST" });
-    if (r?.player) { p = { ...p, ...r.player }; ui(); if (r.reward) { sfx.claim(); haptic("success"); } toast(r.reward ? `+${r.reward} 🪙 Награда получена!` : "Уже получено сегодня"); }
+    if (r?.player) {
+      p = { ...p, ...r.player }; ui(); renderShop(); if (r.reward) { sfx.claim(); haptic("success"); }
+      if (r.chest) openChest(r.chest, r.reward);
+      else toast(r.reward ? `+${r.reward} 🪙 Награда получена!` : "Уже получено сегодня");
+    }
     else { toast("Не удалось получить награду"); renderDaily(); }
+  }
+
+  // сундук 7-го дня: короткая анимация открытия в окне подтверждения
+  function openChest(ch, reward) {
+    const a = ch.accessory;
+    const text = a ? `🎁 ${t("Сундук открыт!")}\n${a.emoji} ${t(a.name)} — ${t("новый аксессуар!")}\n+${reward} 🪙` : `🎁 ${t("Сундук открыт!")}\n+${fmtN(ch.coins + reward)} 🪙`;
+    confirmBox(text, a ? "Надеть" : "Круто!", "Закрыть").then((ok) => { if (ok && a) buyAcc(a.id); });
+    $("cfText").classList.add("chestopen"); setTimeout(() => $("cfText").classList.remove("chestopen"), 900);
   }
 
   async function load() {
@@ -168,12 +181,24 @@
 
   async function renderAchievements() {
     const lv = p.level || { level: 1, xp: 0, progress: 0, next: 100 };
-    $("levelBox").innerHTML = `<h3>🐍 Уровень ${lv.level}</h3><small>XP ${lv.xp} · до следующего ${lv.next}</small><div class="bar" style="margin-top:9px"><i style="width:${lv.progress}%"></i></div>`;
+    $("xpBox").innerHTML = `<h3>🐍 Уровень ${lv.level}</h3><small>XP ${lv.xp} · до следующего ${lv.next}</small><div class="bar" style="margin-top:9px"><i style="width:${lv.progress}%"></i></div>`;
     const a = p.achievements_list || [];
-    $("achievementList").innerHTML = a.map((x) => {
-      const can = !x.claimed && x.ready;
-      return `<div class="achievement${x.claimed ? " done" : ""}"><div class="ai">${x.icon}</div><div class="ab"><b>${esc(x.title)}</b><small>${x.claimed ? "Награда получена" : x.ready ? "Готово — забери награду!" : "Пока не выполнено"}</small></div><button class="${can ? "ready" : ""}" data-ach="${x.id}" ${can ? "" : "disabled"}>${x.claimed ? "✅" : `+${x.reward} 🪙`}</button></div>`;
-    }).join("");
+    const GROUPS = { play: "🎮 Игра", food: "🍎 Еда", score: "🎯 Очки и комбо", levels: "🕳️ Уровни", loyal: "📅 Верность", collect: "🎨 Коллекция", friends: "👥 Друзья" };
+    // сначала готовые к получению, потом по разделам
+    const ready = a.filter((x) => x.ready && !x.claimed);
+    const row = (x) => {
+      const can = !x.claimed && x.ready, pct = x.target ? Math.round(((x.progress ?? 0) / x.target) * 100) : 0;
+      const sub = x.claimed ? "Награда получена" : x.ready ? "Готово — забери награду!" : x.target ? `${fmtN(x.progress || 0)} / ${fmtN(x.target)}` : "Пока не выполнено";
+      return `<div class="achievement${x.claimed ? " done" : ""}${can ? " can" : ""}"><div class="ai">${x.icon}</div><div class="ab"><b>${esc(t(x.title))}</b><small>${t(sub)}</small>${!x.claimed && !x.ready && x.target ? `<div class="bar thin"><i style="width:${pct}%"></i></div>` : ""}</div><button class="${can ? "ready" : ""}" data-ach="${x.id}" ${can ? "" : "disabled"}>${x.claimed ? "✅" : `+${x.reward} 🪙`}</button></div>`;
+    };
+    const done = a.filter((x) => x.claimed).length;
+    let html = `<div class="achsum">🏅 ${done} / ${a.length}</div>`;
+    if (ready.length) html += `<h3 class="sect">🎁 ${t("Можно забрать")}</h3>` + ready.map(row).join("");
+    for (const [g, title] of Object.entries(GROUPS)) {
+      const list = a.filter((x) => (x.group || "play") === g && !(x.ready && !x.claimed)); if (!list.length) continue;
+      html += `<h3 class="sect">${t(title)}</h3>` + list.map(row).join("");
+    }
+    $("achievementList").innerHTML = html;
   }
   async function claimAchievement(b) {
     b.disabled = true;
@@ -361,6 +386,42 @@
   const skinCat = () => p.skins || SA.DEFAULT_SKINS;
   const fieldCat = () => p.fields || SA.DEFAULT_FIELDS;
   const skinPalette = (id) => skinCat().find((z) => z.id === id && z.weekly)?.palette || null;
+  // ---------- профиль: аватар с рамкой по уровню, значки, статистика, «как я выгляжу» ----------
+  const FRAMES = [[1, "bronze", "🥉"], [10, "silver", "🥈"], [20, "gold", "🥇"], [35, "diamond", "💎"]];
+  function renderProfile() {
+    const lv = p.level || { level: 1, progress: 0 };
+    const fr = FRAMES.filter(([l]) => lv.level >= l).pop();
+    const ava = $("pava"); if (!ava) return;
+    ava.className = "pava fr-" + fr[1];
+    const photo = tg?.initDataUnsafe?.user?.photo_url;
+    if (photo && /^https:\/\//.test(photo)) $("pavaTxt").innerHTML = `<img src="${esc(photo)}" alt="" referrerpolicy="no-referrer">`;
+    else $("pavaTxt").textContent = [...String(p.first_name || "🐍")][0].toUpperCase();
+    $("pname").textContent = p.first_name || t("Игрок");
+    $("plevel").textContent = `${fr[2]} ${t("Уровень")} ${lv.level}`;
+    $("pxp").style.width = (lv.progress || 0) + "%";
+    const a = (p.achievements_list || []), got = a.filter((x) => x.claimed);
+    $("badgeSum").textContent = `${got.length} / ${a.length}`;
+    $("badges").innerHTML = a.map((x) => `<span class="bdg${x.claimed ? " on" : ""}" title="${esc(t(x.title))}">${x.icon}</span>`).join("");
+    const st = [["🎮", p.games_played, "забегов"], ["🍎", p.total_apples, "фруктов"], ["🏆", p.best_score, "рекорд"], ["⚡", p.best_combo, "лучшее комбо"],
+      ["🕳️", `${p.levels_done || 0}/30`, "уровней"], ["⭐", `${p.level_stars || 0}/90`, "звёзд"], ["🎨", (p.owned_skins || []).length, "скинов"], ["🎩", (p.owned_accessories || []).length, "аксессуаров"]];
+    $("pstats").innerHTML = st.map(([i, v, l]) => `<div><b>${i} ${typeof v === "number" ? fmtN(v) : esc(v)}</b><small>${t(l)}</small></div>`).join("");
+    drawLook();
+  }
+  // маленький портрет змейки игрока: голова со скином и аксессуаром
+  function drawLook() {
+    const cv = $("plook"); if (!cv) return;
+    const x = cv.getContext("2d"), S = 96; x.clearRect(0, 0, S, S);
+    const skin = p.skin || "classic", epic = SA.EPIC[skin], cols = skinPalette(skin) || SA.SKIN_COLORS[skin] || SA.SKIN_COLORS.classic, now = performance.now();
+    const c0 = SA.hex2rgb(cols[0]), c1 = SA.hex2rgb(cols[1]);
+    x.lineCap = "round";
+    const pts = Array.from({ length: 14 }, (_, k) => ({ x: 70 - k * 4.2, y: 58 + Math.sin(k * 0.7) * 9 }));
+    for (let k = pts.length - 1; k > 0; k--) { const tt = k / pts.length; x.strokeStyle = epic ? epic.color(tt, now) : SA.mix(c0, c1, tt); x.lineWidth = 22 * (1 - 0.45 * tt); x.beginPath(); x.moveTo(pts[k].x, pts[k].y); x.lineTo(pts[k - 1].x, pts[k - 1].y); x.stroke(); }
+    const H = { x: 70, y: 56 }, r = 15, f = { x: 1, y: 0 }, pr = { x: 0, y: 1 };
+    x.fillStyle = epic ? epic.color(0, now) : cols[0]; x.beginPath(); x.ellipse(H.x, H.y, r * 1.08, r, 0, 0, Math.PI * 2); x.fill();
+    for (const sd of [-1, 1]) { x.fillStyle = "#fff"; x.beginPath(); x.arc(H.x + 4, H.y + sd * 7, 4.5, 0, Math.PI * 2); x.fill(); x.fillStyle = "#08130d"; x.beginPath(); x.arc(H.x + 5.5, H.y + sd * 7, 2.2, 0, Math.PI * 2); x.fill(); }
+    if (p.accessory && SA.drawAccessoryOn) SA.drawAccessoryOn(x, p.accessory, H, f, pr, r, now);
+  }
+
   const REWARD_CUR = ["season", "levels", "tournament", "pass"];
   const REWARD_LABEL = { season: "🏆 Награда сезона", levels: "🕳️ За уровни", tournament: "🏁 За турнир", pass: "🎟️ В пропуске" };
   function renderShop() {
@@ -380,7 +441,16 @@
       return `<div class="skin${f.epic ? " epic" : ""}${on ? " sel" : ""}">${f.epic ? '<span class="badge">EPIC</span>' : ""}<button class="pvbtn" data-pfield="${f.id}" aria-label="Посмотреть поле"><div class="fv fv-${f.id}"></div><span>👁 посмотреть</span></button><b>${f.emoji} ${esc(f.name)}</b><small>${sub}</small><button data-field="${f.id}" class="${stars && !isOwned ? "star" : ""}">${label}</button></div>`;
     };
     const fcat = fieldCat();
+    const aowned = p.owned_accessories || [];
+    const acard = (a) => {
+      const isOwned = aowned.includes(a.id), on = p.accessory === a.id, stars = a.currency === "stars";
+      const sub = isOwned ? "✅ Есть" : stars ? "⭐ " + a.price : "🪙 " + fmtN(a.price);
+      const label = on ? "Снять" : isOwned ? "Надеть" : stars ? `Купить · <span class="stp">⭐ ${a.price}</span>` : "Купить";
+      return `<div class="skin acc${a.epic ? " epic" : ""}${on ? " sel" : ""}">${a.epic ? '<span class="badge">EPIC</span>' : ""}<button class="pvbtn" data-pacc="${a.id}" aria-label="Примерить"><div class="accv">${a.emoji}</div><span>👁 примерить</span></button><b>${esc(a.name)}</b><small>${sub}</small><button data-acc="${a.id}" class="${stars && !isOwned ? "star" : ""}">${label}</button></div>`;
+    };
+    const acat = p.accessories || [];
     $("shopGrid").innerHTML =
+      (acat.length ? `<h3 class="sect span2">🎩 Аксессуары<small>носятся с любым скином · 🎁 сундук на 7-й день серии</small></h3>` + acat.map(acard).join("") : "") +
       `<h3 class="sect span2">🏆 Награды<small>сезон, уровни, турниры и пропуск</small></h3>` + cat.filter((x) => REWARD_CUR.includes(x.currency)).sort((a, b) => owned.includes(b.id) - owned.includes(a.id) || b.weekly - a.weekly).map(card).join("") +
       `<h3 class="sect span2">⭐ Эпические скины<small>за Telegram Stars</small></h3>` + cat.filter((x) => x.epic && x.currency === "stars").map(card).join("") +
       `<h3 class="sect span2">🪙 Обычные скины<small>за монеты</small></h3>` + cat.filter((x) => x.currency === "coins").map(card).join("") +
@@ -398,20 +468,35 @@
     if (d?.player) { p = { ...p, ...d.player }; ui(); renderShop(); closePreview(); toast(has ? "Скин выбран!" : "Скин куплен! 🎉"); if (!has) sfx.claim(); }
     else toast("Не получилось, попробуй ещё раз");
   }
+  async function buyAcc(id) {
+    const a = (p.accessories || []).find((x) => x.id === id); if (!a) return;
+    const has = (p.owned_accessories || []).includes(id);
+    if (has && p.accessory === id) { // снять
+      const d = await api("/api/accessory", { method: "POST", body: JSON.stringify({ accessory: "" }) });
+      if (d?.player) { p = { ...p, ...d.player }; ui(); renderShop(); closePreview(); toast("Аксессуар снят"); }
+      return;
+    }
+    if (!has && a.currency === "stars") return buyStars(a, "acc");
+    if (!has && (p.coins || 0) < a.price) return toast("Не хватает монет");
+    if (!has && !(await confirmBox(`Купить «${a.name}» за ${fmtN(a.price)} 🪙?`, "Купить"))) return;
+    const d = await api("/api/accessory", { method: "POST", body: JSON.stringify({ accessory: id }) });
+    if (d?.player) { p = { ...p, ...d.player }; ui(); renderShop(); closePreview(); toast(has ? `${a.emoji} ${t("Надето!")}` : `${a.emoji} ${t("Куплено и надето!")} 🎉`); if (!has) sfx.claim(); }
+    else toast("Не получилось, попробуй ещё раз");
+  }
   // Покупки за Telegram Stars: сервер создаёт счёт, предмет выдаёт вебхук бота после оплаты
   async function buyStars(item, kind = "skin") {
     if (!tg?.openInvoice) return toast("Оплата Stars работает только внутри Telegram");
     if (p.stars_enabled === false) return toast("Оплата пока недоступна");
-    const r = await api("/api/invoice", { method: "POST", body: JSON.stringify(kind === "field" ? { field: item.id } : { skin: item.id }) });
+    const r = await api("/api/invoice", { method: "POST", body: JSON.stringify(kind === "field" ? { field: item.id } : kind === "acc" ? { accessory: item.id } : { skin: item.id }) });
     if (!r?.url) return toast("Не удалось создать счёт");
-    const ownedKey = kind === "field" ? "owned_fields" : "owned_skins";
+    const ownedKey = kind === "field" ? "owned_fields" : kind === "acc" ? "owned_accessories" : "owned_skins";
     tg.openInvoice(r.url, async (status) => {
       if (status === "paid") {
         toast(kind === "field" ? "Оплата прошла! Включаем поле…" : "Оплата прошла! Активируем скин…");
         for (let i = 0; i < 15; i++) {
           await new Promise((o) => setTimeout(o, 1000));
           const d = await api("/api/me");
-          if (d?.player && (d.player[ownedKey] || []).includes(item.id)) { p = { ...p, ...d.player }; ui(); renderShop(); closePreview(); sfx.claim(); toast(kind === "field" ? `${item.emoji} Поле «${item.name}» твоё!` : `${item.emoji} Скин «${item.name}» твой!`); return; }
+          if (d?.player && (d.player[ownedKey] || []).includes(item.id)) { p = { ...p, ...d.player }; ui(); renderShop(); closePreview(); sfx.claim(); toast(kind === "field" ? `${item.emoji} Поле «${item.name}» твоё!` : kind === "acc" ? `${item.emoji} «${item.name}» твой!` : `${item.emoji} Скин «${item.name}» твой!`); return; }
         }
         toast("Платёж обрабатывается — покупка появится через минуту");
       } else if (status === "failed") toast("Оплата не удалась");
@@ -433,18 +518,18 @@
   const previewR = SA.createRenderer($("pvCanvas"), { N: PV_N });
   let pv = null;
   function openPreview(kind, id) {
-    const item = kind === "skin" ? skinCat().find((x) => x.id === id) : fieldCat().find((x) => x.id === id);
+    const item = kind === "skin" ? skinCat().find((x) => x.id === id) : kind === "acc" ? (p.accessories || []).find((x) => x.id === id) : fieldCat().find((x) => x.id === id);
     if (!item) return;
-    const ownedList = kind === "skin" ? p.owned_skins || ["classic"] : p.owned_fields || ["classic"];
-    const has = ownedList.includes(id), on = kind === "skin" ? p.skin === id : fieldId() === id;
+    const ownedList = kind === "skin" ? p.owned_skins || ["classic"] : kind === "acc" ? p.owned_accessories || [] : p.owned_fields || ["classic"];
+    const has = ownedList.includes(id), on = kind === "skin" ? p.skin === id : kind === "acc" ? p.accessory === id : fieldId() === id;
     $("pvTitle").textContent = `${item.emoji} ${item.name}`;
-    $("pvDesc").textContent = item.desc || (kind === "skin" ? "Скин змейки" : "Игровое поле");
+    $("pvDesc").textContent = item.desc || (kind === "skin" ? "Скин змейки" : kind === "acc" ? "Аксессуар — носится с любым скином" : "Игровое поле");
     const btn = $("pvBuy");
     btn.className = !has && item.currency === "stars" ? "primary star" : "primary";
-    btn.innerHTML = on ? "✅ Уже выбрано" : has ? (kind === "skin" ? "Выбрать" : "Включить")
+    btn.innerHTML = on ? (kind === "acc" ? "Снять" : "✅ Уже выбрано") : has ? (kind === "skin" ? "Выбрать" : kind === "acc" ? "Надеть" : "Включить")
       : item.currency === "stars" ? `Купить · <span class="stp">⭐ ${item.price}</span>` : item.currency === "season" ? "🏆 Только за сезон" : `Купить · 🪙 ${fmtN(item.price)}`;
-    btn.disabled = on || item.currency === "season" && !has;
-    btn.onclick = () => (kind === "skin" ? buy(id) : buyField(id));
+    btn.disabled = (on && kind !== "acc") || item.currency === "season" && !has;
+    btn.onclick = () => (kind === "skin" ? buy(id) : kind === "acc" ? buyAcc(id) : buyField(id));
     $("preview").classList.add("show");
     // змейка бегает по кругу по полю 12×12; еда стоит на пути
     const loop = [];
@@ -461,7 +546,7 @@
       const view = () => ({
         snake: cells(pv.i), prevSnake: cells(pv.i - 1), food: { ...loop[(pv.i + 6) % loop.length], type: "apple" }, foodBorn: 0,
         dir: { x: 1, y: 0 }, stepMs, lastTick: pv.last, paused: false, rocks: [], pending: [],
-        skin: kind === "skin" ? id : p.skin, palette: kind === "skin" ? skinPalette(id) : skinPalette(p.skin)
+        skin: kind === "skin" ? id : p.skin, palette: kind === "skin" ? skinPalette(id) : skinPalette(p.skin), acc: kind === "acc" ? id : p.accessory || ""
       });
       pv.timer = setInterval(() => { pv.i++; pv.last = performance.now(); }, stepMs);
       const frame = (now) => { if (!pv) return; previewR.draw(view(), now); pv.raf = requestAnimationFrame(frame); };
@@ -478,7 +563,7 @@
     const s = SA.settings.get();
     $("setSound").checked = s.sound; $("setVolume").value = s.volume; $("setVolume").disabled = !s.sound; $("setVolVal").textContent = s.volume + "%";
     $("setVibro").checked = s.vibro; $("sndBtn").textContent = s.sound && s.volume > 0 ? "🔊" : "🔇";
-    $("setNotify").checked = p.notify !== false; $("setLang").value = SA.i18n.lang();
+    $("setNotify").checked = p.notify !== false; $("setLang").value = SA.i18n.lang(); $("setTheme").value = LS.get("snakeTheme", "auto");
   }
   function openSettings() { renderSettings(); $("settings").classList.add("show"); }
 
@@ -673,7 +758,16 @@
         x.strokeStyle = epic ? epic.color(tt, now) : SA.mix(c0, c1, tt); x.lineWidth = seg * (1 - 0.45 * tt);
         x.beginPath(); x.moveTo(a.x, a.y); x.lineTo(b.x, b.y); x.stroke();
       }
-      const hd = pt(0); x.fillStyle = epic ? epic.color(0, now) : cols[0]; x.beginPath(); x.arc(hd.x, hd.y, seg * 0.62, 0, Math.PI * 2); x.fill();
+      const hd = pt(0), nx = pt(1), fl = Math.hypot(hd.x - nx.x, hd.y - nx.y) || 1, f = { x: (hd.x - nx.x) / fl, y: (hd.y - nx.y) / fl }, pr = { x: -f.y, y: f.x }, r = seg * 0.62;
+      x.fillStyle = epic ? epic.color(0, now) : cols[0]; x.beginPath(); x.arc(hd.x, hd.y, r, 0, Math.PI * 2); x.fill();
+      const blink = now % 3600 < 140;
+      for (const sd of [-1, 1]) {
+        const ex = hd.x + f.x * r * 0.3 + pr.x * r * 0.5 * sd, ey = hd.y + f.y * r * 0.3 + pr.y * r * 0.5 * sd;
+        if (blink) { x.strokeStyle = "#08130d"; x.lineWidth = 2; x.beginPath(); x.moveTo(ex - f.x * 3, ey - f.y * 3); x.lineTo(ex + f.x * 3, ey + f.y * 3); x.stroke(); continue; }
+        x.fillStyle = "#fff"; x.beginPath(); x.arc(ex, ey, r * 0.28, 0, Math.PI * 2); x.fill();
+        x.fillStyle = "#08130d"; x.beginPath(); x.arc(ex + f.x * r * 0.1, ey + f.y * r * 0.1, r * 0.13, 0, Math.PI * 2); x.fill();
+      }
+      if (p.accessory && SA.drawAccessoryOn) SA.drawAccessoryOn(x, p.accessory, hd, f, pr, r, now);
     }
     window.addEventListener("resize", () => { w = 0; });
     requestAnimationFrame(frame);
@@ -702,6 +796,8 @@
     if (!l.unlocked) return toast("Сначала пройди предыдущий уровень");
     const feats = [l.walls ? `🧱 ${t("Стены и коридоры")}` : `🟩 ${t("Открытое поле")}`];
     if (l.moving) feats.push(`⚡ ${t("Живые камни: появляются и исчезают")}`);
+    if (l.rival) feats.push(`🦹 ${t("Босс: змей-вор крадёт еду. Укуси его — он оглушён")}`);
+    if (l.shrink) feats.push(`⚠️ ${t("Босс: поле сужается с краёв")}`);
     if (l.gates) feats.push(`🚪 ${t("Ворота закрываются по таймеру — мигают перед закрытием")}`);
     $("liEmoji").textContent = l.boss ? "👑" : "🕳️";
     $("liTitle").textContent = `${t("Уровень")} ${n}${l.boss ? " · " + t("финал главы") : ""}`;
@@ -737,6 +833,21 @@
     if (ghost.rp.game.over) ghost.dead = true;
   }
 
+  // какой фрукт сейчас на поле (только внешний вид): 0 — яблоко, 1–5 — вишня, клубника, виноград, арбуз, банан
+  const fruitOf = (g, n) => ((n * 7 + (g.cfg.seed % 13)) % 9) % 6;
+  // опасность прямо по курсу (для испуганной мордочки): стена, камень, тело или закрытые ворота в 1–2 клетках
+  function dangerAhead(g) {
+    if (g.isSafe() || g.ghostOn()) return false;
+    const h = g.snake[0], d = g.queue.length ? g.queue[0] : g.dir, wrap = g.cfg.mode === "nowalls";
+    for (let i = 1; i <= 2; i++) {
+      let x = h.x + d.x * i, y = h.y + d.y * i;
+      if (x < 0 || y < 0 || x >= E.N || y >= E.N) { if (!wrap) return true; x = (x + E.N) % E.N; y = (y + E.N) % E.N; }
+      const k = y * E.N + x;
+      if (g.rockSet[k] || (g.lv && g.gateClosed(x, y))) return true;
+      if (g.occ[k] && !(i === 1 && g.snake[g.snake.length - 1].x === x && g.snake[g.snake.length - 1].y === y)) return true;
+    }
+    return false;
+  }
   const curSkin = () => (replay ? replay.skin : p.skin) || "classic";
   const curPalette = () => (replay ? replay.palette : skinPalette(p.skin));
   function view() {
@@ -745,11 +856,14 @@
     let snake = g.snake, prev = prevSnake;
     if (holeAnim) { const k = Math.min(snake.length, Math.floor((performance.now() - holeAnim.t0) / 45)); snake = snake.slice(k); prev = snake; }
     return {
-      snake, prevSnake: prev, dir: g.dir, food: g.food, foodBorn, pu: g.pu, PU: E.PU, PU_LIFE: E.PU_LIFE, gameTime: g.gameTime,
+      snake, prevSnake: prev, dir: g.dir, food: g.food && g.food.type === "apple" ? { ...g.food, fruit: fruitOf(g, g.apples) } : g.food, foodBorn,
+      acc: replay ? replay.acc : p.accessory || "", danger: !g.over && dangerAhead(g), pu: g.pu, PU: E.PU, PU_LIFE: E.PU_LIFE, gameTime: g.gameTime,
       rocks: g.rocks, pending: g.pending, stepMs: g.stepMs() / (replay ? replay.speed : 1), lastTick, paused: paused || !!countdown,
       ghost: g.ghostOn(), safe: g.isSafe() && !g.over, shield: g.shield, skin: curSkin(), palette: curPalette(), countdown, countdownAt,
       combo: g.combo >= 2 ? Math.min(g.combo, 8) : 0,
-      gates: g.gates || [], hole: g.hole, holeAnim,
+      gates: g.gates || [], hole: g.hole, holeAnim, portals: g.portals, shrinkWarn: g.shrinkWarn || [],
+      rival: g.rival ? { snake: g.rival.body, prevSnake: rivalPrev || g.rival.body, dir: g.rival.dir, stun: g.rival.stun > g.ticks } : null,
+      ticks: g.ticks,
       foodFrom: pullAnim && pullAnim.food === g.food ? pullAnim : null,
       magnetR: g.fx.magnet > g.gameTime ? E.BONUS_MAGNET_RANGE : 0, magnetArt: g.cfg.artifact === "magnet" && g.cfg.rules >= 2,
       ghosts: ghost ? [{ snake: ghost.rp.game.snake, prevSnake: ghost.prev, dir: ghost.rp.game.dir, skin: ghost.skin, palette: ghost.palette, label: ghost.label, dead: ghost.dead, hd: ghost.hd }] : []
@@ -763,6 +877,7 @@
     if (!running || paused || countdown) return;
     timer = setTimeout(() => { doTick(); schedule(); }, game.stepMs() / (replay ? replay.speed : 1));
   }
+  let rivalPrev = null;
   let dying = false; // после смерти ещё ~0.7 с рисуем, как змейка рассыпается (игровой цикл уже остановлен)
   function renderLoop(now) {
     if (!running && !dying) return;
@@ -817,7 +932,7 @@
   function handleEvent(e, interval) {
     const g = game;
     if (e.t === "ate") {
-      renderer.eat(e, interval); renderer.burst(e.x, e.y, e.type); renderer.ring(e.x, e.y, e.type === "apple" ? "#ff6b81" : "#ffd84c"); foodBorn = performance.now();
+      renderer.eat(e.type === "apple" ? { ...e, fruit: fruitOf(g, g.apples - 1) } : e, interval); renderer.burst(e.x, e.y, e.type); renderer.ring(e.x, e.y, e.type === "apple" ? "#ff6b81" : "#ffd84c"); foodBorn = performance.now();
       if (e.cm >= 3) renderer.shake(2 + e.cm, 160);
       scoreBump(`+${e.pts}`);
       if (e.coins) hudMsg(e.type === "gold" ? `⭐ +${e.pts} · +${e.coins} 🪙` : `+${e.coins} 🪙`, "#ffd84c");
@@ -842,6 +957,20 @@
       if (SAVE_TEXT[e.kind]) { hudMsg(t(SAVE_TEXT[e.kind]), e.kind === "shield" ? "#6dffb0" : "#c58bff"); renderer.burst(e.x, e.y, "save", 16); renderer.flash("180,140,255"); sfx.save(); haptic("warning"); }
     } else if (e.t === "rocks") {
       if (g.pending.length) haptic("light");
+    } else if (e.t === "teleport") { // портал
+      renderer.ring(e.fx, e.fy, "#b07cff"); renderer.ring(e.x, e.y, "#b07cff"); renderer.burst(e.x, e.y, "save", 10); sfx.power(); haptic("medium");
+    } else if (e.t === "portals") {
+      renderer.ring(e.a.x, e.a.y, "#b07cff"); renderer.ring(e.b.x, e.b.y, "#b07cff");
+    } else if (e.t === "smash") { // щит разбил камень
+      renderer.shatter(e.x, e.y); renderer.shake(8, 300); sfx.boom(); haptic("heavy"); hudMsg("💥 " + t("Камень разбит!"), "#d6e2e6");
+    } else if (e.t === "steal") { // вор утащил еду
+      renderer.burst(e.x, e.y, "die", 12); hudMsg("🦹 " + t("Вор утащил еду!"), "#ff8a8a"); haptic("warning"); foodBorn = performance.now();
+    } else if (e.t === "bite") {
+      renderer.ring(e.x, e.y, "#ffd84c"); renderer.burst(e.x, e.y, "gold", 10); hudMsg("😵 " + t("Вор оглушён!"), "#ffd84c"); sfx.coin(); haptic("success");
+    } else if (e.t === "shrinkwarn") {
+      hudMsg("⚠️ " + t("Поле сужается!"), "#ff9a5c"); haptic("warning");
+    } else if (e.t === "shrink") {
+      renderer.shake(6, 300); sfx.boom(); haptic("heavy");
     }
   }
 
@@ -849,6 +978,7 @@
     if (!running || paused || countdown || !game) return;
     const g = game, interval = g.stepMs();
     prevSnake = g.snake.map((q) => ({ x: q.x, y: q.y }));
+    rivalPrev = g.rival ? g.rival.body.map((q) => ({ x: q.x, y: q.y })) : null;
     const ev = replay ? replay.rp.next() : g.tick();
     if (!g.over) stepGhost();
     lastTick = performance.now();
@@ -869,7 +999,8 @@
   function beginLoop() {
     dying = false; holeAnim = null; running = true; paused = false; countdown = 0; fxSig = "";
     prevSnake = game.snake.map((q) => ({ x: q.x, y: q.y })); lastTick = performance.now(); foodBorn = performance.now();
-    renderer.reset(); $("fx").innerHTML = ""; $("combo").classList.remove("show"); $("hudMsg").classList.remove("on"); $("scoreBump").classList.remove("on");
+    renderer.reset(); if (run?.kind === "level") renderer.iris(12, 12, true, 750);
+    $("fx").innerHTML = ""; $("combo").classList.remove("show"); $("hudMsg").classList.remove("on"); $("scoreBump").classList.remove("on");
     el.pauseBtn.textContent = "Ⅱ";
     requestAnimationFrame(() => { resizeCanvas(); updateHud(); });
     cancelAnimationFrame(raf); raf = requestAnimationFrame(renderLoop);
@@ -878,7 +1009,7 @@
 
   // kindOpt: { kind: "free" } | { kind: "daily" } | { kind: "challenge", ref }
   async function startRun(kindOpt = { kind: "free" }) {
-    if (starting) return; starting = true;
+    if (starting) return; starting = true; closeRecord();
     stopReplay(true);
     SA.audio.unlock();
     el.over.classList.remove("show"); $("pauseMenu").classList.remove("show");
@@ -964,7 +1095,10 @@
     // даём досмотреть, как змейка рассыпается (или заползает в норку), и только потом показываем итоги
     const animMs = viaHole ? Math.min(1100, 120 + g.snake.length * 45) : res.win ? 0 : 750;
     if (viaHole) { holeAnim = { t0: performance.now(), len: g.snake.length + 1 }; renderer.ring(g.hole.x, g.hole.y, "#ffd84c"); }
-    if (animMs) { dying = true; cancelAnimationFrame(raf); raf = requestAnimationFrame(renderLoop); setTimeout(() => { if (game === g) { dying = false; cancelAnimationFrame(raf); } }, animMs); }
+    // норка: после того как змейка заползла — «диафрагма» закрывается к норке
+    const irisMs = viaHole ? 600 : 0;
+    if (viaHole) setTimeout(() => { if (game === g) renderer.iris(g.hole.x, g.hole.y, false, irisMs); }, animMs);
+    if (animMs) { dying = true; cancelAnimationFrame(raf); raf = requestAnimationFrame(renderLoop); setTimeout(() => { if (game === g) { dying = false; cancelAnimationFrame(raf); } }, animMs + irisMs + 50); }
     $("overEmoji").textContent = viaHole ? "🕳️" : res.win ? "🏆" : "💥";
     $("overTitle").textContent = isLevel ? (viaHole ? `${t("Уровень")} ${run.ref} ${t("пройден!")}` : `${t("Уровень")} ${run.ref} ${t("не пройден")}`) : res.win ? "Поле заполнено!" : "Игра окончена";
     $("levelStars").hidden = !isLevel; $("levelStars").innerHTML = isLevel ? starsHtml(res.stars || 0) : "";
@@ -980,12 +1114,13 @@
     $("overInfo").textContent = run.token ? "Проверяем забег…" : "Забег не засчитан: нет связи с сервером";
     $("overInfo").className = "overinfo" + (run.token ? "" : " warn");
     $("duelBtn").hidden = true; $("shareResBtn").hidden = res.score <= 0; $("replayShareBtn").hidden = true; $("overExtra").innerHTML = "";
-    setTimeout(() => el.over.classList.add("show"), animMs);
+    setTimeout(() => { el.over.classList.add("show"); if (localRecord && !isLevel) showRecord(g, res, prevBest); }, animMs + irisMs);
     send.then((d) => {
       if (!d) return;
       if (d.result) {
         Object.assign(lastResult, { reward: d.result.reward, isRecord: d.result.is_record, game_id: d.result.game_id });
         $("reward").textContent = d.result.reward; $("recBadge").hidden = !d.result.is_record;
+        if (d.result.is_record && !localRecord && !isLevel && res.score > 0) setTimeout(() => showRecord(g, res, prevBest), Math.max(0, animMs + irisMs - 200));
         const extra = [];
         if (d.daily) extra.push(`📅 Твоё место сегодня: #${d.daily.rank}` + (d.daily.bonus ? ` · бонус +${d.daily.bonus} 🪙` : ""));
         if (d.challenge_result) extra.push(d.challenge_result.win ? `🏆 Вызов выигран: ${d.challenge_result.score} > ${d.challenge_result.creator_score}` : `⚔️ Вызов проигран: ${d.challenge_result.score} против ${d.challenge_result.creator_score}`);
@@ -1011,12 +1146,76 @@
       }
     });
   }
+  // ---------- новый рекорд: конфетти и замедленный повтор последних ~3 секунд ----------
+  let recR = null, rec = null;
+  function showRecord(g, res, prevBest) {
+    if (rec || !g.log) return;
+    $("recScore").textContent = res.score; $("recPrev").textContent = prevBest ? `${t("Прошлый рекорд")}: ${prevBest}` : "";
+    $("record").classList.add("show"); sfx.claim(); haptic("success");
+    if (!recR) recR = SA.createRenderer($("recCanvas"), { N: E.N });
+    recR.setField(fieldId());
+    const cfg = g.cfg, log = g.log.slice(), ticks = res.ticks, SLOW = 0.35, BACK = 30;
+    rec = { raf: 0, timer: 0, conf: [], confRaf: 0 };
+    const start = () => {
+      const rp = E.player(cfg, log, ticks);
+      while (!rp.done() && rp.game.ticks < ticks - BACK) rp.next();
+      rec.rp = rp; rec.prev = rp.game.snake.map((q) => ({ ...q })); rec.last = performance.now(); rec.ended = false;
+      recR.reset();
+    };
+    const vw = () => {
+      const q = rec.rp.game;
+      return { snake: q.snake, prevSnake: rec.prev, dir: q.dir, food: q.food && q.food.type === "apple" ? { ...q.food, fruit: fruitOf(q, q.apples) } : q.food, foodBorn: 0, pu: q.pu, PU: E.PU, PU_LIFE: E.PU_LIFE,
+        gameTime: q.gameTime, rocks: q.rocks, pending: q.pending, stepMs: q.stepMs() / SLOW, lastTick: rec.last, paused: false, gates: q.gates || [], hole: q.hole, portals: q.portals,
+        shrinkWarn: q.shrinkWarn || [], skin: p.skin, palette: skinPalette(p.skin), acc: p.accessory || "", combo: q.combo >= 2 ? Math.min(q.combo, 8) : 0, shield: q.shield, ghost: q.ghostOn(),
+        rival: q.rival ? { snake: q.rival.body, prevSnake: q.rival.body, dir: q.rival.dir, stun: q.rival.stun > q.ticks } : null };
+    };
+    const step = () => {
+      if (!rec) return;
+      const q = rec.rp.game;
+      if (rec.rp.done() || q.over) { // конец: змейка рассыпается, через паузу — сначала
+        if (!rec.ended) { rec.ended = true; if (!q.win) recR.die(q.snake); }
+        rec.timer = setTimeout(() => { if (rec) { start(); step(); } }, 1500); return;
+      }
+      rec.prev = q.snake.map((c) => ({ ...c }));
+      const ev = rec.rp.next(); rec.last = performance.now();
+      for (const e of ev) if (e.t === "ate") { recR.eat(e.type === "apple" ? { ...e, fruit: fruitOf(q, q.apples - 1) } : e, q.stepMs() / SLOW); recR.burst(e.x, e.y, e.type); recR.ring(e.x, e.y, "#ffd84c"); }
+      recR.step(q.snake.length);
+      rec.timer = setTimeout(step, q.stepMs() / SLOW);
+    };
+    requestAnimationFrame(() => {
+      if (!rec) return;
+      recR.resize(); start();
+      const frame = (now) => { if (!rec) return; recR.draw(vw(), now); rec.raf = requestAnimationFrame(frame); };
+      rec.raf = requestAnimationFrame(frame); step();
+    });
+    confetti();
+  }
+  function confetti() {
+    const cv = $("confetti"), x = cv.getContext("2d"), d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = innerWidth * d; cv.height = innerHeight * d; x.setTransform(d, 0, 0, d, 0, 0);
+    const cols = ["#ffd84c", "#55ffad", "#ff5f8f", "#5fd3ff", "#c58bff", "#ffffff"];
+    const parts = Array.from({ length: 140 }, (_, i) => ({ x: innerWidth / 2 + (Math.random() - 0.5) * 60, y: innerHeight * 0.35, vx: (Math.random() - 0.5) * 14, vy: -6 - Math.random() * 10, r: Math.random() * 6.3, vr: (Math.random() - 0.5) * 0.4, c: cols[i % cols.length], w: 5 + Math.random() * 6 }));
+    const t0 = performance.now();
+    const frame = (now) => {
+      if (!rec) return x.clearRect(0, 0, cv.width, cv.height);
+      x.clearRect(0, 0, innerWidth, innerHeight);
+      for (const q of parts) { q.vy += 0.28; q.vx *= 0.99; q.x += q.vx; q.y += q.vy; q.r += q.vr; x.save(); x.translate(q.x, q.y); x.rotate(q.r); x.fillStyle = q.c; x.fillRect(-q.w / 2, -q.w / 4, q.w, q.w / 2); x.restore(); }
+      if (now - t0 < 4000) rec.confRaf = requestAnimationFrame(frame); else x.clearRect(0, 0, innerWidth, innerHeight);
+    };
+    rec.confRaf = requestAnimationFrame(frame);
+  }
+  function closeRecord() {
+    if (rec) { clearTimeout(rec.timer); cancelAnimationFrame(rec.raf); cancelAnimationFrame(rec.confRaf); rec = null; }
+    const cv = $("confetti"); cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+    $("record").classList.remove("show");
+  }
   async function sendScore(g, res) {
     const d = await api("/api/score", { method: "POST", body: JSON.stringify({ token: run.token, log: E.encodeLog(g.log), ticks: res.ticks }) });
     if (d?.player) { p = { ...p, ...d.player, ...(d.bot_username ? { bot_username: d.bot_username } : {}) }; ui(); renderArtifacts(); }
     return d;
   }
   function closeGame() {
+    closeRecord();
     running = false; paused = false; countdown = 0; clearTimeout(timer); clearInterval(cdTimer); cancelAnimationFrame(raf);
     stopReplay(true);
     $("pauseMenu").classList.remove("show"); el.over.classList.remove("show"); el.game.classList.remove("active");
@@ -1094,6 +1293,8 @@
     if (t.dataset.field) return buyField(t.dataset.field);
     if (t.dataset.pskin) return openPreview("skin", t.dataset.pskin);
     if (t.dataset.pfield) return openPreview("field", t.dataset.pfield);
+    if (t.dataset.acc) return buyAcc(t.dataset.acc);
+    if (t.dataset.pacc) return openPreview("acc", t.dataset.pacc);
     if (t.dataset.up) { e.stopPropagation(); return upgradeArtifact(t.dataset.up); }
     if (t.dataset.artifact) return pickArtifact(t.dataset.artifact);
     if (t.dataset.mode) { sel.mode = t.dataset.mode; LS.set("snakeMode", sel.mode); haptic("light"); return renderSplash(); }
@@ -1143,6 +1344,16 @@
   $("settingsClose").addEventListener("click", () => $("settings").classList.remove("show"));
   $("setNotify").addEventListener("change", async (e) => { const r = await api("/api/settings", { method: "POST", body: JSON.stringify({ notify: e.target.checked }) }); if (r?.player) p = { ...p, ...r.player }; });
   // смена языка: сохраняем на сервере (для сообщений бота) и перезагружаем страницу
+  // тема: как в Telegram / тёмная / светлая (игровое поле всегда тёмное)
+  function applyTheme() {
+    const mode = LS.get("snakeTheme", "auto");
+    const light = mode === "light" || (mode === "auto" && tg?.colorScheme === "light");
+    document.body.classList.toggle("light", light);
+    try { tg?.setHeaderColor?.(light ? "#eef5f0" : "#030907"); tg?.setBackgroundColor?.(light ? "#eef5f0" : "#030907"); } catch (e) {}
+  }
+  applyTheme(); tg?.onEvent?.("themeChanged", applyTheme);
+  $("setTheme").addEventListener("change", (e) => { LS.set("snakeTheme", e.target.value); applyTheme(); });
+  $("recOk").addEventListener("click", closeRecord);
   $("setLang").addEventListener("change", async (e) => { await api("/api/settings", { method: "POST", body: JSON.stringify({ lang: e.target.value }) }); SA.i18n.set(e.target.value, true); });
   $("pvClose").addEventListener("click", closePreview);
   $("newsOk").addEventListener("click", () => $("news").classList.remove("show"));

@@ -77,6 +77,14 @@ const MIGRATIONS = [
         completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(telegram_id, level))`);
       await q(`CREATE INDEX IF NOT EXISTS level_progress_player_idx ON level_progress (telegram_id)`);
     }
+  },
+  {
+    id: 8, name: "аксессуары, сундук 7-го дня",
+    up: async (q) => {
+      await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS accessory TEXT NOT NULL DEFAULT ''`);
+      await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS owned_accessories TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`);
+      await q(`ALTER TABLE players ADD COLUMN IF NOT EXISTS chests INTEGER NOT NULL DEFAULT 0`);
+    }
   }
 ];
 

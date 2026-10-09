@@ -393,3 +393,127 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
 .scorebump{position:absolute;left:22px;top:-4px;font-weight:900;font-size:13px;color:#ffe38a;opacity:0;pointer-events:none;text-shadow:0 0 8px rgba(255,190,50,.9)}
 .scorebump.on{animation:bump .8s ease-out both}
 @keyframes bump{0%{opacity:0;transform:translateY(4px)}20%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
+
+/* ---------- v34: новые поля в магазине ---------- */
+.fv-rain_field{background:repeating-linear-gradient(105deg,transparent 0 9px,rgba(170,210,255,.35) 9px 10px),radial-gradient(ellipse at 30% 75%,rgba(120,170,220,.25),transparent 40%),#08111a;background-size:22px 100%,100% 100%,auto;animation:rain .6s linear infinite}
+@keyframes rain{to{background-position:22px 0,0 0,0 0}}
+.fv-autumn_field{background:radial-gradient(ellipse at 20% 30%,#ffb347 0 4px,transparent 5px),radial-gradient(ellipse at 65% 60%,#e8642c 0 4px,transparent 5px),radial-gradient(ellipse at 85% 25%,#c9a227 0 3px,transparent 4px),radial-gradient(circle at 50% 50%,rgba(200,110,30,.35),transparent 75%),#170d04;animation:twinkle 2.2s ease-in-out infinite}
+.fv-night_field{background:radial-gradient(circle at 35% 55%,rgba(255,255,255,.22),transparent 22%),radial-gradient(circle at 15% 25%,#e9ff8a 0 1.5px,transparent 2.5px),radial-gradient(circle at 80% 70%,#e9ff8a 0 1.5px,transparent 2.5px),#03050d;animation:twinkle 1.4s ease-in-out infinite}
+
+/* ---------- аксессуары ---------- */
+.accv{height:56px;display:grid;place-items:center;font-size:36px;margin:2px 0 10px;border-radius:12px;background:radial-gradient(circle at 50% 60%,rgba(85,255,173,.16),transparent 70%)}
+.skin.acc.epic .accv{margin-top:22px;background:radial-gradient(circle at 50% 60%,rgba(255,216,76,.2),transparent 70%)}
+.day{position:relative}.day .chest{position:absolute;top:-8px;right:-4px;font-size:15px;animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-3px) rotate(-8deg)}}
+.cftext{white-space:pre-line}.chestopen{animation:chest .9s ease}
+@keyframes chest{0%{transform:scale(.6);opacity:0}50%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+
+/* ---------- профиль ---------- */
+.pcard{display:flex;gap:12px;align-items:center;padding:12px;border-radius:20px;background:rgba(4,14,9,.72);border:1px solid var(--line)}
+.pava{flex:none;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:28px;font-weight:950;background:#102c1e;position:relative;overflow:hidden}
+.pava img{width:100%;height:100%;object-fit:cover}
+.pava:after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--fr,#c98a4b);box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+.pava.fr-bronze{--fr:#c98a4b}.pava.fr-silver{--fr:#d6dde4}.pava.fr-gold{--fr:#ffd34d}
+.pava.fr-diamond{--fr:#7fe9ff}.pava.fr-diamond:after{animation:frglow 2s ease-in-out infinite}
+@keyframes frglow{50%{box-shadow:0 0 14px #7fe9ff,inset 0 0 0 1px rgba(0,0,0,.4)}}
+.pinfo{flex:1;min-width:0}.pinfo b{display:block;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pinfo .bar{margin-top:7px}
+#plook{flex:none;width:72px;height:72px}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px;margin-top:8px}
+.bdg{height:40px;display:grid;place-items:center;font-size:21px;border-radius:12px;background:rgba(4,14,9,.6);border:1px solid rgba(120,255,190,.08);filter:grayscale(1);opacity:.35}
+.bdg.on{filter:none;opacity:1;border-color:rgba(255,216,76,.4);box-shadow:0 0 10px rgba(255,216,76,.12)}
+.pstats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.pstats div{padding:10px 12px;border-radius:14px;background:rgba(4,14,9,.6);border:1px solid rgba(120,255,190,.08)}
+.pstats b{display:block;font-size:16px}
+.achsum{font-weight:900;color:#ffe38a;margin:8px 0 0}
+.bar.thin{height:5px;margin-top:6px}
+.achievement.can{border-color:rgba(255,216,76,.5);box-shadow:0 0 16px rgba(255,216,76,.12)}
+
+/* ---------- новый рекорд ---------- */
+.confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+#record .modal{position:relative;z-index:2}
+.rectitle{font-size:24px;font-weight:950;color:#ffe38a;letter-spacing:.5px;animation:pop .6s cubic-bezier(.2,1.6,.4,1)}
+.rectitle span{background:linear-gradient(90deg,#fff3a0,#ffd34d,#fff3a0);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:slide 2s linear infinite}
+.recscore{font-size:56px;font-weight:950;line-height:1.1;margin:6px 0 2px;text-shadow:0 0 30px rgba(255,216,76,.5)}
+.recreplay{position:relative;margin-top:12px}
+#recCanvas{width:100%;max-width:300px;aspect-ratio:1;border-radius:16px;border:1px solid rgba(255,216,76,.35);display:block;margin:auto}
+.slowmo{position:absolute;left:50%;top:8px;transform:translateX(-50%);padding:3px 9px;border-radius:99px;background:rgba(0,0,0,.55);font-size:11px;font-weight:800}
+@keyframes pop{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
+
+/* ---------- единый стиль: одинаковые карточки, кнопки и заголовки разделов ---------- */
+.nav button,.stat,.skin,.achievement,.fr,.pstats div,.daily{transition:transform .12s ease,border-color .2s}
+.nav button:active,.skin button:active,.primary:active,.achievement button:active{transform:scale(.97)}
+.sect small{font-weight:600;margin-left:6px}
+.nav button i{font-style:normal;font-size:20px;display:block;margin-bottom:2px}
+
+/* светлая тема: автоматически заменённые тёмные фоны (сгенерировано) */
+body.light .coins{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .card{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .hero{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .avatar{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .stat{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .nav button{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .skin{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .skin button{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .ref{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .daily{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .day{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .refbtns .alt{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .modal{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .actions button{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .achievement{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .achievement button{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .ostats div{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .lbrow{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .lbav{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .tabs{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .msn{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .msn-ico{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .bar{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .claim{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .fr{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .artifact{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .chips button{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .wide-btn{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .xbtn{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .artifact .up:disabled{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .actions2 button{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .pnum{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .ptr{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .clanav{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .lbrow .sm{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .card input{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .card select{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .selbox{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .emojis button{background:#e4f2e9;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .newslist li{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .lvchapter{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .lvnode{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .liinfo div{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .pcard{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .pava{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .bdg{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+body.light .pstats div{background:#f5fbf7;border-color:rgba(20,140,80,.14);color:var(--text)}
+/* ---------- светлая тема (поле игры остаётся тёмным) ---------- */
+body.light{--bg:#eef5f0;--panel:#ffffff;--panel2:#f3faf5;--line:rgba(20,140,80,.2);--text:#0e2318;--muted:#5b7768;--accent:#0fae5f;--accent2:#0b9450}
+body.light .card,body.light .hero{background:linear-gradient(145deg,#ffffff,#f1f9f4);box-shadow:0 12px 40px rgba(20,80,50,.1)}
+body.light .stat,body.light .nav button,body.light .skin,body.light .daily,body.light .achievement,body.light .fr,body.light .pstats div,body.light .pcard,body.light .bdg,body.light .tabs,body.light .ref{background:#f5fbf7;border-color:rgba(20,140,80,.14)}
+body.light .coins,body.light .day,body.light .skin button,body.light .achievement button,body.light .bar{background:#e4f2e9;border-color:rgba(20,140,80,.14)}
+body.light .day.done{background:#c9f0d8}
+body.light .back{border-color:rgba(20,140,80,.25)}
+body.light .avatar,body.light .pava{background:#d8f1e2}
+body.light .overlay:not(#over):not(#pauseMenu) .modal{background:linear-gradient(145deg,#ffffff,#eef8f2);border-color:rgba(20,140,80,.2);color:var(--text)}
+body.light .hero:after{background:rgba(15,174,95,.1)}
+body.light #heroCv{opacity:.35}
+body.light .lb,body.light td{border-color:rgba(20,140,80,.1)}
+body.light .selbox{background:#f5fbf7;color:var(--text)}
+body.light #game.screen.active{--text:#f3fff8;--muted:#83a296;color:#f3fff8}
+body.light .lbrow:not(.top1):not(.top2):not(.top3),body.light .evt,body.light .lvnode,body.light .clan,body.light .mission{background:#f5fbf7;border-color:rgba(20,140,80,.12)}
+body.light .lbrow .sm{background:#e4f2e9}
+body.light .logo{background:linear-gradient(90deg,#0e2318,#0fae5f);-webkit-background-clip:text;background-clip:text}
+body.light .logo span{-webkit-text-fill-color:#0fae5f}
+body.light .day.last b{color:#b07a00}
+body.light .bar i{background:linear-gradient(90deg,#0fae5f,#46d98f)}
+body.light .achsum{color:#a87400}
+.achievement .ab b,.achievement .ab small{display:block}.achievement .ab small{margin-top:2px}
+body.light #game .card{background:linear-gradient(145deg,#0d2117,#07110c);border-color:rgba(89,255,166,.18);color:#f3fff8}body.light #game .card *{--text:#f3fff8;--muted:#83a296}body.light #plook{background:transparent}
+body.light #game .tabs,body.light #game .artifact,body.light #game .xbtn{background:rgba(4,14,9,.7);border-color:rgba(89,255,166,.18);color:#f3fff8}body.light #game .tabs button:not(.on){color:#83a296}

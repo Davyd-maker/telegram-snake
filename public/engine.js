@@ -38,13 +38,18 @@
     ghost:  { icon: "👻", color: "#c58bff", dur: 6000,  name: "Призрак" },
     shield: { icon: "🛡️", color: "#6dffb0", dur: 0,     name: "Щит" },
     magnet: { icon: "🧲", color: "#55d6ff", dur: 9000,  name: "Магнит" },
-    bomb:   { icon: "💣", color: "#ff8a4c", dur: 0,     name: "Бомба" }
+    bomb:   { icon: "💣", color: "#ff8a4c", dur: 0,     name: "Бомба" },
+    // с правил v3
+    portal: { icon: "🌀", color: "#b07cff", dur: 12000, name: "Портал" },
+    freeze: { icon: "🧊", color: "#9ff0ff", dur: 10000, name: "Заморозка комбо" }
   };
-  const TIMED = ["slow", "x2", "ghost", "magnet"];
+  const PU_V2 = ["slow", "x2", "ghost", "shield", "magnet", "bomb"];
+  const TIMED = ["slow", "x2", "ghost", "magnet", "portal", "freeze"];
   const MAX_ART_LEVEL = 5;
   // Версия правил. Старые забеги (реплеи, призраки) переигрываются по своей версии, новые — по последней.
   // 2 — новый магнит: тянет еду на клетку перед головой и только спереди.
-  const RULES = 2;
+  // 3 — боссы на уровнях 10/20/30, бонусы «Портал» и «Заморозка комбо», щит разбивает камни.
+  const RULES = 3;
   const BONUS_MAGNET_RANGE = 6;
   // Артефакты по уровням прокачки
   const artifactStats = (id, lvl) => {
@@ -111,7 +116,7 @@
       { t: 22, s: 1.02, w: [...V(7, 2, 21), ...V(16, 2, 21)] },
       { t: 24, s: 1.01, w: H_() },
       { t: 26, s: 1.0, w: grid(4, 3) },
-      { t: 32, s: 1.0, w: [...ring(5, 5, 18, 18), ...mir(blk(1, 1))], boss: true },
+      { t: 32, s: 1.0, w: [...ring(5, 5, 18, 18), ...mir(blk(1, 1))], boss: true, rival: true },
       // Глава 2 — «Подземелье»
       { t: 28, s: 0.98, w: [...H(4, 0, 17), ...H(8, 6, 23), ...H(15, 0, 17), ...H(19, 6, 23)] },
       { t: 30, s: 0.97, w: mir(blk(5, 5)), m: true },
@@ -122,7 +127,7 @@
       { t: 40, s: 0.92, w: [...H(4, 0, 15), ...H(8, 8, 23), ...H(15, 0, 15), ...H(19, 8, 23)] },
       { t: 42, s: 0.91, w: [...MZ, ...mir(blk(1, 1))] },
       { t: 44, s: 0.9, w: rooms(), g: [gate(roomDoors, 36)] },
-      { t: 55, s: 0.9, w: [...without(box(4, 4, 19, 19), sideGaps(4, 4, 19, 19)), ...mir(blk(1, 1))], g: [gate(sideGaps(4, 4, 19, 19), 32, 10)], m: true, boss: true },
+      { t: 55, s: 0.9, w: [...without(box(4, 4, 19, 19), sideGaps(4, 4, 19, 19)), ...mir(blk(1, 1))], g: [gate(sideGaps(4, 4, 19, 19), 32, 10)], m: true, boss: true, shrink: true },
       // Глава 3 — «Вулкан»
       { t: 45, s: 0.88, w: grid(3, 1) },
       { t: 48, s: 0.87, w: [...ring(2, 2, 21, 21), ...ring(6, 6, 17, 17)], g: [gate(sideGaps(6, 6, 17, 17), 28)] },
@@ -133,12 +138,12 @@
       { t: 60, s: 0.82, w: spiral(), m: true },
       { t: 62, s: 0.81, w: [...H(3, 0, 20), ...H(7, 3, 23), ...H(16, 0, 20), ...H(20, 3, 23)] },
       { t: 65, s: 0.8, w: grid(3, 1), g: [gate(H(6, 0, 23).filter(([x]) => x % 3 !== 1), 26), gate(H(17, 0, 23).filter(([x]) => x % 3 !== 1), 26, 13)], m: true },
-      { t: 80, s: 0.78, w: [...ring(2, 2, 21, 21), ...comb().filter(([x, y]) => x > 2 && x < 21 && y > 2 && y < 21)], g: [gate(sideGaps(2, 2, 21, 21), 30, 8)], m: true, boss: true }
+      { t: 80, s: 0.78, w: [...ring(2, 2, 21, 21), ...comb().filter(([x, y]) => x > 2 && x < 21 && y > 2 && y < 21)], g: [gate(sideGaps(2, 2, 21, 21), 30, 8)], m: true, boss: true, rival: true }
     ];
     const inStart = ([x, y]) => y >= 11 && y <= 13 && x >= 6 && x <= 18;
     const uniq = (cells) => { const seen = new Set(), o = []; for (const [x, y] of cells) { const k = y * N + x; if (x < 0 || y < 0 || x >= N || y >= N || seen.has(k) || inStart([x, y])) continue; seen.add(k); o.push({ x, y }); } return o; };
     return raw.map((l, i) => ({
-      n: i + 1, chapter: Math.floor(i / 10) + 1, target: l.t, speed: l.s, moving: !!l.m, boss: !!l.boss,
+      n: i + 1, chapter: Math.floor(i / 10) + 1, target: l.t, speed: l.s, moving: !!l.m, boss: !!l.boss, rival: !!l.rival, shrink: !!l.shrink,
       walls: uniq(l.w), gates: (l.g || []).map((g) => ({ cells: uniq(g.cells), period: g.period, phase: g.phase || 0 })),
       par: l.t * 8 + 70 // ходов на 3 звезды (2 звезды — до ×1.6)
     }));
@@ -170,7 +175,10 @@
       this.pendingGrowth = 0; this.runCoins = 0; this.score = 0; this.apples = 0;
       this.combo = 0; this.comboTimer = 0; this.bestRun = 0;
       this.gameTime = 0; this.ticks = 0; this.speedMs = SPEED_START;
-      this.fx = { slow: 0, x2: 0, ghost: 0, magnet: 0 };
+      this.fx = { slow: 0, x2: 0, ghost: 0, magnet: 0, portal: 0, freeze: 0 };
+      this.portals = null;                  // бонус «Портал»: две связанные клетки
+      // боссы (правила v3): змей-вор и сужающееся поле
+      this.rival = null; this.rivalOcc = new Uint8Array(N * N); this.shrinkWarn = []; this.shrinkStep = 0;
       this.shield = false;
       this.charges = cfg.artifact === "phantom" ? this.art.phantomCharges : 0; // «Фантом»: спасения за забег
       this.pu = null; this.nextPuAt = 10000;
@@ -186,6 +194,7 @@
       this.stats = { gold: 0, coin: 0, pu: 0, saves: 0, pathTicks: 0, pathDist: 0 };
       this._foodAt = null;
       this._initObstacles();
+      if (this.lv && cfg.rules >= 3 && this.lv.rival) this._initRival();
       this.placeFood();
     }
 
@@ -311,9 +320,11 @@
       if (this.pu) busy[this.pu.y * N + this.pu.x] = 1;
       for (const c of this.pending) busy[c.y * N + c.x] = 1;
       if (this.lv) {
-        for (let i = 0; i < N * N; i++) if (this.gateSet[i] || this.blocked[i]) busy[i] = 1;
+        for (let i = 0; i < N * N; i++) if (this.gateSet[i] || this.blocked[i] || this.rivalOcc[i]) busy[i] = 1;
         if (this.hole) busy[this.hole.y * N + this.hole.x] = 1;
+        for (const c of this.shrinkWarn) busy[c.y * N + c.x] = 1;
       }
+      if (this.portals) for (const c of this.portals) busy[c.y * N + c.x] = 1;
       const free = [];
       for (let i = 0; i < N * N; i++) if (!busy[i]) free.push({ x: i % N, y: (i / N) | 0 });
       return free;
@@ -329,7 +340,7 @@
     }
     spawnPu() {
       const free = this.freeCells(); if (!free.length) return;
-      const c = free[Math.floor(this.rng() * free.length)], types = Object.keys(PU);
+      const c = free[Math.floor(this.rng() * free.length)], types = this.cfg.rules >= 3 ? Object.keys(PU) : PU_V2;
       let type;
       do { type = types[Math.floor(this.rng() * types.length)]; } while (type === "bomb" && this.snake.length < 8);
       this.pu = { x: c.x, y: c.y, type, expires: this.gameTime + PU_LIFE };
@@ -342,7 +353,10 @@
         while (this.snake.length > keep) { const q = this.snake.pop(); this.occ[q.y * N + q.x]--; cells.push(q); }
         this.updateSpeed();
         ev.push({ t: "bomb", cells });
-      } else this.fx[type] = Math.max(this.fx[type], this.gameTime) + PU[type].dur;
+      } else {
+        this.fx[type] = Math.max(this.fx[type], this.gameTime) + PU[type].dur;
+        if (type === "portal" && !this.portals) this._placePortals(ev);
+      }
       this.stats.pu++;
       ev.push({ t: "pu", type });
     }
@@ -365,6 +379,100 @@
       f.x = nx; f.y = ny;
     }
 
+    // ---- Портал: две клетки подальше друг от друга; заполз в одну — вылез из другой ----
+    _placePortals(ev) {
+      const free = this.freeCells(), h = this.snake[0];
+      const far = free.filter((c) => Math.abs(c.x - h.x) + Math.abs(c.y - h.y) >= 3 && c.x > 0 && c.y > 0 && c.x < N - 1 && c.y < N - 1);
+      if (far.length < 2) return;
+      const a = far[Math.floor(this.rng() * far.length)];
+      const pool = far.filter((c) => Math.abs(c.x - a.x) + Math.abs(c.y - a.y) >= 10);
+      const b = (pool.length ? pool : far.filter((c) => c !== a))[Math.floor(this.rng() * (pool.length || far.length - 1))];
+      if (!b) return;
+      this.portals = [{ x: a.x, y: a.y }, { x: b.x, y: b.y }];
+      ev.push({ t: "portals", a: this.portals[0], b: this.portals[1] });
+    }
+
+    // ---- Босс «Змей-вор»: ползёт к еде (каждый второй ход) и крадёт её. Укус оглушает его ----
+    _initRival() {
+      const r = mulberry32(this.cfg.seed ^ 0xB05511), cand = [];
+      for (let i = 0; i < N * N; i++) {
+        const x = i % N, y = (i / N) | 0;
+        if (this.rockSet[i] || this.gateSet[i] || this.blocked[i] || this.occ[i]) continue;
+        if (Math.abs(x - 12) + Math.abs(y - 12) < 10) continue;
+        cand.push({ x, y });
+      }
+      if (!cand.length) return;
+      const c = cand[Math.floor(r() * cand.length)];
+      this.rival = { body: [], dir: { x: 0, y: 0 }, len: 5, stolen: 0, stun: 0, bites: 0 };
+      for (let i = 0; i < 5; i++) { this.rival.body.push({ x: c.x, y: c.y }); this.rivalOcc[c.y * N + c.x]++; }
+    }
+    _rivalOpen(x, y) {
+      if (x < 0 || y < 0 || x >= N || y >= N) return false;
+      const k = y * N + x;
+      return !this.rockSet[k] && !this.occ[k] && !this.rivalOcc[k] && !this.gateClosed(x, y) && !(this.hole && this.hole.x === x && this.hole.y === y)
+        && !this.shrinkWarn.some((c) => c.x === x && c.y === y) && !(this.portals && this.portals.some((c) => c.x === x && c.y === y));
+    }
+    _moveRival(ev) {
+      const R = this.rival; if (!R || !this.food) return;
+      const h = R.body[0], f = this.food;
+      // поиск в ширину к еде; хвост вора на этом ходу уйдёт — его клетку считаем свободной
+      const tail = R.body[R.body.length - 1];
+      this.rivalOcc[tail.y * N + tail.x]--;
+      const prev = new Int16Array(N * N).fill(-1), q = [];
+      for (let d = 0; d < 4; d++) {
+        const x = h.x + DIRS[d][0], y = h.y + DIRS[d][1];
+        if (!this._rivalOpen(x, y) && !(x === f.x && y === f.y)) continue;
+        const k = y * N + x; if (prev[k] !== -1) continue; prev[k] = d; q.push(k);
+      }
+      let dir = -1;
+      for (let i = 0; i < q.length && dir < 0; i++) {
+        const k = q[i], x = k % N, y = (k / N) | 0;
+        if (x === f.x && y === f.y) { dir = prev[k]; break; }
+        for (let d = 0; d < 4; d++) {
+          const nx = x + DIRS[d][0], ny = y + DIRS[d][1];
+          if (!this._rivalOpen(nx, ny) && !(nx === f.x && ny === f.y)) continue;
+          const nk = ny * N + nx; if (prev[nk] !== -1) continue; prev[nk] = prev[k]; q.push(nk);
+        }
+      }
+      if (dir < 0) for (let d = 0; d < 4; d++) if (this._rivalOpen(h.x + DIRS[d][0], h.y + DIRS[d][1])) { dir = d; break; }
+      this.rivalOcc[tail.y * N + tail.x]++;
+      if (dir < 0) return; // заперт — стоит на месте
+      const nx = h.x + DIRS[dir][0], ny = h.y + DIRS[dir][1];
+      R.dir = { x: DIRS[dir][0], y: DIRS[dir][1] };
+      R.body.unshift({ x: nx, y: ny }); this.rivalOcc[ny * N + nx]++;
+      if (nx === f.x && ny === f.y) {
+        R.stolen++; if (R.len < 10) R.len++;
+        ev.push({ t: "steal", x: nx, y: ny, type: f.type });
+        this.food = null; this.placeFood();
+      }
+      while (R.body.length > R.len) { const q2 = R.body.pop(); this.rivalOcc[q2.y * N + q2.x]--; }
+    }
+
+    // ---- Босс «Сужение»: с краёв поля нарастают стены (сначала предупреждение за 12 ходов) ----
+    _updateShrink(ev) {
+      const STEPS = [150, 300], WARN = 12, t = this.ticks;
+      const k = this.shrinkStep; if (k >= STEPS.length) return;
+      if (!this.shrinkWarn.length && t === STEPS[k] - WARN) {
+        const h = this.snake[0];
+        for (let i = 0; i < N * N; i++) {
+          const x = i % N, y = (i / N) | 0;
+          if (Math.min(x, y, N - 1 - x, N - 1 - y) !== k) continue;
+          if (this.rockSet[i] || this.gateSet[i] || this.blocked[i]) continue;
+          if (Math.abs(x - h.x) + Math.abs(y - h.y) < 4) continue;
+          if ((this.food && this.food.x === x && this.food.y === y) || (this.hole && this.hole.x === x && this.hole.y === y)) continue;
+          this.shrinkWarn.push({ x, y });
+        }
+        ev.push({ t: "shrinkwarn" });
+      } else if (t === STEPS[k]) {
+        const add = this.shrinkWarn.filter((c) => { const i = c.y * N + c.x; return !this.occ[i] && !this.rivalOcc[i] && !(this.food && this.food.x === c.x && this.food.y === c.y) && !(this.pu && this.pu.x === c.x && this.pu.y === c.y) && !(this.portals && this.portals.some((p) => p.x === c.x && p.y === c.y)); });
+        this.shrinkWarn = []; this.shrinkStep++;
+        this.baseRocks.push(...add);
+        this._setRocks(this.rocks.filter((r) => !this.baseRocks.includes(r) && !add.includes(r)).filter((r) => !this.baseRocks.some((b) => b.x === r.x && b.y === r.y)));
+        for (const c of add) this.blocked[c.y * N + c.x] = 1;
+        ev.push({ t: "shrink", n: add.length });
+      }
+    }
+
     _bodyHit(x, y) {
       let c = this.occ[y * N + x];
       const tail = this.snake[this.snake.length - 1];
@@ -373,7 +481,8 @@
     }
     _free(x, y) {
       return x >= 0 && x < N && y >= 0 && y < N && !this.occ[y * N + x] && !this.rockSet[y * N + x] && !(this.pu && this.pu.x === x && this.pu.y === y)
-        && !(this.lv && (this.gateSet[y * N + x] || (this.hole && this.hole.x === x && this.hole.y === y)));
+        && !(this.lv && (this.gateSet[y * N + x] || this.rivalOcc[y * N + x] || (this.hole && this.hole.x === x && this.hole.y === y)))
+        && !(this.portals && this.portals.some((c) => c.x === x && c.y === y));
     }
 
     // ---- один ход ----
@@ -385,8 +494,14 @@
       const ghost = this.ghostOn();
       let hx = this.snake[0].x + this.dir.x, hy = this.snake[0].y + this.dir.y;
       if (cfg.mode === "nowalls" || ghost) { hx = (hx + N) % N; hy = (hy + N) % N; }
+      // портал: голова выходит из второй клетки
+      if (this.portals && hx >= 0 && hy >= 0 && hx < N && hy < N) {
+        const pi = this.portals.findIndex((c) => c.x === hx && c.y === hy);
+        if (pi >= 0) { const o = this.portals[1 - pi]; ev.push({ t: "teleport", fx: hx, fy: hy, x: o.x, y: o.y }); hx = o.x; hy = o.y; }
+      }
       const oob = hx < 0 || hx >= N || hy < 0 || hy >= N;
-      const hit = oob || (!ghost && (this._bodyHit(hx, hy) || this.rockSet[hy * N + hx] === 1 || (this.lv && this.gateClosed(hx, hy))));
+      const rockHit = !oob && this.rockSet[hy * N + hx] === 1;
+      const hit = oob || (!ghost && (this._bodyHit(hx, hy) || rockHit || (this.lv && this.gateClosed(hx, hy))));
       if (hit) {
         let saved = "";
         if (this.isSafe()) saved = "safe";
@@ -396,10 +511,17 @@
         hx = (hx + N) % N; hy = (hy + N) % N;
         if (saved !== "safe") this.stats.saves++;
         ev.push({ t: "save", kind: saved, x: hx, y: hy });
+        // v3: щит разбивает камень (кроме стен уровня и лабиринта)
+        if (saved === "shield" && rockHit && cfg.rules >= 3 && cfg.mode !== "maze" && !this.baseRocks.some((r) => r.x === hx && r.y === hy)) {
+          this.rocks = this.rocks.filter((r) => r.x !== hx || r.y !== hy); this.rockSet[hy * N + hx] = 0;
+          ev.push({ t: "smash", x: hx, y: hy });
+        }
       }
       this.gameTime += interval; this.ticks++;
-      for (const k of TIMED) if (this.fx[k] && this.fx[k] <= this.gameTime) { this.fx[k] = 0; ev.push({ t: "fxend", k }); }
+      for (const k of TIMED) if (this.fx[k] && this.fx[k] <= this.gameTime) { this.fx[k] = 0; if (k === "portal") this.portals = null; ev.push({ t: "fxend", k }); }
       this.snake.unshift({ x: hx, y: hy }); this.occ[hy * N + hx]++;
+      // укусил вора — он оглушён и стоит на месте 16 ходов (сам вор безвреден, опасна только потеря еды)
+      if (this.rival && this.rivalOcc[hy * N + hx] > 0 && !(this.rival.stun > this.ticks)) { this.rival.stun = this.ticks + 16; this.rival.bites = (this.rival.bites || 0) + 1; ev.push({ t: "bite", x: hx, y: hy }); }
       // норка: заполз — уровень пройден
       if (this.hole && hx === this.hole.x && hy === this.hole.y) {
         const q = this.snake.pop(); this.occ[q.y * N + q.x]--;
@@ -464,8 +586,13 @@
       if (!this.pu && this.apples >= 2 && this.gameTime >= this.nextPuAt) { this.spawnPu(); ev.push({ t: "pu_spawn" }); }
       if (cfg.mode === "moving" || (this.lv && this.lv.moving)) this._updateMoving(ev);
       if (this.lv && this.gates.length) this._updateGates(ev);
+      if (this.lv && cfg.rules >= 3) {
+        if (this.rival && this.ticks % 2 === 0 && !(this.rival.stun > this.ticks)) this._moveRival(ev);
+        if (this.lv.shrink) this._updateShrink(ev);
+      }
 
-      if (this.comboTimer > 0) this.comboTimer--;
+      if (this.fx.freeze > this.gameTime) { /* заморозка: комбо не сгорает */ }
+      else if (this.comboTimer > 0) this.comboTimer--;
       else if (this.combo > 0) this.combo = 0;
       return ev;
     }
@@ -538,6 +665,6 @@
     };
   }
 
-  return { N, START_LEN, SAFE_MS, DIRS, RULES, BONUS_MAGNET_RANGE, LEVELS, levelStars, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
+  return { N, START_LEN, SAFE_MS, DIRS, RULES, PU_V2, BONUS_MAGNET_RANGE, LEVELS, levelStars, MODES, DIFFS, PU, TIMED, MAX_ART_LEVEL, PU_LIFE, COMBO_WINDOW, COMBO_MAX,
     artifactStats, mulberry32, normCfg, Game, reward, isRated, parseLog, encodeLog, simulate, player };
 });

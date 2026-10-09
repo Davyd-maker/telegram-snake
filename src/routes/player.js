@@ -75,6 +75,22 @@ module.exports = (app) => {
     res.json({ player: P.responsePlayer(await P.getPlayer(u)), bot_username: config.botUsername });
   }, { limit: [30, 60000] }));
 
+  // Аксессуар: надеть / снять (id="") / купить за монеты. За Stars — через /api/invoice + вебхук
+  app.post("/api/accessory", player(async (req, res, { p, uid, u }) => {
+    const id = String(req.body?.accessory ?? "");
+    if (id === "") { await pool.query(`UPDATE players SET accessory='', updated_at=NOW() WHERE telegram_id=$1`, [uid]); return res.json({ player: P.responsePlayer(await P.getPlayer(u)) }); }
+    const def = C.ACC_BY_ID[id];
+    if (!def) return res.status(400).json({ error: "Bad accessory" });
+    if (!(p.owned_accessories || []).includes(id)) {
+      if (def.currency === "stars") return res.status(402).json({ error: "Buy with Telegram Stars" });
+      const r = await pool.query(
+        `UPDATE players SET coins=coins-$1, accessory=$2, owned_accessories=ARRAY(SELECT DISTINCT unnest(owned_accessories || ARRAY[$2]::TEXT[])), updated_at=NOW()
+         WHERE telegram_id=$3 AND coins>=$1 RETURNING 1`, [def.price, id, uid]);
+      if (!r.rowCount) return res.status(400).json({ error: "Not enough coins" });
+    } else await pool.query(`UPDATE players SET accessory=$1, updated_at=NOW() WHERE telegram_id=$2`, [id, uid]);
+    res.json({ player: P.responsePlayer(await P.getPlayer(u)) });
+  }, { limit: [30, 60000] }));
+
   app.post("/api/daily", player(async (req, res, { uid, u }) => {
     const client = await pool.connect();
     try {
@@ -92,8 +108,23 @@ module.exports = (app) => {
       await client.query(
         `UPDATE players SET coins=coins+$1, daily_streak=$2, daily_bonus_claimed_at=NOW(), updated_at=NOW() WHERE telegram_id=$3`,
         [info.reward, info.next_streak, uid]);
+      // каждый 7-й день серии — сундук: аксессуар, которого ещё нет (за монеты), а если все есть — монеты
+      let chest = null;
+      if (info.next_streak % config.DAILY_REWARDS.length === 0) {
+        const have = rows[0].owned_accessories || [];
+        const pool2 = C.ACCESSORY_CATALOG.filter((a) => a.currency === "coins" && !have.includes(a.id));
+        if (pool2.length) {
+          const a = pool2[Math.floor(Math.random() * pool2.length)];
+          await client.query(`UPDATE players SET owned_accessories=ARRAY(SELECT DISTINCT unnest(owned_accessories || ARRAY[$1]::TEXT[])), chests=chests+1 WHERE telegram_id=$2`, [a.id, uid]);
+          chest = { accessory: a };
+        } else {
+          const coins = 1500 + Math.floor(Math.random() * 7) * 250;
+          await client.query(`UPDATE players SET coins=coins+$1, chests=chests+1 WHERE telegram_id=$2`, [coins, uid]);
+          chest = { coins };
+        }
+      }
       await client.query("COMMIT");
-      res.json({ reward: info.reward, player: P.responsePlayer(await P.getPlayer(u)) });
+      res.json({ reward: info.reward, chest, player: P.responsePlayer(await P.getPlayer(u)) });
     } catch (e) {
       await client.query("ROLLBACK").catch(() => {});
       throw e;

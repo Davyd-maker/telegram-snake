@@ -31,7 +31,10 @@
     { id: "aurora_field", name: "Аврора", emoji: "🎇", price: 110, currency: "stars", epic: true, desc: "Сияющие волны северного света" },
     { id: "cyber_field", name: "Киберпанк", emoji: "🏙️", price: 130, currency: "stars", epic: true, desc: "Неоновый мегаполис и сканирующая сетка" },
     { id: "volcano_field", name: "Вулкан", emoji: "🔥", price: 175, currency: "stars", epic: true, desc: "Лава, пепел и раскалённые трещины" },
-    { id: "crystal_field", name: "Кристалл", emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" }
+    { id: "crystal_field", name: "Кристалл", emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" },
+    { id: "rain_field", name: "Дождь", emoji: "🌧️", price: 30000, currency: "coins", desc: "Косой дождь и круги на лужах" },
+    { id: "autumn_field", name: "Осень", emoji: "🍂", price: 90, currency: "stars", epic: true, desc: "Кружатся жёлтые листья" },
+    { id: "night_field", name: "Ночь", emoji: "🌙", price: 120, currency: "stars", epic: true, desc: "Темнота и светлячки — видно только вокруг головы" }
   ];
 
   // Оформление полей: цвета фона, шахматка, сетка, свечение и анимированный эффект (fx)
@@ -46,7 +49,10 @@
     aurora_field: { bg: "#041412", chk: "rgba(80,255,200,.04)", g0: "rgba(0,210,150,.28)", g1: "rgba(20,60,80,.1)", border: "rgba(100,255,210,.6)", fx: "neon" },
     cyber_field: { bg: "#080313", chk: "rgba(255,50,220,.04)", grid: "rgba(0,220,255,.18)", g0: "rgba(100,30,180,.28)", g1: "rgba(30,10,60,.1)", border: "rgba(0,240,255,.6)", fx: "neon" },
     volcano_field: { bg: "#130402", chk: "rgba(255,90,30,.06)", g0: "rgba(255,60,10,.25)", g1: "rgba(70,8,0,.12)", border: "rgba(255,100,40,.65)", fx: "lava" },
-    crystal_field: { bg: "#09051a", chk: "rgba(200,180,255,.04)", g0: "rgba(150,90,255,.28)", g1: "rgba(35,15,80,.1)", border: "rgba(210,180,255,.65)", fx: "stars" }
+    crystal_field: { bg: "#09051a", chk: "rgba(200,180,255,.04)", g0: "rgba(150,90,255,.28)", g1: "rgba(35,15,80,.1)", border: "rgba(210,180,255,.65)", fx: "stars" },
+    rain_field: { bg: "#08111a", chk: "rgba(150,190,230,.04)", g0: "rgba(60,110,170,.24)", g1: "rgba(10,30,50,.1)", border: "rgba(140,190,240,.5)", fx: "rain" },
+    autumn_field: { bg: "#170d04", chk: "rgba(255,170,60,.05)", g0: "rgba(200,110,30,.24)", g1: "rgba(70,30,5,.1)", border: "rgba(255,170,70,.55)", fx: "leaves" },
+    night_field: { bg: "#03050d", chk: "rgba(120,140,255,.03)", g0: "rgba(40,50,120,.22)", g1: "rgba(5,8,30,.1)", border: "rgba(130,140,255,.45)", fx: "night" }
   };
 
   // Цвета обычных скинов: [голова, хвост]
@@ -56,7 +62,7 @@
     samurai: ["#ffd0d0", "#b3122f"], void: ["#d8b5ff", "#4314a3"], prism: ["#ffffff", "#3bdcff"]
   };
   // скины за главы уровней
-  Object.assign(SA.SKIN_COLORS, { lv_garden: ["#c8ffb0", "#2e9e3a"], lv_dungeon: ["#e6d5ff", "#5b4a8a"], lv_volcano: ["#ffe08a", "#d13b0a"] });
+  Object.assign(SA.SKIN_COLORS, { thief: ["#b48cff", "#2a1240"], lv_garden: ["#c8ffb0", "#2e9e3a"], lv_dungeon: ["#e6d5ff", "#5b4a8a"], lv_volcano: ["#ffe08a", "#d13b0a"] });
 
   const hsl = (h, l = 60) => `hsl(${((h % 360) + 360) % 360},95%,${l}%)`;
   const mix = (a, b, t) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;

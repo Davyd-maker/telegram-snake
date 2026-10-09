@@ -57,17 +57,59 @@ const FIELD_CATALOG = [
   { id: "aurora_field",  name: "Аврора",    emoji: "🎇", price: 110, currency: "stars", epic: true, desc: "Сияющие волны северного света" },
   { id: "cyber_field",   name: "Киберпанк", emoji: "🏙️", price: 130, currency: "stars", epic: true, desc: "Неоновый мегаполис и сканирующая сетка" },
   { id: "volcano_field", name: "Вулкан",    emoji: "🔥", price: 175, currency: "stars", epic: true, desc: "Лава, пепел и раскалённые трещины" },
-  { id: "crystal_field", name: "Кристалл",  emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" }
+  { id: "crystal_field", name: "Кристалл",  emoji: "💠", price: 220, currency: "stars", epic: true, desc: "Кристаллическая арена с сиянием" },
+  { id: "rain_field",    name: "Дождь",     emoji: "🌧️", price: 30000, currency: "coins", desc: "Косой дождь и круги на лужах" },
+  { id: "autumn_field",  name: "Осень",     emoji: "🍂", price: 90,  currency: "stars", epic: true, desc: "Кружатся жёлтые листья" },
+  { id: "night_field",   name: "Ночь",      emoji: "🌙", price: 120, currency: "stars", epic: true, desc: "Темнота и светлячки — видно только вокруг головы" }
 ];
 const FIELD_BY_ID = Object.fromEntries(FIELD_CATALOG.map((f) => [f.id, f]));
 
+// Достижения. Полученные показываются значками в профиле. group — для сортировки по разделам.
+const ACH = (id, icon, title, stat, target, reward, group) => ({ id, icon, title, need: (p) => (p[stat] || 0) >= target, stat, target, reward, group });
 const ACHIEVEMENTS = [
-  { id: "first",     icon: "🐣", title: "Первый забег", need: (p) => p.games >= 1,        reward: 250 },
-  { id: "apples100", icon: "🍎", title: "100 яблок",    need: (p) => p.total_apples >= 100, reward: 500 },
-  { id: "score500",  icon: "🔥", title: "500 очков",    need: (p) => p.best_score >= 500,  reward: 750 },
-  { id: "combo5",    icon: "⚡", title: "Комбо ×5",     need: (p) => p.best_combo >= 5,    reward: 1000 },
-  { id: "friends5",  icon: "👥", title: "5 друзей",     need: (p) => p.referrals >= 5,     reward: 1500 }
+  { id: "first",     icon: "🐣", title: "Первый забег", need: (p) => p.games >= 1,        stat: "games", target: 1, reward: 250, group: "play" },
+  ACH("games50", "🎮", "Сыграй 50 забегов", "games", 50, 1000, "play"),
+  ACH("games300", "🕹️", "Сыграй 300 забегов", "games", 300, 3000, "play"),
+  { id: "apples100", icon: "🍎", title: "100 яблок",    need: (p) => p.total_apples >= 100, stat: "total_apples", target: 100, reward: 500, group: "food" },
+  ACH("apples1000", "🧺", "Съешь 1000 фруктов", "total_apples", 1000, 2000, "food"),
+  ACH("apples5000", "🍉", "Съешь 5000 фруктов", "total_apples", 5000, 5000, "food"),
+  ACH("score100", "🎯", "100 очков за забег", "best_score", 100, 400, "score"),
+  ACH("score250", "🏹", "250 очков за забег", "best_score", 250, 600, "score"),
+  { id: "score500",  icon: "🔥", title: "500 очков",    need: (p) => p.best_score >= 500,  stat: "best_score", target: 500, reward: 750, group: "score" },
+  ACH("score1000", "☄️", "1000 очков за забег", "best_score", 1000, 3000, "score"),
+  { id: "combo5",    icon: "⚡", title: "Комбо ×5",     need: (p) => p.best_combo >= 5,    stat: "best_combo", target: 5, reward: 1000, group: "score" },
+  ACH("combo10", "🌩️", "Серия из 10 фруктов подряд", "best_combo", 10, 2000, "score"),
+  ACH("lv10", "🌿", "Пройди главу «Сад»", "levels", 10, 1500, "levels"),
+  ACH("lv20", "🏰", "Пройди главу «Подземелье»", "levels", 20, 3000, "levels"),
+  ACH("lv30", "🌋", "Пройди все 30 уровней", "levels", 30, 6000, "levels"),
+  ACH("stars45", "⭐", "Собери 45 звёзд на уровнях", "level_stars", 45, 2500, "levels"),
+  ACH("stars90", "🌟", "Все 90 звёзд на уровнях", "level_stars", 90, 8000, "levels"),
+  ACH("streak7", "📅", "Заходи 7 дней подряд", "streak", 7, 1000, "loyal"),
+  ACH("streak30", "🗓️", "Заходи 30 дней подряд", "streak", 30, 5000, "loyal"),
+  ACH("skins5", "🎨", "Собери 5 скинов", "skins", 5, 1500, "collect"),
+  ACH("acc3", "🎩", "Собери 3 аксессуара", "accs", 3, 1000, "collect"),
+  ACH("fields3", "🗺️", "Собери 3 поля", "fields", 3, 1500, "collect"),
+  ACH("friends1", "🤝", "Пригласи друга", "referrals", 1, 500, "friends"),
+  { id: "friends5",  icon: "👥", title: "5 друзей",     need: (p) => p.referrals >= 5,     stat: "referrals", target: 5, reward: 1500, group: "friends" },
+  ACH("friends20", "🎉", "20 друзей", "referrals", 20, 6000, "friends")
 ];
+
+// Аксессуары: надеваются поверх любого скина. Один надет одновременно.
+const ACCESSORY_CATALOG = [
+  { id: "cap",        name: "Кепка",        emoji: "🧢", price: 3000,  currency: "coins" },
+  { id: "bow",        name: "Бантик",       emoji: "🎀", price: 3000,  currency: "coins" },
+  { id: "glasses",    name: "Очки",         emoji: "👓", price: 4000,  currency: "coins" },
+  { id: "flower",     name: "Цветок",       emoji: "🌼", price: 4000,  currency: "coins" },
+  { id: "mustache",   name: "Усы",          emoji: "🥸", price: 5000,  currency: "coins" },
+  { id: "party",      name: "Колпак",       emoji: "🥳", price: 6000,  currency: "coins" },
+  { id: "headphones", name: "Наушники",     emoji: "🎧", price: 8000,  currency: "coins" },
+  { id: "shades",     name: "Тёмные очки",  emoji: "🕶️", price: 40,    currency: "stars", epic: true },
+  { id: "tophat",     name: "Цилиндр",      emoji: "🎩", price: 60,    currency: "stars", epic: true },
+  { id: "horns",      name: "Рожки",        emoji: "😈", price: 75,    currency: "stars", epic: true },
+  { id: "halo",       name: "Нимб",         emoji: "😇", price: 90,    currency: "stars", epic: true },
+  { id: "crown",      name: "Корона",       emoji: "👑", price: 150,   currency: "stars", epic: true }
+];
+const ACC_BY_ID = Object.fromEntries(ACCESSORY_CATALOG.map((a) => [a.id, a]));
 
 // ---- Сезон = неделя (понедельник 00:00 UTC). Скин недели зависит только от даты понедельника,
 // поэтому id и цвета восстанавливаются без БД — прошлые недельные скины остаются у тех, кто их получил.
@@ -182,6 +224,6 @@ const levelStarReward = (n) => 40 + Math.ceil(n / 10) * 30; // монет за �
 module.exports = {
   CHAPTERS, levelFirstReward, levelStarReward,
   MISSION_POOL, WEEKLY_POOL, MISSION_BY_ID, PRODUCTS, STARTER, PASS_TIERS, PASS_TIER_XP, TOUR_PRIZES, CLAN,
-  ARTIFACT_UPGRADE_COST, MISSIONS, SKIN_CATALOG, SKIN_BY_ID, ARTIFACT_CATALOG, ARTIFACT_BY_ID, FIELD_CATALOG, FIELD_BY_ID, ACHIEVEMENTS,
+  ARTIFACT_UPGRADE_COST, MISSIONS, SKIN_CATALOG, SKIN_BY_ID, ARTIFACT_CATALOG, ARTIFACT_BY_ID, FIELD_CATALOG, FIELD_BY_ID, ACHIEVEMENTS, ACCESSORY_CATALOG, ACC_BY_ID,
   currentSeasonBounds, weeklySkinFor, weeklySkinById, skinDef, skinPalette, catalogFor
 };

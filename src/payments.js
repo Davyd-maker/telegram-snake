@@ -9,9 +9,9 @@ function parseItemPayload(payload, userId) {
     if (pm[3] !== String(userId) || !C.PRODUCTS[pm[1]]) return null;
     return { kind: "product", def: C.PRODUCTS[pm[1]], ref: Number(pm[2]) };
   }
-  const m = /^(skin|field):([a-z_]+):(\d+)$/.exec(String(payload || ""));
+  const m = /^(skin|field|acc):([a-z_]+):(\d+)$/.exec(String(payload || ""));
   if (!m || m[3] !== String(userId)) return null;
-  const def = (m[1] === "field" ? C.FIELD_BY_ID : C.SKIN_BY_ID)[m[2]];
+  const def = (m[1] === "field" ? C.FIELD_BY_ID : m[1] === "acc" ? C.ACC_BY_ID : C.SKIN_BY_ID)[m[2]];
   return def && def.currency === "stars" ? { kind: m[1], def } : null;
 }
 
@@ -34,7 +34,7 @@ async function grantPaidItem(userId, kind, def, chargeId, stars, ref = 0) {
     // charge_id уникален — повторная доставка вебхука не выдаст покупку дважды
     const ins = await client.query(
       `INSERT INTO payments (charge_id, telegram_id, skin, stars) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING 1`,
-      [chargeId, String(userId), kind === "product" ? `product:${def.id}:${ref}` : kind === "field" ? "field:" + def.id : def.id, stars]
+      [chargeId, String(userId), kind === "product" ? `product:${def.id}:${ref}` : kind === "field" || kind === "acc" ? kind + ":" + def.id : def.id, stars]
     );
     if (ins.rowCount) {
       if (kind === "product" && def.id === "pass") {
@@ -46,6 +46,10 @@ async function grantPaidItem(userId, kind, def, chargeId, stars, ref = 0) {
           `UPDATE players SET starter_bought=TRUE, coins=coins+$1, owned_skins=ARRAY(SELECT DISTINCT unnest(owned_skins || ARRAY[$2]::TEXT[])),
              artifact_levels=jsonb_set(COALESCE(artifact_levels,'{}'::jsonb), ARRAY[$3::text], to_jsonb(GREATEST($4::int, COALESCE((artifact_levels->>$3)::int,1))), true), updated_at=NOW()
            WHERE telegram_id=$5`, [S.coins, S.skin, S.artifact, S.level, String(userId)]);
+      } else if (kind === "acc") {
+        await client.query(
+          `UPDATE players SET accessory=$1, owned_accessories=ARRAY(SELECT DISTINCT unnest(owned_accessories || ARRAY[$1]::TEXT[])), updated_at=NOW()
+           WHERE telegram_id=$2`, [def.id, String(userId)]);
       } else if (kind === "field") {
         await client.query(
           `UPDATE players SET field_skin=$1, owned_fields=ARRAY(SELECT DISTINCT unnest(owned_fields || ARRAY[$1]::TEXT[])), updated_at=NOW()
@@ -97,7 +101,11 @@ async function refundPayment(chargeId, adminId) {
        WHERE telegram_id=$3`, [C.STARTER.coins, C.STARTER.skin, pay.telegram_id]);
     return pay;
   }
-  if (isField) {
+  if (pay.skin.startsWith("acc:")) {
+    await pool.query(
+      `UPDATE players SET owned_accessories=array_remove(owned_accessories,$1), accessory=CASE WHEN accessory=$1 THEN '' ELSE accessory END, updated_at=NOW()
+       WHERE telegram_id=$2`, [pay.skin.slice(4), pay.telegram_id]);
+  } else if (isField) {
     await pool.query(
       `UPDATE players SET owned_fields=array_remove(owned_fields,$1), field_skin=CASE WHEN field_skin=$1 THEN 'classic' ELSE field_skin END, updated_at=NOW()
        WHERE telegram_id=$2`, [id, pay.telegram_id]);

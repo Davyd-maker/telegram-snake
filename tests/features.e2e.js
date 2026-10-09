@@ -163,6 +163,21 @@ const tgLog = async () => (TG_LOG ? (await fetch(TG_LOG)).json() : []);
   // подделка: прислать «прохождение» другого уровня тем же логом нельзя — сервер переигрывает по своему токену
   r = await call(Cc, "GET", "/api/levels"); ok(!r.data.levels[1].done, "2-й уровень не отмечен пройденным");
 
+  console.log("• аксессуары, достижения, правила v3");
+  await call(admin, "POST", "/api/admin/player/grant", { telegram_id: "4002", coins: 10000 });
+  r = await call(B, "POST", "/api/accessory", { accessory: "cap" }); ok(r.status === 200 && r.data.player.accessory === "cap" && r.data.player.owned_accessories.includes("cap"), "кепка куплена за монеты и надета");
+  r = await call(B, "POST", "/api/accessory", { accessory: "crown" }); ok(r.status === 402, "корона — только за Stars");
+  r = await call(B, "POST", "/api/accessory", { accessory: "" }); ok(r.data.player.accessory === "", "аксессуар снят");
+  r = await call(B, "POST", "/api/accessory", { accessory: "nope" }); ok(r.status === 400, "несуществующий аксессуар — отказ");
+  r = await call(B, "POST", "/api/invoice", { accessory: "crown" }); ok(r.status === 200 && r.data.url, "счёт на корону");
+  await webhook({ message: { chat: { id: 4002 }, from: { id: 4002 }, successful_payment: { currency: "XTR", total_amount: 150, invoice_payload: "acc:crown:4002", telegram_payment_charge_id: "ch-acc-crown" } } }); await sleep(400);
+  r = await call(B, "GET", "/api/me"); ok(r.data.player.owned_accessories.includes("crown") && r.data.player.accessory === "crown", "корона выдана после оплаты Stars");
+  r = await call(admin, "POST", "/api/admin/payments/refund", { charge_id: "ch-acc-crown" });
+  r = await call(B, "GET", "/api/me"); ok(!r.data.player.owned_accessories.includes("crown") && r.data.player.accessory === "", "возврат Stars забирает корону");
+  const al = r.data.player.achievements_list; ok(al.length >= 25 && al.every((x) => x.group && x.target), `достижений: ${al.length}, у всех есть прогресс`);
+  r = await call(Cc, "GET", "/api/me"); ok(r.data.player.levels_done >= 1 && r.data.player.level_stars >= 1, "в профиле — пройденные уровни и звёзды", { l: r.data.player.levels_done, s: r.data.player.level_stars });
+  r = await call(A, "POST", "/api/run", { mode: "rocks" }); ok(r.data.cfg.rules === E.RULES && E.RULES >= 3, "новые забеги идут по правилам v3");
+
   console.log("• админка: удержание, античит, реплей");
   r = await call(admin, "GET", "/api/admin/retention"); ok(r.data.cohorts.length >= 1 && r.data.funnel.registered >= 5 && r.data.funnel.paid >= 1, "когорты и воронка", r.data.funnel);
   r = await call(admin, "GET", "/api/admin/suspicious"); ok(Array.isArray(r.data.runs), `подозрительных забегов: ${r.data.runs.length} (бот играет почти идеально — должен попадаться)`);

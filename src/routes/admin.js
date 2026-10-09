@@ -18,6 +18,7 @@ const PLAYER_COLS = `telegram_id,username,first_name,coins,xp,best_score,best_no
 function itemName(key) {
   const prod = /^product:([a-z]+):(\d+)$/.exec(String(key));
   if (prod) { const d = C.PRODUCTS[prod[1]]; return d ? `${d.emoji} ${d.name}${prod[1] === "pass" ? ` (сезон ${prod[2]})` : ""}` : key; }
+  if (String(key).startsWith("acc:")) { const d = C.ACC_BY_ID[key.slice(4)]; return d ? `${d.emoji} ${d.name} (аксессуар)` : key; }
   const isField = String(key).startsWith("field:");
   const id = isField ? key.slice(6) : key;
   const def = isField ? C.FIELD_BY_ID[id] : C.skinDef(id);

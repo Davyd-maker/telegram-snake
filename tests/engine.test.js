@@ -194,3 +194,46 @@ test("уровни: норка появляется только после це
   const fresh = new E.Game({ mode: "level", level: 1, seed: 11, rules: E.RULES });
   assert.equal(fresh.hole, null);
 });
+
+// ---- правила v3 ----
+test("v3: портал переносит голову во вторую клетку", () => {
+  const g = new E.Game({ seed: 5, mode: "classic", rules: 3 });
+  g.safeUntil = 0; g.food = { x: 0, y: 0, type: "apple" };
+  g.portals = [{ x: 13, y: 12 }, { x: 3, y: 20 }]; g.fx.portal = 99999;
+  const ev = g.tick();
+  assert.ok(ev.some((e) => e.t === "teleport"));
+  assert.deepEqual(g.snake[0], { x: 3, y: 20 });
+});
+test("v3: щит разбивает камень, а v2 — нет", () => {
+  for (const rules of [2, 3]) {
+    const g = new E.Game({ seed: 5, mode: "rocks", rules });
+    g.safeUntil = 0; g.shield = true; g._setRocks([{ x: 13, y: 12 }]); g.food = { x: 0, y: 0, type: "apple" };
+    const ev = g.tick();
+    assert.equal(ev.some((e) => e.t === "smash"), rules === 3);
+    assert.equal(g.rockSet[12 * 24 + 13], rules === 3 ? 0 : 1);
+  }
+});
+test("v3: заморозка не даёт комбо сгореть", () => {
+  const g = new E.Game({ seed: 5, mode: "nowalls", rules: 3 });
+  g.combo = 3; g.comboTimer = 1; g.fx.freeze = 1e9; g.food = { x: 0, y: 0, type: "apple" };
+  for (let i = 0; i < 10; i++) g.tick();
+  assert.equal(g.combo, 3);
+});
+test("v2: бонусы только старые шесть (реплеи не меняются)", () => {
+  const seen = new Set();
+  for (let s = 1; s < 200; s++) { const g = new E.Game({ seed: s, rules: 2 }); g.snake.length = 10; g.spawnPu(); seen.add(g.pu.type); }
+  assert.ok(!seen.has("portal") && !seen.has("freeze"));
+  const seen3 = new Set();
+  for (let s = 1; s < 200; s++) { const g = new E.Game({ seed: s, rules: 3 }); g.snake.length = 10; g.spawnPu(); seen3.add(g.pu.type); }
+  assert.ok(seen3.has("portal") && seen3.has("freeze"));
+});
+test("v3: на 10-м уровне есть вор, на 20-м поле сужается", () => {
+  const g10 = new E.Game({ mode: "level", level: 10, seed: 3, rules: 3 });
+  assert.ok(g10.rival && g10.rival.body.length === 5);
+  const g10old = new E.Game({ mode: "level", level: 10, seed: 3, rules: 2 });
+  assert.equal(g10old.rival, null);
+  const g20 = new E.Game({ mode: "level", level: 20, seed: 3, rules: 3 });
+  const before = g20.rocks.length; g20.safeUntil = 1e9;
+  for (let i = 0; i < 150 && !g20.over; i++) { g20.fx.ghost = 0; g20.tick(); }
+  assert.ok(g20.shrinkStep === 1 && g20.baseRocks.length > E.LEVELS[19].walls.length, "первое сужение случилось " + before);
+});

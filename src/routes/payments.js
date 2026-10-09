@@ -25,13 +25,13 @@ module.exports = (app) => {
       if (def.id === "starter" && p.starter_bought) return res.status(400).json({ error: "Already owned" });
       title = def.name; description = `${def.emoji} ${def.desc}`; payload = `product:${def.id}:${ref}:${u.id}`;
     } else {
-      const kind = b.field ? "field" : "skin";
-      def = kind === "field" ? C.FIELD_BY_ID[String(b.field || "")] : C.SKIN_BY_ID[String(b.skin || "")];
-      if (!def || def.currency !== "stars") return res.status(400).json({ error: kind === "field" ? "Bad field" : "Bad skin" });
-      const have = kind === "field" ? p.owned_fields : p.owned_skins;
+      const kind = b.field ? "field" : b.accessory ? "acc" : "skin";
+      def = kind === "field" ? C.FIELD_BY_ID[String(b.field || "")] : kind === "acc" ? C.ACC_BY_ID[String(b.accessory || "")] : C.SKIN_BY_ID[String(b.skin || "")];
+      if (!def || def.currency !== "stars") return res.status(400).json({ error: kind === "field" ? "Bad field" : kind === "acc" ? "Bad accessory" : "Bad skin" });
+      const have = kind === "field" ? p.owned_fields : kind === "acc" ? p.owned_accessories : p.owned_skins;
       if ((have || []).includes(def.id)) return res.status(400).json({ error: "Already owned" });
-      title = kind === "field" ? `Поле «${def.name}»` : `Скин «${def.name}»`;
-      description = `${def.emoji} ${def.desc || (kind === "field" ? "Игровое поле" : "Эпический скин змейки")} — навсегда в Snake Arena`;
+      title = kind === "field" ? `Поле «${def.name}»` : kind === "acc" ? `Аксессуар «${def.name}»` : `Скин «${def.name}»`;
+      description = `${def.emoji} ${def.desc || (kind === "field" ? "Игровое поле" : kind === "acc" ? "Аксессуар для змейки — носится с любым скином" : "Эпический скин змейки")} — навсегда в Snake Arena`;
       payload = `${kind}:${def.id}:${u.id}`;
     }
     try {

@@ -32,11 +32,13 @@ function levelInfo(xp = 0) {
 }
 const achStats = (p) => ({
   games: Number(p.games_played || 0), total_apples: Number(p.total_apples || 0), best_score: Number(p.best_score || 0),
-  best_combo: Number(p.best_combo || 0), referrals: Number(p.referrals || 0)
+  best_combo: Number(p.best_combo || 0), referrals: Number(p.referrals || 0),
+  levels: Number(p.levels_done || 0), level_stars: Number(p.level_stars || 0), streak: Number(p.daily_streak || 0),
+  skins: (p.owned_skins || []).length, accs: (p.owned_accessories || []).length, fields: (p.owned_fields || []).length
 });
 function achievementList(p) {
   const a = p.achievements || {}, st = achStats(p);
-  return C.ACHIEVEMENTS.map(({ need, ...x }) => ({ ...x, claimed: !!a[x.id], ready: !!need(st) }));
+  return C.ACHIEVEMENTS.map(({ need, ...x }) => ({ ...x, claimed: !!a[x.id], ready: !!need(st), progress: x.stat ? Math.min(st[x.stat] || 0, x.target) : null }));
 }
 
 // ---------- задания: см. src/missions.js ----------
@@ -129,7 +131,9 @@ async function getPlayer(u) {
     `SELECT *,
             to_char(daily_bonus_claimed_at AT TIME ZONE $2, 'YYYY-MM-DD') AS last_day,
             to_char(NOW() AT TIME ZONE $2, 'YYYY-MM-DD') AS today,
-            (SELECT first_name FROM players r WHERE r.telegram_id=players.referred_by) AS invited_by
+            (SELECT first_name FROM players r WHERE r.telegram_id=players.referred_by) AS invited_by,
+            (SELECT COUNT(*)::int FROM level_progress lp WHERE lp.telegram_id=players.telegram_id) AS levels_done,
+            (SELECT COALESCE(SUM(stars),0)::int FROM level_progress lp WHERE lp.telegram_id=players.telegram_id) AS level_stars
      FROM players WHERE telegram_id=$1`,
     [id, config.DAILY_TZ]
   );
@@ -168,6 +172,10 @@ function responsePlayer(p) {
     equipped_artifact: C.ARTIFACT_BY_ID[p.equipped_artifact] ? p.equipped_artifact : "magnet",
     fields: C.FIELD_CATALOG,
     field_skin: C.FIELD_BY_ID[p.field_skin] ? p.field_skin : "classic",
+    accessories: C.ACCESSORY_CATALOG,
+    owned_accessories: Array.isArray(p.owned_accessories) ? p.owned_accessories : [],
+    accessory: C.ACC_BY_ID[p.accessory] && (p.owned_accessories || []).includes(p.accessory) ? p.accessory : "",
+    levels_done: Number(p.levels_done || 0), level_stars: Number(p.level_stars || 0),
     stars_enabled: !!config.BOT_TOKEN,
     missions: missionList(p),
     ref_reward: config.REF_REWARD,

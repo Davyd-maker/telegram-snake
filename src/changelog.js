@@ -1,9 +1,32 @@
 // Новости обновлений. После выкладки новой версии бот один раз рассылает новость CURRENT всем, кто не отключил
 // сообщения (ANNOUNCE_UPDATES=off — не рассылать), а в игре при первом входе показывается окно «Что нового».
 // Новая версия: добавь запись в NEWS и поменяй CURRENT. Лимит Telegram — 4096 символов; лучше коротко.
-const CURRENT = "29";
+const CURRENT = "30";
 
 const NEWS = {
+  30: {
+    title: { ru: "Змейка ожила!", en: "The snake comes alive!" },
+    ru: [
+      "😊 Мимика: змейка смотрит на еду, моргает, открывает рот, жуёт, пугается перед стеной и радуется комбо",
+      "🍒 Вместо одних яблок — вишня, клубника, виноград, арбуз и банан",
+      "🎩 Аксессуары: шапки, очки, корона и не только — носятся с любым скином",
+      "🎁 Сундук на 7-й день серии — с новым аксессуаром",
+      "🦹 Боссы на 10-м, 20-м и 30-м уровнях: змей-вор и сужающееся поле",
+      "🌀 Новые бонусы: портал и заморозка комбо. 🛡️ Щит теперь разбивает камни",
+      "🌧️ Новые поля: Дождь, Осень и Ночь",
+      "🏅 25 достижений со значками и новый профиль, 🏆 повтор рекорда с конфетти, светлая тема"
+    ],
+    en: [
+      "😊 Expressions: the snake watches food, blinks, opens its mouth, chews, gets scared near walls and smiles on combos",
+      "🍒 Not just apples — cherries, strawberries, grapes, watermelon and bananas",
+      "🎩 Accessories: hats, glasses, a crown and more — wear them with any skin",
+      "🎁 A chest on day 7 of your streak — with a new accessory",
+      "🦹 Bosses on levels 10, 20 and 30: a thief snake and a shrinking field",
+      "🌀 New power-ups: portal and combo freeze. 🛡️ The shield now smashes rocks",
+      "🌧️ New fields: Rain, Autumn and Night",
+      "🏅 25 achievements with badges and a new profile, 🏆 record replay with confetti, light theme"
+    ]
+  },
   29: {
     title: { ru: "Новый режим — «Уровни»!", en: "New mode — Levels!" },
     ru: [
