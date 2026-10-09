@@ -603,3 +603,11 @@ body.light button.sm,body.light .edtools button,body.light .giftamts button,body
 body.light .petcard{background:#fff8ec;border-color:rgba(200,150,60,.25)}
 body.light #edName{background:#fff;color:var(--text)}
 body.light #duelGame .dside{background:rgba(5,18,11,.88);color:#f3fff8}
+/* вкладки магазина */
+.shoptabs{position:sticky;top:6px;z-index:5;margin-top:10px}
+.shoptabs.n4{grid-template-columns:repeat(4,1fr)}.shoptabs.n5{grid-template-columns:repeat(5,1fr)}
+.shoptabs button{padding:9px 2px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shop .sect:first-child{margin-top:0}
+.shoptabs button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 2px;font-size:11px;line-height:1.1}
+.shoptabs button i{font-style:normal;font-size:18px}.shoptabs button span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.shoptabs button{font-size:10.5px;padding:7px 0;letter-spacing:-.2px}

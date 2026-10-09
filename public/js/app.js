@@ -464,14 +464,26 @@
     const hs = holItems(cat, owned), hf = holItems(fcat, fowned), ha = holItems(acat, aowned);
     const holHtml = hs.length + hf.length + ha.length ? `<h3 class="sect span2 holsect">🎃 ${t("Хэллоуин")}<small>${hol ? t("за конфеты") + " · 🍬 " + fmtN(p.candies || 0) + " · " + t("конфеты — за фрукты во время праздника") : t("праздник закончился")}</small></h3>`
       + hs.map(card).join("") + ha.map(acard).join("") + hf.map(fcard).join("") : "";
-    $("shopGrid").innerHTML = holHtml +
-      (acat.length ? `<h3 class="sect span2">🎩 Аксессуары<small>носятся с любым скином · 🎁 сундук на 7-й день серии</small></h3>` + acat.filter((x) => x.currency !== "candy").map(acard).join("") : "") +
-      `<h3 class="sect span2">🏆 Награды<small>сезон, уровни, турниры и пропуск</small></h3>` + cat.filter((x) => REWARD_CUR.includes(x.currency)).sort((a, b) => owned.includes(b.id) - owned.includes(a.id) || b.weekly - a.weekly).map(card).join("") +
-      `<h3 class="sect span2">⭐ Эпические скины<small>за Telegram Stars</small></h3>` + cat.filter((x) => x.epic && x.currency === "stars").map(card).join("") +
-      `<h3 class="sect span2">🪙 Обычные скины<small>за монеты</small></h3>` + cat.filter((x) => x.currency === "coins").map(card).join("") +
-      `<h3 class="sect span2">🗺 Игровые поля<small>за Telegram Stars</small></h3>` + fcat.filter((x) => x.currency === "stars").map(fcard).join("") +
-      `<h3 class="sect span2">⬛ Простые поля<small>за монеты</small></h3>` + fcat.filter((x) => x.currency === "coins").map(fcard).join("");
+    // вкладки магазина: скины / поля / аксессуары / артефакты (+ праздник, когда он идёт)
+    const tabs = [["skins", "🐍", t("Скины")], ["fields", "🗺", t("Поля")], ["acc", "🎩", t("Аксессуары")], ["art", "🧿", t("Артефакты")]];
+    if (holHtml) tabs.unshift(["holiday", "🎃", t("Праздник")]);
+    if (!tabs.some(([id]) => id === shopTab)) shopTab = "skins";
+    $("shopTabs").className = "tabs shoptabs n" + tabs.length;
+    $("shopTabs").innerHTML = tabs.map(([id, ic, n]) => `<button data-shoptab="${id}" class="${id === shopTab ? "on" : ""}"><i>${ic}</i><span>${n}</span></button>`).join("");
+    const html = {
+      holiday: holHtml,
+      skins: `<h3 class="sect span2">🏆 Награды<small>сезон, уровни, турниры и пропуск</small></h3>` + cat.filter((x) => REWARD_CUR.includes(x.currency)).sort((a, b) => owned.includes(b.id) - owned.includes(a.id) || b.weekly - a.weekly).map(card).join("") +
+        `<h3 class="sect span2">⭐ Эпические скины<small>за Telegram Stars</small></h3>` + cat.filter((x) => x.epic && x.currency === "stars").map(card).join("") +
+        `<h3 class="sect span2">🪙 Обычные скины<small>за монеты</small></h3>` + cat.filter((x) => x.currency === "coins").map(card).join(""),
+      fields: `<h3 class="sect span2">🗺 Игровые поля<small>за Telegram Stars</small></h3>` + fcat.filter((x) => x.currency === "stars").map(fcard).join("") +
+        `<h3 class="sect span2">⬛ Простые поля<small>за монеты</small></h3>` + fcat.filter((x) => x.currency === "coins").map(fcard).join(""),
+      acc: `<h3 class="sect span2">🎩 Аксессуары<small>носятся с любым скином · 🎁 сундук на 7-й день серии</small></h3>` + acat.filter((x) => x.currency !== "candy").map(acard).join(""),
+      art: ""
+    };
+    $("shopGrid").innerHTML = html[shopTab];
+    $("shopGrid").hidden = shopTab === "art"; $("artSect").hidden = shopTab !== "art";
   }
+  let shopTab = "skins";
   async function buy(id) {
     const sk = skinCat().find((x) => x.id === id); if (!sk || p.skin === id) return;
     const has = (p.owned_skins || ["classic"]).includes(id);
@@ -1386,6 +1398,7 @@
     if (t.dataset.diff) { sel.diff = t.dataset.diff; LS.set("snakeDiff", sel.diff); haptic("light"); return renderSplash(); }
     if (t.dataset.rmode) { ratingMode = t.dataset.rmode; return renderRating(); }
     if (t.dataset.tab && t.parentElement.id === "ratingTabs") { ratingTab = t.dataset.tab; return renderRating(); }
+    if (t.dataset.shoptab) { shopTab = t.dataset.shoptab; haptic("light"); return renderShop(); }
     if (t.dataset.tab && t.parentElement.id === "seasonTabs") { seasonTab = t.dataset.tab; return renderSeason(); }
     if (t.dataset.level) return openLevel(Number(t.dataset.level));
     if (t.dataset.ptier) { t.disabled = true; return claimPass(Number(t.dataset.ptier), t.dataset.ptrack); }

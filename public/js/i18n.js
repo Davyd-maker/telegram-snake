@@ -377,7 +377,7 @@
     "Ночь Хэллоуина": "Halloween night",
     "Туман, луна и летучие мыши": "Fog, moon and bats",
     "Шляпа ведьмы": "Witch hat",
-    "Повтор последних секунд": "Replay of the last seconds", "Редактор уровня": "Level editor", "Поле дуэли": "Duel field", "Схема головоломки": "Puzzle layout", "Закрыть": "Close", "Вверх": "Up", "Вниз": "Down", "Влево": "Left", "Вправо": "Right",
+    "Поля": "Fields", "Магазин": "Shop", "Праздник": "Holiday", "Повтор последних секунд": "Replay of the last seconds", "Редактор уровня": "Level editor", "Поле дуэли": "Duel field", "Схема головоломки": "Puzzle layout", "Закрыть": "Close", "Вверх": "Up", "Вниз": "Down", "Влево": "Left", "Вправо": "Right",
     "Доберись до 5-го этажа подземелья": "Reach floor 5 of the dungeon",
     "Доберись до 15-го этажа подземелья": "Reach floor 15 of the dungeon",
     "Реши 7 головоломок дня": "Solve 7 daily puzzles",
