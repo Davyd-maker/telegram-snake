@@ -909,7 +909,7 @@
       fxSig = sig;
       // обновляем по ключу: новый эффект появляется с анимацией, у старых меняются только цифры
       const box = $("fx"), keep = new Set(chips.map((c) => c[0]));
-      box.classList.toggle("compact", chips.length > 2); // много эффектов — без названий, только значок и время
+      box.classList.add("compact"); // эффекты — только значок и время, без названий
       for (const elx of [...box.children]) if (!keep.has(elx.dataset.k)) elx.remove();
       chips.forEach(([k, icon, name, val, color], i) => {
         let elx = box.querySelector(`[data-k="${k}"]`);
@@ -935,7 +935,8 @@
       renderer.eat(e.type === "apple" ? { ...e, fruit: fruitOf(g, g.apples - 1) } : e, interval); renderer.burst(e.x, e.y, e.type); renderer.ring(e.x, e.y, e.type === "apple" ? "#ff6b81" : "#ffd84c"); foodBorn = performance.now();
       if (e.cm >= 3) renderer.shake(2 + e.cm, 160);
       scoreBump(`+${e.pts}`);
-      if (e.coins) hudMsg(e.type === "gold" ? `⭐ +${e.pts} · +${e.coins} 🪙` : `+${e.coins} 🪙`, "#ffd84c");
+      // над головой: очки за еду, у монет — сколько монет
+      renderer.floater(e.x, e.y, e.coins ? `+${e.coins} 🪙` : `+${e.pts}`, e.coins ? "#ffd84c" : "#fff7c2");
       (e.type === "gold" ? sfx.gold : e.type === "coin" ? sfx.coin : sfx.eat)();
       haptic(e.type === "gold" ? "success" : "light");
     } else if (e.t === "pu") {

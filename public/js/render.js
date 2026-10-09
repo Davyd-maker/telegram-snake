@@ -680,11 +680,12 @@
     }
     function drawFloaters() {
       floaters = floaters.filter((f) => f.life > 0);
-      ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `900 ${cell * 0.55}px system-ui`;
+      ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `900 ${Math.max(17, cell * 0.95)}px system-ui`;
       for (const f of floaters) {
-        f.life -= 0.022; const k = 1 - f.life;
-        ctx.globalAlpha = Math.max(0, Math.min(1, f.life * 1.6)); ctx.fillStyle = "#fff7c2"; ctx.shadowColor = "rgba(255,190,50,.9)"; ctx.shadowBlur = 10;
-        ctx.fillText(f.text, Math.max(cell * 2, Math.min(side - cell * 2, f.x * cell)), (f.y - k * 1.4) * cell);
+        f.life -= 0.018; const k = 1 - f.life;
+        ctx.globalAlpha = Math.max(0, Math.min(1, f.life * 1.6)); ctx.fillStyle = f.color || "#fff7c2"; ctx.shadowColor = "rgba(0,0,0,.85)"; ctx.shadowBlur = 6;
+        const sc = k < 0.15 ? 0.6 + (k / 0.15) * 0.5 : 1.1 - Math.min(0.1, (k - 0.15)); // «выпрыгивает» и чуть уменьшается
+        ctx.save(); ctx.translate(Math.max(cell * 1.2, Math.min(side - cell * 1.2, (f.x + 0.5) * cell)), Math.max(cell * 0.5, (f.y - 0.35 - k * 1.3) * cell)); ctx.scale(sc, sc); ctx.fillText(f.text, 0, 0); ctx.restore();
       }
       ctx.restore();
     }
@@ -768,7 +769,7 @@
       if (now < shakeUntil) { const k = (shakeUntil - now) / 400 * shakePow; ctx.translate((Math.random() - 0.5) * k, (Math.random() - 0.5) * k); }
       if (bgc) ctx.drawImage(bgc, 0, 0, side, side); else { ctx.fillStyle = "#04100a"; ctx.fillRect(0, 0, side, side); }
       drawFieldFx(now); drawLight(now); drawRocks(now); drawShrinkWarn(now); drawGates(now); drawHole(now); drawPortals(now); drawMagnet(now); drawFood(now); drawPowerUp(now); drawRings(now);
-      drawRival(now); drawSnake(now); drawParticles(); drawFloaters(); drawNight(now); drawComboGlow(now);
+      drawRival(now); drawSnake(now); drawParticles(); drawNight(now); drawComboGlow(now); drawFloaters();
       ctx.restore();
       drawIris(now);
       if (now < flashUntil) { ctx.save(); ctx.globalAlpha = ((flashUntil - now) / 350) * 0.45; ctx.fillStyle = `rgb(${flashColor})`; ctx.fillRect(0, 0, side, side); ctx.restore(); }
@@ -798,7 +799,7 @@
           particles.push({ x: (x + 0.5) * cell, y: (y + 0.5) * cell, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, size: 2 + Math.random() * 4, type });
         }
       },
-      floater(x, y, text) { floaters.push({ x, y, life: 1, text }); },
+      floater(x, y, text, color) { floaters.push({ x, y, life: 1, text, color }); },
       magnetSpark(fx, fy, x, y) { for (let i = 0; i < 3; i++) sparks.push({ x: fx, y: fy, tx: x + (x - fx) * 0.6, ty: y + (y - fy) * 0.6, t: performance.now() + i * 60 }); },
       ring(x, y, color = "#7dffbd") { rings.push({ x, y, color, t: performance.now() }); },
       shake(pow = 10, ms = 400) { shakeUntil = performance.now() + ms; shakePow = pow; },
