@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Snake Arena</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="/css/app.css?v=32">
+<link rel="stylesheet" href="/css/app.css?v=33">
 </head>
 <body>
 <div class="app">
@@ -127,9 +127,9 @@
     </div>
     <div class="gtop">
       <div class="gtitle"><span id="gameTitle">🐍 Snake Arena</span><small id="gameSub"></small></div>
-      <div class="gright"><span class="scorepill">🏆 <b id="score">0</b> · 🪙 <b id="gc">0</b></span><button id="sndBtn" class="icon-btn" aria-label="Звук">🔊</button></div>
+      <div class="gright"><span class="scorepill">🏆 <b id="score">0</b><span id="scoreBump" class="scorebump"></span> · 🪙 <b id="gc">0</b></span><button id="sndBtn" class="icon-btn" aria-label="Звук">🔊</button></div>
     </div>
-    <div class="hudbar"><div id="fx" class="fx"></div><div id="combo" class="combo"><span id="comboTxt">COMBO ×2</span><i><b id="comboBar"></b></i></div></div>
+    <div class="hudbar"><div id="fx" class="fx"></div><div id="hudMsg" class="hudmsg"></div><div id="combo" class="combo"><span id="comboTxt">COMBO ×2</span><i><b id="comboBar"></b></i></div></div>
     <div class="board-shell"><canvas id="cv" width="720" height="720" aria-label="Игровое поле Snake"></canvas><div class="board-vignette"></div></div>
     <div class="dpad" id="dpad"><button class="u" data-d="0,-1" aria-label="Вверх">▲</button><button class="l" data-d="-1,0" aria-label="Влево">◀</button><button class="d" data-d="0,1" aria-label="Вниз">▼</button><button class="r" data-d="1,0" aria-label="Вправо">▶</button></div>
     <div class="gbot">
@@ -216,12 +216,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="/engine.js?v=32"></script>
-<script src="/js/catalog.js?v=32"></script>
-<script src="/js/i18n.js?v=32"></script>
-<script src="/js/settings.js?v=32"></script>
-<script src="/js/render.js?v=32"></script>
-<script src="/js/card.js?v=32"></script>
-<script src="/js/app.js?v=32"></script>
+<script src="/engine.js?v=33"></script>
+<script src="/js/catalog.js?v=33"></script>
+<script src="/js/i18n.js?v=33"></script>
+<script src="/js/settings.js?v=33"></script>
+<script src="/js/render.js?v=33"></script>
+<script src="/js/card.js?v=33"></script>
+<script src="/js/app.js?v=33"></script>
 </body>
 </html>

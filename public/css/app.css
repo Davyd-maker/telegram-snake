@@ -383,3 +383,13 @@ h2{margin:0 0 10px;letter-spacing:-.4px}
 /* строка эффектов и поле — одним блоком по центру экрана */
 .hudbar{margin-top:auto}
 .board-shell{margin:0 auto auto}
+
+/* надписи событий над полем и «+очки» у счёта */
+.hudmsg{flex:1 1 auto;min-width:0;text-align:center;font-weight:900;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;text-shadow:0 0 12px currentColor}
+.hudmsg.on{animation:hudmsg 1.6s ease both}
+@keyframes hudmsg{0%{opacity:0;transform:translateY(6px) scale(.85)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0;transform:translateY(-4px)}}
+.hudbar .fx{flex:0 1 auto}
+.scorepill{position:relative}
+.scorebump{position:absolute;left:22px;top:-4px;font-weight:900;font-size:13px;color:#ffe38a;opacity:0;pointer-events:none;text-shadow:0 0 8px rgba(255,190,50,.9)}
+.scorebump.on{animation:bump .8s ease-out both}
+@keyframes bump{0%{opacity:0;transform:translateY(4px)}20%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}

@@ -770,6 +770,15 @@
     raf = requestAnimationFrame(renderLoop);
   }
 
+  // Надписи событий — в строке над полем (а не на самом поле); «+очки» прыгают рядом со счётом
+  function hudMsg(text, color = "#fff7c2") {
+    const m = $("hudMsg"); m.textContent = text; m.style.color = color;
+    m.classList.remove("on"); void m.offsetWidth; m.classList.add("on");
+  }
+  function scoreBump(text) {
+    const b = $("scoreBump"); b.textContent = text;
+    b.classList.remove("on"); void b.offsetWidth; b.classList.add("on");
+  }
   function updateHud() {
     const g = game;
     el.score.textContent = g.score;
@@ -810,18 +819,19 @@
     if (e.t === "ate") {
       renderer.eat(e, interval); renderer.burst(e.x, e.y, e.type); renderer.ring(e.x, e.y, e.type === "apple" ? "#ff6b81" : "#ffd84c"); foodBorn = performance.now();
       if (e.cm >= 3) renderer.shake(2 + e.cm, 160);
-      renderer.floater(e.x + 0.5, e.y + 0.3, (e.type === "gold" ? `+${e.pts} ⭐` : e.type === "coin" ? `+${e.pts} · ${e.coins}🪙` : `+${e.pts}`) + (e.cm > 1 ? ` ×${e.cm}` : ""));
+      scoreBump(`+${e.pts}`);
+      if (e.coins) hudMsg(e.type === "gold" ? `⭐ +${e.pts} · +${e.coins} 🪙` : `+${e.coins} 🪙`, "#ffd84c");
       (e.type === "gold" ? sfx.gold : e.type === "coin" ? sfx.coin : sfx.eat)();
       haptic(e.type === "gold" ? "success" : "light");
     } else if (e.t === "pu") {
       const d = E.PU[e.type], h = g.snake[0];
-      renderer.floater(h.x + 0.5, h.y, d.icon + " " + t(d.name)); renderer.ring(h.x, h.y, d.color); sfx.power(); haptic("success");
+      hudMsg(d.icon + " " + t(d.name), d.color); renderer.ring(h.x, h.y, d.color); sfx.power(); haptic("success");
     } else if (e.t === "bomb") {
       for (const c of e.cells) renderer.burst(c.x, c.y, "bomb", 6);
       sfx.boom(); haptic("heavy"); renderer.shake(9, 350); renderer.flash("255,140,60");
     } else if (e.t === "hole") { // цель набрана — открылась норка
       renderer.ring(e.x, e.y, "#ffd84c"); renderer.ring(e.x, e.y, "#ffffff"); sfx.claim(); haptic("success");
-      renderer.floater(e.x + 0.5, e.y, "🕳️ " + t("Норка открыта!"));
+      hudMsg("🕳️ " + t("Норка открыта!"), "#ffd84c");
       toast("🕳️ Норка открыта — заползай!");
     } else if (e.t === "pull") { // магнит: еда плавно едет к голове
       pullAnim = { food: g.food, x: e.fx, y: e.fy, t: performance.now(), dur: interval };
@@ -829,7 +839,7 @@
     } else if (e.t === "pu_spawn") {
       if (g.pu) g.pu.born = performance.now();
     } else if (e.t === "save") {
-      if (SAVE_TEXT[e.kind]) { renderer.floater(e.x + 0.5, e.y, t(SAVE_TEXT[e.kind])); renderer.burst(e.x, e.y, "save", 16); renderer.flash("180,140,255"); sfx.save(); haptic("warning"); }
+      if (SAVE_TEXT[e.kind]) { hudMsg(t(SAVE_TEXT[e.kind]), e.kind === "shield" ? "#6dffb0" : "#c58bff"); renderer.burst(e.x, e.y, "save", 16); renderer.flash("180,140,255"); sfx.save(); haptic("warning"); }
     } else if (e.t === "rocks") {
       if (g.pending.length) haptic("light");
     }
@@ -859,7 +869,7 @@
   function beginLoop() {
     dying = false; holeAnim = null; running = true; paused = false; countdown = 0; fxSig = "";
     prevSnake = game.snake.map((q) => ({ x: q.x, y: q.y })); lastTick = performance.now(); foodBorn = performance.now();
-    renderer.reset(); $("fx").innerHTML = ""; $("combo").classList.remove("show");
+    renderer.reset(); $("fx").innerHTML = ""; $("combo").classList.remove("show"); $("hudMsg").classList.remove("on"); $("scoreBump").classList.remove("on");
     el.pauseBtn.textContent = "Ⅱ";
     requestAnimationFrame(() => { resizeCanvas(); updateHud(); });
     cancelAnimationFrame(raf); raf = requestAnimationFrame(renderLoop);
