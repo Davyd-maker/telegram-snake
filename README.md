@@ -50,7 +50,7 @@
 ## Как устроен код
 - `server.js` — точка входа. Сервер — в `src/`: `routes/` (эндпоинты: игрок, игра, рейтинги, кланы, соцчасть, платежи, админка), `bot.js` (вебхук и рассылки), `jobs.js` (фоновые задачи), `notify.js` (сообщения игрокам и админу), `i18n.js` (тексты бота RU/EN), `missions.js`, `pass.js`, `events.js` (события, турнир), `anticheat.js`, `payments.js`, `seasons.js`, `players.js`, `catalog.js` (все цены и награды), `replay.js`, `db.js` + `migrations.js`, `config.js`, `auth.js`, `middleware.js`, `ratelimit.js`.
 - `public/engine.js` — **правила игры, один файл для клиента и сервера**. Клиент играет по нему, сервер по нему же переигрывает забег. В нём нельзя использовать `Math.random()`/`Date.now()`: вся случайность — через seed.
-- Клиент: `public/index.html` (разметка), `css/app.css`, `js/catalog.js`, `js/i18n.js` (английский), `js/settings.js` (звук, вибрация), `js/render.js` (отрисовка), `js/card.js` (картинка результата), `js/app.js` (интерфейс и игровой цикл). После правок клиента подними `?v=35` в `index.html`, чтобы у игроков не остался старый кэш.
+- Клиент: `public/index.html` (разметка), `css/app.css`, `js/catalog.js`, `js/i18n.js` (английский), `js/settings.js` (звук, вибрация), `js/render.js` (отрисовка), `js/card.js` (картинка результата), `js/app.js` (интерфейс и игровой цикл). После правок клиента подними `?v=36` в `index.html`, чтобы у игроков не остался старый кэш.
 - Админка: `public/admin/index.html`, открывается по `/admin` только для `ADMIN_TELEGRAM_ID`.
 
 ## Тесты

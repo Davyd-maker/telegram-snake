@@ -941,7 +941,7 @@
       haptic(e.type === "gold" ? "success" : "light");
     } else if (e.t === "pu") {
       const d = E.PU[e.type], h = g.snake[0];
-      hudMsg(d.icon + " " + t(d.name), d.color); renderer.ring(h.x, h.y, d.color); sfx.power(); haptic("success");
+      renderer.ring(h.x, h.y, d.color); sfx.power(); haptic("success");
     } else if (e.t === "bomb") {
       for (const c of e.cells) renderer.burst(c.x, c.y, "bomb", 6);
       sfx.boom(); haptic("heavy"); renderer.shake(9, 350); renderer.flash("255,140,60");
